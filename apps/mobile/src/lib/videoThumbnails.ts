@@ -1,3 +1,4 @@
+import { loadCertificateMedia } from "./certificateMedia";
 import type { VideoThumbnail } from "expo-video";
 
 import type { AttachmentPreviewFile } from "./attachmentDownload";
@@ -11,29 +12,40 @@ export function cachedVideoThumbnail(key: string): VideoThumbnail | null {
 }
 
 async function extractFrame(uri: string) {
-  const { createVideoPlayer } = await import("expo-video");
-  const player = createVideoPlayer(null);
-  let disposed = false;
-  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const controller = new AbortController();
+  let player: ReturnType<typeof import("expo-video").createVideoPlayer> | undefined;
+  let media: Awaited<ReturnType<typeof loadCertificateMedia>> | undefined;
   let attachedSubscription: { remove(): void } | undefined;
+  const cancel = () => controller.abort();
+  const timedOut = new Promise<null>((resolve) => {
+    controller.signal.addEventListener("abort", () => resolve(null), { once: true });
+  });
+  const timeout = setTimeout(cancel, 15_000);
   try {
-    // Never play or change audio settings: thumbnails must leave the shared audio session alone.
-    player.bufferOptions = { preferredForwardBufferDuration: 1 };
-    const timedOut = new Promise<null>((resolve) => {
-      timeout = setTimeout(() => resolve(null), 15_000);
-    });
-    // iOS resolves replaceAsync before the main thread attaches the item, and until then
-    // generateThumbnailsAsync finds no asset and returns no frames.
-    const attached = new Promise<void>((resolve) => {
-      attachedSubscription = player.addListener("sourceChange", ({ source }) => {
-        if (source) resolve();
-      });
-    });
     const frame = (async () => {
-      await player.replaceAsync({ uri, contentType: "progressive" });
+      const { createVideoPlayer } = await import("expo-video");
+      if (controller.signal.aborted) return null;
+      const loaded = await loadCertificateMedia(uri, controller.signal);
+      if (controller.signal.aborted) {
+        loaded.dispose();
+        return null;
+      }
+      media = loaded;
+      const created = createVideoPlayer(null);
+      player = created;
+      // Never play or change audio settings: thumbnails must leave the shared audio session alone.
+      created.bufferOptions = { preferredForwardBufferDuration: 1 };
+      // iOS resolves replaceAsync before the main thread attaches the item, and until then
+      // generateThumbnailsAsync finds no asset and returns no frames.
+      const attached = new Promise<void>((resolve) => {
+        attachedSubscription = created.addListener("sourceChange", ({ source }) => {
+          if (source) resolve();
+        });
+      });
+      await created.replaceAsync({ uri: media.uri, contentType: "progressive" });
       await attached;
-      if (disposed) return null;
-      const [thumbnail] = await player.generateThumbnailsAsync([0], {
+      if (controller.signal.aborted) return null;
+      const [thumbnail] = await created.generateThumbnailsAsync([0], {
         maxWidth: 480,
         maxHeight: 480,
       });
@@ -41,10 +53,14 @@ async function extractFrame(uri: string) {
     })();
     return await Promise.race([frame, timedOut]);
   } finally {
-    disposed = true;
+    cancel();
     clearTimeout(timeout);
     attachedSubscription?.remove();
-    player.release();
+    try {
+      player?.release();
+    } finally {
+      media?.dispose();
+    }
   }
 }
 
