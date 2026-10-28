@@ -15,7 +15,9 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
+import { HttpClient } from "effect/http";
 import Constants from "expo-constants";
+import * as ExpoCrypto from "expo-crypto";
 import * as Network from "expo-network";
 import { AppState } from "react-native";
 
@@ -26,6 +28,8 @@ import { appAtomRegistry } from "../state/atom-registry";
 import { mobileApplicationActiveWakeup } from "./app-state-wakeups";
 import * as EnvironmentOwnedDataCleanup from "./environment-owned-data-cleanup";
 import * as ConnectionStorage from "./storage";
+import { makeSshGateway } from "./ssh/gateway";
+import { sshNative } from "./ssh/native";
 
 function networkStatus(state: Network.NetworkState): "unknown" | "offline" | "online" {
   if (state.isConnected === false) {
@@ -149,7 +153,18 @@ const layerWakeups = Wakeups.layer({
 const layerCapabilities = Layer.effectContext(
   Effect.gen(function* () {
     const storage = yield* MobileStorage.MobileStorage;
-    return Context.make(
+    // Android reaches SSH hosts with its native module; elsewhere the stub below stays.
+    const sshGateway =
+      sshNative === null
+        ? null
+        : yield* makeSshGateway({
+            native: sshNative,
+            httpClient: yield* HttpClient.HttpClient,
+            clientMetadata: authClientMetadata(Constants.expoConfig?.version),
+            sha256Hex: (text) =>
+              ExpoCrypto.digestStringAsync(ExpoCrypto.CryptoDigestAlgorithm.SHA256, text),
+          });
+    const capabilities = Context.make(
       ClientCapabilities.CloudSession,
       ClientCapabilities.CloudSession.of({
         identity: Effect.sync(() =>
@@ -251,6 +266,9 @@ const layerCapabilities = Layer.effectContext(
         }),
       ),
     );
+    return sshGateway === null
+      ? capabilities
+      : Context.add(capabilities, ClientCapabilities.SshEnvironmentGateway, sshGateway);
   }),
 );
 
