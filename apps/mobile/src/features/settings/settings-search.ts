@@ -28,6 +28,13 @@ const SETTINGS_SEARCH_TERMS = {
     msg("live activity", { $context: "settings search keyword" }),
     msg("agent activity", { $context: "settings search keyword" }),
   ],
+  SettingsSsh: [
+    msg("ssh key", { $context: "settings search keyword" }),
+    msg("ssh config", { $context: "settings search keyword" }),
+    msg("known hosts", { $context: "settings search keyword" }),
+    "proxyjump",
+    "authorized_keys",
+  ],
   SettingsAppearance: [
     msg("theme", { $context: "settings search keyword" }),
     msg("dark mode", { $context: "settings search keyword" }),

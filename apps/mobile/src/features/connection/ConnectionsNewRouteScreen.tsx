@@ -35,6 +35,7 @@ import { splitEnvironmentSections } from "./environmentSections";
 import { leaveSettingsPage } from "../settings/settings-navigation";
 import { workspaceHasColumns } from "../layout/workspace/workspace-selection-store";
 import { m } from "../../i18n/messages";
+import { SshEnvironmentSection } from "./SshEnvironmentSection";
 
 type ConnectionsNewRouteParams = {
   readonly mode?: string;
@@ -183,14 +184,16 @@ function PairingForm({
         ? Haptics.NotificationFeedbackType.Success
         : Haptics.NotificationFeedbackType.Error,
     );
-    if (outcome.ok) {
-      // Replacing with Home would nest it inside any sheet below; return to the opener.
-      if (!navigation.canGoBack()) {
-        navigation.dispatch(StackActions.replace("Home"));
-      } else {
-        // Added from the Settings list, the new environment shows on Environments.
-        leaveSettingsPage(navigation, workspaceHasColumns(), "SettingsEnvironments");
-      }
+    if (outcome.ok) close();
+  };
+
+  const close = () => {
+    // Replacing with Home would nest it inside any sheet below; return to the opener.
+    if (!navigation.canGoBack()) {
+      navigation.dispatch(StackActions.replace("Home"));
+    } else {
+      // Added from the Settings list, the new environment shows on Environments.
+      leaveSettingsPage(navigation, workspaceHasColumns(), "SettingsEnvironments");
     }
   };
 
@@ -285,6 +288,8 @@ function PairingForm({
                     ))}
             </Text>
           </View>
+
+          <SshEnvironmentSection onConnected={close} />
 
           {hasCloudPublicConfig() ? <T3ConnectSection /> : null}
         </View>
