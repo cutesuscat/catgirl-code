@@ -1,9 +1,6 @@
 /**
- * The remote side of SSH environments: the shell scripts a client runs on the
- * host to start or reuse a t3 server and to issue a pairing credential, and the
- * decoders for what they print. Free of Node and process APIs so any client
- * that can open an SSH exec channel (desktop through `ssh`, Android natively)
- * runs the same scripts.
+ * Scripts a client runs over SSH to start or reuse a t3 server and issue a pairing credential,
+ * plus decoders for their output. Node-free, so Android's native SSH client shares them.
  */
 import {
   DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
