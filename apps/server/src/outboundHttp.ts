@@ -1,5 +1,10 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off - runs before the Effect runtime exists.
+import * as NodeFS from "node:fs";
 import * as NodeModule from "node:module";
 import * as NodeNet from "node:net";
+import * as NodeOS from "node:os";
+// @effect-diagnostics-next-line nodeBuiltinImport:off - runs before the Effect runtime exists.
+import * as NodePath from "node:path";
 
 import type * as Undici from "undici";
 
@@ -29,6 +34,50 @@ export function installHttp1FetchDispatcher(): void {
 /** Avoids uncaught idle-timeout errors on h2 streams (https://github.com/nodejs/undici/issues/5936). */
 export function keepOutboundFetchOnHttp1(): void {
   if (builtinFetchUsesHttp2(process.versions.undici)) installHttp1FetchDispatcher();
+}
+
+export interface TlsClientCertificate {
+  readonly cert: Buffer;
+  readonly key: Buffer;
+}
+
+/** PEM files from T3CODE_TLS_CLIENT_CERT/KEY, else <T3 home>/client-cert/client.{crt,key}. */
+export function readTlsClientCertificate(
+  env: NodeJS.ProcessEnv = process.env,
+  homeDir: string = NodeOS.homedir(),
+): TlsClientCertificate | undefined {
+  const t3Home = env.T3CODE_HOME?.trim() || NodePath.join(homeDir, ".t3");
+  const certPath =
+    env.T3CODE_TLS_CLIENT_CERT?.trim() || NodePath.join(t3Home, "client-cert", "client.crt");
+  const keyPath =
+    env.T3CODE_TLS_CLIENT_KEY?.trim() || NodePath.join(t3Home, "client-cert", "client.key");
+  try {
+    return { cert: NodeFS.readFileSync(certPath), key: NodeFS.readFileSync(keyPath) };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Machines behind a client-certificate gate (self-hosted T3 Connect) refuse peer links without
+ * one. TLS sends it only to servers that request it. Built-in fetch on Node 24 (Electron) and 26
+ * both use this npm Agent through undici's global dispatcher symbol.
+ */
+export function presentTlsClientCertificate(
+  ...args: [] | [certificate: TlsClientCertificate | undefined]
+): boolean {
+  // An explicit `undefined` means "no certificate"; only a bare call reads the files.
+  const certificate = args.length === 0 ? readTlsClientCertificate() : args[0];
+  if (!certificate) return false;
+  const undici = requireUndici("undici") as typeof Undici;
+  if (undici.getGlobalDispatcher()?.constructor.name === "EnvHttpProxyAgent") return false;
+  undici.setGlobalDispatcher(
+    new undici.Agent({
+      allowH2: false,
+      connect: { cert: certificate.cert, key: certificate.key },
+    }),
+  );
+  return true;
 }
 
 // @types/node does not declare setTypeOfService yet.
