@@ -63,7 +63,7 @@ class T3ClientCertificatesModule : Module() {
     Events("transferProgress", "changed")
     OnCreate { create() }
     Function("getAlias") { url: String ->
-      certificateOrigin(url)?.let { preferences.getString(it, null) }
+      certificateOrigin(url)?.let { resolveCertificateAlias(preferences, it) }
     }
     AsyncFunction("choose") { url: String, promise: Promise -> choose(url, promise) }
     AsyncFunction("remove") { url: String -> remove(url) }
@@ -142,7 +142,7 @@ class T3ClientCertificatesModule : Module() {
         { alias -> execute(promise) { saveChoice(origin, alias, promise) } },
         null,
         null,
-        uri.host,
+        uri.host?.removePrefix("*."),
         if (uri.port == -1) 443 else uri.port,
         preferences.getString(origin, null)
       )
@@ -191,7 +191,9 @@ class T3ClientCertificatesModule : Module() {
   private fun createTransfer(url: String): String {
     val origin = requireNotNull(certificateOrigin(url)) { "HTTPS URL required" }
     return synchronized(lock) {
-      check(preferences.contains(origin)) { "No client certificate selected for this host" }
+      check(resolveCertificateAlias(preferences, origin) != null) {
+        "No client certificate selected for this host"
+      }
       UUID.randomUUID().toString().also { id ->
         transfers[id] = Transfer(url, origin, transport.generation(origin))
       }
@@ -222,7 +224,7 @@ class T3ClientCertificatesModule : Module() {
       if (upload) request.post(progressBody(id, target, contentType))
       val call =
         synchronized(lock) {
-          check(preferences.contains(transfer.origin)) {
+          check(resolveCertificateAlias(preferences, transfer.origin) != null) {
             "Certificate selection changed. Try again."
           }
           check(transfers[id] === transfer) { "Transfer cancelled" }
@@ -309,6 +311,15 @@ class T3ClientCertificatesModule : Module() {
   }
 
   private fun retire(origin: String) {
+    if (isWildcardOrigin(origin)) {
+      // A wildcard may change the identity of any host: drop everything.
+      transport.invalidateAll()
+      calls.values.forEach { it.cancel() }
+      sockets.keys.forEach { runCatching { it.close() } }
+      sockets.clear()
+      fileClient.connectionPool.evictAll()
+      return
+    }
     transport.invalidate(origin)
     calls.values
       .filter { certificateOrigin(it.request().url.toString()) == origin }

@@ -18,8 +18,14 @@ function subscribe(listener: () => void) {
   return () => subscription.remove();
 }
 
-export function ClientCertificateField(props: { host: string; disabled?: boolean }) {
-  const endpoint = buildPairingUrl(props.host, "certificate-origin");
+export function ClientCertificateField(props: {
+  host: string;
+  disabled?: boolean;
+  /** Certificate origin used as-is, e.g. a wildcard `https://*.example.com/`. */
+  endpoint?: string;
+  description?: string;
+}) {
+  const endpoint = props.endpoint ?? buildPairingUrl(props.host, "certificate-origin");
   const alias = useSyncExternalStore(
     subscribe,
     () => selectedClientCertificate(endpoint),
@@ -66,8 +72,9 @@ export function ClientCertificateField(props: { host: string; disabled?: boolean
             Client certificate (optional)
           </Text>
           <Text className="text-sm text-foreground-muted">
-            {alias ?? "None selected"}. Applies to this HTTPS host and port, including other
-            environments using the same address.
+            {alias ?? "None selected"}.{" "}
+            {props.description ??
+              "Applies to this HTTPS host and port, including other environments using the same address."}
           </Text>
           <Pressable
             accessibilityRole="button"

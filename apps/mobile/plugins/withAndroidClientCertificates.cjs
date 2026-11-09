@@ -1,6 +1,26 @@
 const { withMainApplication } = require("expo/config-plugins");
 
 const install = "expo.modules.t3clientcertificates.T3CertificateTransport.install(this)";
+const reassert = "expo.modules.t3clientcertificates.T3CertificateTransport.reassert(this)";
+const lifecycle = /ApplicationLifecycleDispatcher\.onApplicationCreate\(this\)[ \t]*;?/g;
+
+// Expo lifecycle listeners (expo-app-metrics) replace React Native's OkHttp factory after the
+// early install. Re-assert right after them, wrapping theirs, or Expo fetch sends no certificate.
+function reassertAfterLifecycle(source) {
+  const matches = [...source.matchAll(lifecycle)];
+  if (matches.length !== 1)
+    throw new Error("Cannot re-assert client certificates after Expo lifecycle startup");
+  const offset = matches[0].index + matches[0][0].length;
+  if (source.includes(reassert)) {
+    if (!source.slice(offset).trimStart().startsWith(reassert) || source.split(reassert).length !== 2)
+      throw new Error(
+        "Client certificate transport must be re-asserted immediately after Expo lifecycle startup",
+      );
+    return source;
+  }
+  const newline = source.includes("\r\n") ? "\r\n" : "\n";
+  return source.slice(0, offset) + `${newline}    ${reassert}` + source.slice(offset);
+}
 
 function installCertificateTransport(source) {
   // Anchor to the method body, not a comment or another lifecycle method. Fail closed if
@@ -23,11 +43,17 @@ function installCertificateTransport(source) {
   return source.slice(0, offset) + `${newline}    ${install}` + source.slice(offset);
 }
 
+function wireCertificateTransport(source) {
+  return reassertAfterLifecycle(installCertificateTransport(source));
+}
+
 module.exports = (config) =>
   withMainApplication(config, (next) => {
     if (next.modResults.language !== "kt")
       throw new Error("Client certificate startup requires Kotlin MainApplication");
-    next.modResults.contents = installCertificateTransport(next.modResults.contents);
+    next.modResults.contents = wireCertificateTransport(next.modResults.contents);
     return next;
   });
 module.exports.installCertificateTransport = installCertificateTransport;
+module.exports.reassertAfterLifecycle = reassertAfterLifecycle;
+module.exports.wireCertificateTransport = wireCertificateTransport;

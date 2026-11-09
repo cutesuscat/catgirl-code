@@ -2,9 +2,12 @@ import * as NodeModule from "node:module";
 import { describe, expect, it } from "vite-plus/test";
 
 const require = NodeModule.createRequire(import.meta.url);
-const { installCertificateTransport } = require("./withAndroidClientCertificates.cjs") as {
-  installCertificateTransport(source: string): string;
-};
+const { installCertificateTransport, wireCertificateTransport } =
+  require("./withAndroidClientCertificates.cjs") as {
+    installCertificateTransport(source: string): string;
+    wireCertificateTransport(source: string): string;
+  };
+const reassert = "expo.modules.t3clientcertificates.T3CertificateTransport.reassert(this)";
 const install = "expo.modules.t3clientcertificates.T3CertificateTransport.install(this)";
 const template = `class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
@@ -56,5 +59,26 @@ describe("Android certificate startup prebuild", () => {
     expect(() => installCertificateTransport(source)).toThrow(
       "Client certificate transport must be installed immediately after super.onCreate()",
     );
+  });
+
+  it("re-asserts after Expo lifecycle listeners, which replace the OkHttp factory", () => {
+    const generated = wireCertificateTransport(template);
+    expect(generated).toBe(
+      template
+        .replace("super.onCreate()", `super.onCreate()\n    ${install}`)
+        .replace(
+          "ApplicationLifecycleDispatcher.onApplicationCreate(this)",
+          `ApplicationLifecycleDispatcher.onApplicationCreate(this)\n    ${reassert}`,
+        ),
+    );
+    expect(wireCertificateTransport(generated)).toBe(generated);
+  });
+
+  it("rejects a template without the Expo lifecycle call", () => {
+    expect(() =>
+      wireCertificateTransport(
+        template.replace("    ApplicationLifecycleDispatcher.onApplicationCreate(this)\n", ""),
+      ),
+    ).toThrow("Cannot re-assert client certificates after Expo lifecycle startup");
   });
 });

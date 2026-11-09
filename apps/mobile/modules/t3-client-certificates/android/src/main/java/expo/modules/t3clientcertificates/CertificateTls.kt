@@ -10,19 +10,49 @@ import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.X509ExtendedKeyManager
+import android.content.SharedPreferences
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 
 /** HTTPS and WSS share an identity; paths, credentials and fragments never enter the key. */
 internal fun certificateOrigin(url: String): String? {
-  val normalized = if (url.startsWith("wss://", true)) "https://" + url.substring(6) else url
+  val plain = if (url.startsWith("wss://", true)) "https://" + url.substring(6) else url
+  // `https://*.example.com/` is a wildcard identity: it covers every subdomain (any depth) on the
+  // default port. OkHttp may reject '*' in a host, so parse with a placeholder label.
+  val wildcard = plain.startsWith(WILDCARD_PREFIX, true)
+  val normalized = if (wildcard) "https://$WILDCARD_LABEL." + plain.substring(10) else plain
   val parsed =
     normalized
       .toHttpUrlOrNull()
       ?.takeIf { it.scheme == "https" && it.username.isEmpty() && it.password.isEmpty() }
       ?: return null
-  return parsed.newBuilder().encodedPath("/").query(null).fragment(null).build().toString()
+  if (wildcard && (parsed.port != 443 || parsed.host.split('.').size < 3)) return null
+  val origin = parsed.newBuilder().encodedPath("/").query(null).fragment(null).build().toString()
+  return if (wildcard) WILDCARD_PREFIX + origin.substring("https://$WILDCARD_LABEL.".length) else origin
 }
+
+private const val WILDCARD_PREFIX = "https://*."
+private const val WILDCARD_LABEL = "t3-wildcard-2a"
+
+internal fun isWildcardOrigin(origin: String) = origin.startsWith(WILDCARD_PREFIX)
+
+/** Exact origin first, then wildcard parents nearest first. Wildcards never cover a bare TLD. */
+internal fun certificateLookupKeys(origin: String): List<String> {
+  if (isWildcardOrigin(origin)) return listOf(origin)
+  val parsed = origin.toHttpUrlOrNull() ?: return listOf(origin)
+  val host = parsed.host
+  val keys = mutableListOf(origin)
+  if (parsed.port == 443 && !host.contains(':') && host.any { it.isLetter() }) {
+    val labels = host.split('.')
+    for (i in 1 until labels.size - 1) {
+      keys += WILDCARD_PREFIX + labels.drop(i).joinToString(".") + "/"
+    }
+  }
+  return keys
+}
+
+internal fun resolveCertificateAlias(preferences: SharedPreferences, origin: String): String? =
+  certificateLookupKeys(origin).firstNotNullOfOrNull { preferences.getString(it, null) }
 
 internal class SelectedIdentity(
   private val alias: String,

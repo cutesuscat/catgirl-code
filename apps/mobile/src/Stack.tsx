@@ -144,6 +144,7 @@ import { WorkflowStepSheet } from "./features/workflows/WorkflowStepSheet";
 import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRouteScreen";
 import { SettingsNotificationsRouteScreen } from "./features/settings/SettingsNotificationsRouteScreen";
 import { SettingsSshRouteScreen } from "./features/settings/SettingsSshRouteScreen";
+import { SettingsClientCertificateRouteScreen } from "./features/settings/SettingsClientCertificateRouteScreen";
 import { SettingsRouteScreen } from "./features/settings/SettingsRouteScreen";
 import { SettingsLabsRouteScreen } from "./features/settings/ThreadSettingsSections";
 import { SettingsEnvironmentFilterProvider } from "./features/settings/settings-environment-filter";
@@ -182,6 +183,7 @@ const ROUTE_TITLES: Readonly<Record<string, string>> = {
   SettingsProviderAccounts: msg("Providers"),
   SettingsEnvironmentMaintenance: msg("Maintenance"),
   SettingsNotifications: msg("Notifications"),
+  SettingsClientCertificate: msg("Client certificate"),
   SettingsSsh: "SSH",
   SettingsThreads: msg("Threads"),
   SettingsAbout: msg("About"),
@@ -300,6 +302,11 @@ const SETTINGS_SCREENS = {
   SettingsNotifications: createNativeStackScreen({
     screen: SettingsNotificationsRouteScreen,
     linking: "settings/notifications",
+    options: settingsPage(),
+  }),
+  SettingsClientCertificate: createNativeStackScreen({
+    screen: SettingsClientCertificateRouteScreen,
+    linking: "settings/client-certificate",
     options: settingsPage(),
   }),
   SettingsSsh: createNativeStackScreen({

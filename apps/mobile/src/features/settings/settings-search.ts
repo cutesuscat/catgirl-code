@@ -28,6 +28,13 @@ const SETTINGS_SEARCH_TERMS = {
     msg("live activity", { $context: "settings search keyword" }),
     msg("agent activity", { $context: "settings search keyword" }),
   ],
+  SettingsClientCertificate: [
+    "mtls",
+    msg("client certificate", { $context: "settings search keyword" }),
+    "cloudflare access",
+    "p12",
+    "keychain",
+  ],
   SettingsSsh: [
     msg("ssh key", { $context: "settings search keyword" }),
     msg("ssh config", { $context: "settings search keyword" }),

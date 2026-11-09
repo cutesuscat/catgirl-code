@@ -2,6 +2,7 @@ import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
 import { msg, T, useGT, useMessages } from "gt-react-native";
 import * as Dialog from "../../components/ui/Dialog";
 import { ClientCertificateField } from "./ClientCertificateField";
+import { relayCertificateOrigin, wildcardCertificateOrigin } from "../../lib/certificateScope";
 import { ConnectionTraceId } from "./ConnectionTraceId";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { hasSavedBearerRoute, hostFreezeNotice } from "@t3tools/client-runtime/connection";
@@ -71,6 +72,9 @@ export function ConnectionEnvironmentRow(props: {
     serverEnvironment.configValueAtom(props.environment.environmentId),
   );
   const unsupported = props.environment.connectionState === "unsupported";
+  const relayCertificateScope = props.environment.isRelayManaged
+    ? (wildcardCertificateOrigin(props.environment.displayUrl) ?? relayCertificateOrigin())
+    : null;
   const presentation = useAtomValue(
     environmentPresentations.presentationAtom(props.environment.environmentId),
   );
@@ -232,11 +236,20 @@ export function ConnectionEnvironmentRow(props: {
             />
           ) : null}
           {props.environment.isRelayManaged ? (
-            <Text className="text-sm text-foreground-muted">
-              {gt("Managed by {product}. Tunnel details update automatically.", {
-                product: "T3 Connect",
-              })}
-            </Text>
+            <>
+              <Text className="text-sm text-foreground-muted">
+                {gt("Managed by {product}. Tunnel details update automatically.", {
+                  product: "T3 Connect",
+                })}
+              </Text>
+              {relayCertificateScope ? (
+                <ClientCertificateField
+                  host={relayCertificateScope}
+                  endpoint={relayCertificateScope}
+                  description={`Applies to every machine under ${relayCertificateScope.slice(8, -1)}, including T3 Connect machines added later. A certificate chosen for one exact address takes priority.`}
+                />
+              ) : null}
+            </>
           ) : (
             <>
               <ConnectionFormField

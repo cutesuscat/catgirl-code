@@ -26,6 +26,7 @@ import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { useAdaptiveWorkspaceLayout } from "../layout/adaptive-workspace-context";
 import { useSavedRemoteConnections } from "../../state/use-remote-environment-registry";
 import { sshNative } from "../../connection/ssh/native";
+import { clientCertificatesAvailable } from "../../lib/clientCertificates";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection, SettingsSidebarContext } from "./components/SettingsSection";
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -159,10 +160,21 @@ function LocalSettingsRouteScreen() {
   );
 }
 
-const sshRows: readonly SettingsListRow[] =
-  sshNative === null
+const sshRows: readonly SettingsListRow[] = [
+  ...(sshNative === null
     ? []
-    : [{ id: "SettingsSsh", icon: "terminal", label: "SSH", target: "SettingsSsh" }];
+    : [{ id: "SettingsSsh", icon: "terminal", label: "SSH", target: "SettingsSsh" } as const]),
+  ...(clientCertificatesAvailable
+    ? [
+        {
+          id: "SettingsClientCertificate",
+          icon: { ios: "lock", android: "lock" },
+          label: "Client certificate",
+          target: "SettingsClientCertificate",
+        } as const,
+      ]
+    : []),
+];
 
 function environmentsRow(label: string, count: number): SettingsListRow {
   return {

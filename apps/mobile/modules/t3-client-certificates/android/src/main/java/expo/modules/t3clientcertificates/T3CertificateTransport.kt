@@ -52,12 +52,8 @@ class T3CertificateTransport private constructor(private val context: Context) {
         lock,
         ::generation
       )
-    OkHttpClientProvider.setOkHttpClientFactory(
-      OkHttpClientFactory {
-        // Networking and Fresco must not open separate caches over the same directory.
-        configure(OkHttpClientProvider.createClientBuilder()).build()
-      }
-    )
+    // Networking and Fresco must not open separate caches over the same directory.
+    OkHttpClientProvider.setOkHttpClientFactory(CertificateClientFactory(null))
     val customize = CustomClientBuilder { builder -> configure(builder) }
     NetworkingModule.setCustomClientBuilder(customize)
     WebSocketModule.setCustomClientBuilder(customize)
@@ -80,9 +76,34 @@ class T3CertificateTransport private constructor(private val context: Context) {
     generations.invalidateAll()
   }
 
+  /** Wraps another factory so its interceptors stay while every client gets this transport. */
+  private inner class CertificateClientFactory(private val inner: OkHttpClientFactory?) :
+    OkHttpClientFactory {
+    override fun createNewNetworkModuleClient(): OkHttpClient =
+      configure(
+          inner?.createNewNetworkModuleClient()?.newBuilder()
+            ?: OkHttpClientProvider.createClientBuilder()
+        )
+        .build()
+  }
+
+  // expo-app-metrics replaces the factory from an Expo lifecycle listener after install().
+  internal fun reassertFactory() {
+    val current =
+      runCatching {
+          OkHttpClientProvider::class.java
+            .getDeclaredField("factory")
+            .apply { isAccessible = true }
+            .get(null) as OkHttpClientFactory?
+        }
+        .getOrNull()
+    if (current is CertificateClientFactory) return
+    OkHttpClientProvider.setOkHttpClientFactory(CertificateClientFactory(current))
+  }
+
   @Suppress("TooGenericExceptionCaught") // Any KeyChain or TLS setup failure fails the connection.
   private fun identityFactory(origin: String): SSLSocketFactory {
-    val alias = preferences.getString(origin, null) ?: return defaultTls.socketFactory
+    val alias = resolveCertificateAlias(preferences, origin) ?: return defaultTls.socketFactory
     return try {
       val key =
         checkNotNull(KeyChain.getPrivateKey(context, alias)) {
@@ -114,5 +135,12 @@ class T3CertificateTransport private constructor(private val context: Context) {
     @Synchronized
     fun install(context: Context): T3CertificateTransport =
       instance ?: T3CertificateTransport(context.applicationContext).also { instance = it }
+
+    /** Call after Expo lifecycle listeners ran, so a factory they installed is wrapped. */
+    @JvmStatic
+    @Synchronized
+    fun reassert(context: Context) {
+      install(context).reassertFactory()
+    }
   }
 }
