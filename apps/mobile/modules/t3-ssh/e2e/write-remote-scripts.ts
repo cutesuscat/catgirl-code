@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off - a Node script the JVM end-to-end test runs.
 // Writes the scripts T3ServerEndToEndTest runs, exactly as the app builds them.
 // Usage (from apps/mobile): node modules/t3-ssh/e2e/write-remote-scripts.ts <dir> <t3 version>
 import * as NodeFS from "node:fs";

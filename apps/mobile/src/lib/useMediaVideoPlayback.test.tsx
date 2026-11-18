@@ -99,6 +99,9 @@ vi.mock("../state/assets", () => ({
   useRefreshAssetUrl: () => mocks.refresh,
 }));
 vi.mock("./localAttachmentPreview", () => ({ loadLocalAttachmentPreview: vi.fn() }));
+vi.mock("./certificateMedia", () => ({
+  loadCertificateMedia: async (uri: string) => ({ uri, dispose: () => {} }),
+}));
 vi.mock("./videoThumbnails", () => ({
   cachedVideoThumbnail: () => null,
   loadVideoThumbnail: mocks.thumbnail,

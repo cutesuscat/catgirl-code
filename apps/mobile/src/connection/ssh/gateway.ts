@@ -68,7 +68,7 @@ const answers = (httpBaseUrl: string) =>
     makeError: () => "unanswered" as const,
   }).pipe(
     Effect.as(true),
-    Effect.catch(() => Effect.succeed(false)),
+    Effect.orElseSucceed(() => false),
   );
 
 /**
@@ -279,10 +279,16 @@ export const makeSshGateway = Effect.fn("mobile.ssh.makeGateway")(function* (
       );
 
   return ClientCapabilities.SshEnvironmentGateway.of({
-    provision: (target, expectedEnvironmentId) =>
-      provision(target, expectedEnvironmentId).pipe(resetOnFailure(target)),
-    prepare: (input) => prepare(input).pipe(resetOnFailure(input.target)),
-    disconnect: (target) => dropTunnel(sshTargetKey(target)),
+    provision: Effect.fn("ClientCapabilities.SshEnvironmentGateway.provision")(
+      (target: DesktopSshEnvironmentTarget, expectedEnvironmentId?: EnvironmentId) =>
+        provision(target, expectedEnvironmentId).pipe(resetOnFailure(target)),
+    ),
+    prepare: Effect.fn("ClientCapabilities.SshEnvironmentGateway.prepare")(
+      (input: Parameters<typeof prepare>[0]) => prepare(input).pipe(resetOnFailure(input.target)),
+    ),
+    disconnect: Effect.fn("ClientCapabilities.SshEnvironmentGateway.disconnect")(
+      (target: DesktopSshEnvironmentTarget) => dropTunnel(sshTargetKey(target)),
+    ),
   });
 });
 

@@ -1,5 +1,6 @@
 import type { SshHop, SshHostKeyRejection, SshNative } from "./native";
 
+// @effect-diagnostics-next-line extendsNativeError:off - thrown from Promise code, not an Effect failure.
 export class SshHostKeyChangedError extends Error {
   constructor(readonly rejection: SshHostKeyRejection) {
     super(
