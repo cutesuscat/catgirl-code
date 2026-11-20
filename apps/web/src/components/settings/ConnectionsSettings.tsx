@@ -117,7 +117,11 @@ import {
   usePrimaryEnvironment,
 } from "~/state/environments";
 import { requestConfirmDialog } from "~/confirmDialog";
-import { useUpdateEnvironmentSettings } from "~/hooks/useSettings";
+import {
+  updateClientSettings,
+  useClientSettings,
+  useUpdateEnvironmentSettings,
+} from "~/hooks/useSettings";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { environmentIdsKey } from "~/state/environmentAtomList";
 import { environmentUpdateStatesAtom, serverEnvironment } from "~/state/server";
@@ -166,6 +170,31 @@ const BACKEND_VALUE_DEFAULT_WSL = "backend:default-wsl";
 const BACKEND_VALUE_WSL_OFF = "backend:wsl-off";
 
 // Subscribes on its own so desktop download progress does not re-render the page.
+/** Per device: whether this machine's threads are listed in the sidebar. */
+function SidebarVisibilityRow({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const hiddenEnvironmentIds = useClientSettings((s) => s.sidebarHiddenEnvironmentIds);
+  const shown = !hiddenEnvironmentIds.includes(environmentId);
+  return (
+    <SettingsRow
+      title="Show threads in sidebar"
+      description="Off keeps this machine's threads out of the sidebar on this device. Search, links and open threads still reach them."
+      control={
+        <Switch
+          checked={shown}
+          aria-label="Show this machine's threads in the sidebar"
+          onCheckedChange={(checked) =>
+            void updateClientSettings({
+              sidebarHiddenEnvironmentIds: checked
+                ? hiddenEnvironmentIds.filter((id) => id !== environmentId)
+                : [...hiddenEnvironmentIds, environmentId],
+            })
+          }
+        />
+      }
+    />
+  );
+}
+
 function LocalVersionStatusLabel() {
   const m = useMessages();
   const updateState = useDesktopUpdateState();
@@ -1339,6 +1368,7 @@ function ConnectionsSettingsContent({
                 <ManagedByOrganization policy={accessServerConfig.managedPolicy} />
               </div>
             ) : null}
+            <SidebarVisibilityRow environmentId={accessEnvironmentId} />
             {canManageLocalBackend ? (
               <SettingsRow
                 title={gt("Version")}

@@ -436,6 +436,7 @@ function useSidebarThreads(input: {
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly threads: readonly EnvironmentThreadShell[];
+  readonly hiddenEnvironmentIds: readonly string[];
   readonly delegatedUnderParent: ReadonlySet<string>;
   readonly routeRowThreadKey: string | null;
   readonly departingThreadKey: string | null;
@@ -451,6 +452,7 @@ function useSidebarThreads(input: {
     connectedEnvironmentIds,
     optimisticDrop,
     threads,
+    hiddenEnvironmentIds,
     delegatedUnderParent,
     routeRowThreadKey,
     departingThreadKey,
@@ -512,7 +514,12 @@ function useSidebarThreads(input: {
     partition;
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
-    scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
+    scopes: olderSettledScopes(
+      [...serverConfigs.keys()].filter(
+        (environmentId) => !hiddenEnvironmentIds.includes(environmentId),
+      ),
+      scopedProjectKeys,
+    ),
     expanded: settledShelfExpanded,
     visibleCount: settledVisibleCount,
   });
@@ -831,7 +838,19 @@ function useSidebarLookups() {
   const environments = useEnvironmentIdentities();
   const serverConfigs = useServerConfigs();
   const providerEntriesByEnvironment = useAtomValue(sidebarProviderEntriesAtom);
-  const projectGroups = useSidebarProjectGroups();
+  const hiddenEnvironmentIds = useClientSettings((s) => s.sidebarHiddenEnvironmentIds);
+  const allProjectGroups = useSidebarProjectGroups();
+  // A project on hidden machines only leaves the folders and the project picker.
+  const projectGroups =
+    hiddenEnvironmentIds.length === 0
+      ? allProjectGroups
+      : allProjectGroups.filter(
+          (group) =>
+            group.memberProjectRefs.length === 0 ||
+            group.memberProjectRefs.some(
+              (ref) => !hiddenEnvironmentIds.includes(ref.environmentId),
+            ),
+        );
   const environmentLabelById = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
   );
@@ -839,7 +858,7 @@ function useSidebarLookups() {
     projects.map((project) => [`${project.environmentId}:${project.id}`, project] as const),
   );
   const projectDisplayNameByKey = new Map(
-    projectGroups.flatMap((group) =>
+    allProjectGroups.flatMap((group) =>
       group.memberProjects.map(
         (project) => [`${project.environmentId}:${project.id}`, group.displayName] as const,
       ),
@@ -860,6 +879,7 @@ function useSidebarLookups() {
     projects,
     serverConfigs,
     projectGroups,
+    hiddenEnvironmentIds,
     environmentLabelById,
     providerEntriesByEnvironment,
     projectByKey,
@@ -933,6 +953,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projects,
     serverConfigs,
     projectGroups,
+    hiddenEnvironmentIds,
     environmentLabelById,
     providerEntriesByEnvironment,
     projectByKey,
@@ -1143,6 +1164,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       ? null
       : scopedThreadKey(resolveListedAncestorThreadRef(routeThreadRef, threads));
   const isSearchingThreads = threadSearchQuery.trim().length > 0;
+  // Hidden machines' threads stay out of the list; search and the open thread still show.
+  const sidebarThreads =
+    hiddenEnvironmentIds.length === 0 || isSearchingThreads
+      ? listedThreads
+      : listedThreads.filter(
+          (thread) =>
+            !hiddenEnvironmentIds.includes(thread.environmentId) ||
+            threadShellKey(thread) === routeRowThreadKey,
+        );
   // The open draft's first send names its thread in place; a finalized draft reached by
   // navigation resolves through its redirect instead, and still reveals.
   const routeKeyInPlace = routeDraftThread?.promotedTo != null;
@@ -1375,7 +1405,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
-    threads: listedThreads,
+    threads: sidebarThreads,
+    hiddenEnvironmentIds,
     delegatedUnderParent,
     routeRowThreadKey,
     departingThreadKey,
