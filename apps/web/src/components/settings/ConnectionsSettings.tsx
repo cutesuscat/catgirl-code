@@ -45,6 +45,7 @@ import { useAccessEnvironment } from "./useAccessEnvironment";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 import { ManagedByOrganization } from "../ManagedPolicy";
 import { LocalEnvironmentSetting } from "./LocalEnvironmentSetting";
+import { DeviceNameRow } from "./DeviceNameRow";
 import { useSearchableSetting } from "./settingsSearch";
 import { ConnectDeviceApprovalSettings } from "./ConnectDeviceApprovalSettings";
 import { EnvironmentIconMenu } from "./EnvironmentIconPicker";
@@ -1368,6 +1369,7 @@ function ConnectionsSettingsContent({
                 <ManagedByOrganization policy={accessServerConfig.managedPolicy} />
               </div>
             ) : null}
+            <DeviceNameRow key={accessEnvironmentId} environmentId={accessEnvironmentId} />
             <SidebarVisibilityRow environmentId={accessEnvironmentId} />
             {canManageLocalBackend ? (
               <SettingsRow

@@ -40,8 +40,56 @@ const EMPTY_ENVIRONMENT_CATALOG_STATE: EnvironmentCatalogState = Object.freeze({
   entries: new Map(),
 });
 
+export type EnvironmentLabelOverrides = Readonly<Record<string, string>>;
+
+/**
+ * Shows each environment under the name this device gave it. An entry keeps its identity
+ * while its saved entry and its name stay the same, so readers that compare entries hold.
+ */
+export function createEnvironmentLabelOverrider() {
+  const renamed = new WeakMap<ConnectionCatalogEntry, ConnectionCatalogEntry>();
+  let previous: EnvironmentCatalogState = EMPTY_ENVIRONMENT_CATALOG_STATE;
+  return (
+    catalog: EnvironmentCatalogState,
+    overrides: EnvironmentLabelOverrides,
+  ): EnvironmentCatalogState => {
+    let changed = false;
+    const entries = new Map<EnvironmentIdType, ConnectionCatalogEntry>();
+    for (const [environmentId, entry] of catalog.entries) {
+      const label = overrides[environmentId]?.trim();
+      if (!label || label === entry.target.label) {
+        entries.set(environmentId, entry);
+        continue;
+      }
+      changed = true;
+      let next = renamed.get(entry);
+      if (next === undefined || next.target.label !== label) {
+        const target: ConnectionCatalogEntry["target"] = Object.assign(
+          Object.create(Object.getPrototypeOf(entry.target)),
+          entry.target,
+          { label },
+        );
+        next = { ...entry, target };
+        renamed.set(entry, next);
+      }
+      entries.set(environmentId, next);
+    }
+    if (!changed) return catalog;
+    const same =
+      previous.isReady === catalog.isReady &&
+      previous.entries.size === entries.size &&
+      [...entries].every(([environmentId, entry]) => previous.entries.get(environmentId) === entry);
+    if (!same) previous = { isReady: catalog.isReady, entries };
+    return previous;
+  };
+}
+
 export function createEnvironmentCatalogAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry.EnvironmentRegistry | R, E>,
+  options?: {
+    /** Names this device shows in place of each environment's own, by environment id. */
+    readonly labelOverridesAtom?: Atom.Atom<EnvironmentLabelOverrides>;
+  },
 ) {
   const commandScheduler = createAtomCommandScheduler();
   const serial = { mode: "serial" as const, key: () => "environment-catalog" };
@@ -61,8 +109,17 @@ export function createEnvironmentCatalogAtoms<R, E>(
     { initialValue: EMPTY_ENVIRONMENT_CATALOG_STATE },
   );
 
-  const catalogValueAtom = Atom.make((get) =>
+  /** The catalog as saved, under each environment's own name. */
+  const savedCatalogValueAtom = Atom.make((get) =>
     AsyncResult.getOrElse(get(catalogAtom), () => EMPTY_ENVIRONMENT_CATALOG_STATE),
+  ).pipe(Atom.withLabel("environment-catalog-saved-value"));
+
+  const labelOverridesAtom = options?.labelOverridesAtom;
+  const overrideLabels = createEnvironmentLabelOverrider();
+  const catalogValueAtom = (
+    labelOverridesAtom === undefined
+      ? savedCatalogValueAtom
+      : Atom.make((get) => overrideLabels(get(savedCatalogValueAtom), get(labelOverridesAtom)))
   ).pipe(Atom.withLabel("environment-catalog-value"));
 
   const pullRequestRoutingPermissionsAtom = runtime.atom(
@@ -195,6 +252,7 @@ export function createEnvironmentCatalogAtoms<R, E>(
   return {
     catalogAtom,
     catalogValueAtom,
+    savedCatalogValueAtom,
     pullRequestRoutingPermissionsValueAtom,
     setPullRequestRoutingPermission,
     networkStatusAtom,

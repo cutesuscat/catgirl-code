@@ -51,6 +51,7 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import { toastManager } from "~/components/ui/toast";
 import { isHostedStaticApp } from "~/hostedPairing";
 import { environmentCatalog } from "~/connection/catalog";
+import { environmentLabelOverridesAtom } from "~/connection/environmentLabelOverrides";
 import { primaryServerSettingsAtom, serverEnvironment } from "~/state/server";
 import { useEnvironments, usePrimaryEnvironment } from "~/state/environments";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -97,8 +98,16 @@ function getClientSettingsSnapshot(): ClientSettings {
   return clientSettingsSnapshot;
 }
 
+/** The connection catalog reads machine names from an atom, so every surface follows a rename. */
+function publishEnvironmentLabelOverrides(settings: ClientSettings): void {
+  if (appAtomRegistry.get(environmentLabelOverridesAtom) !== settings.environmentLabelOverrides) {
+    appAtomRegistry.set(environmentLabelOverridesAtom, settings.environmentLabelOverrides);
+  }
+}
+
 function replaceClientSettingsSnapshot(settings: ClientSettings): void {
   clientSettingsSnapshot = settings;
+  publishEnvironmentLabelOverrides(settings);
   emitClientSettingsChange();
 }
 
@@ -815,6 +824,7 @@ export function updateClientSettings(patch: ClientSettingsPatch): Promise<void> 
 export function __resetClientSettingsPersistenceForTests(): void {
   clientSettingsHydrationGeneration += 1;
   clientSettingsSnapshot = DEFAULT_CLIENT_SETTINGS;
+  publishEnvironmentLabelOverrides(DEFAULT_CLIENT_SETTINGS);
   clientSettingsHydrationStatus = "pending";
   clientSettingsHydrationPromise = null;
   clientSettingsPersistenceQueue = Promise.resolve();
@@ -828,6 +838,7 @@ export function __resetClientSettingsPersistenceForTests(): void {
 export function __setClientSettingsForTests(settings: ClientSettings): void {
   clientSettingsHydrationGeneration += 1;
   clientSettingsSnapshot = settings;
+  publishEnvironmentLabelOverrides(settings);
   clientSettingsHydrationStatus = "ready";
   clientSettingsHydrationPromise = null;
 }
