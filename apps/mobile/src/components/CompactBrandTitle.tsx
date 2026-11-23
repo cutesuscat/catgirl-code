@@ -52,8 +52,16 @@ export function CompactBrandTitle(
         props.fit && { flexShrink: 0 },
       ]}
     >
-      <T3Wordmark colorClassName="accent-icon" height={Math.round(15 * scale)} />
+      <T3Wordmark colorClassName="accent-icon" height={Math.round(18 * scale)} />
       {/* A logo beside a fixed-size wordmark: it may grow with Dynamic Type, not crowd the bar. */}
+      <Text
+        allowFontScaling={props.allowFontScaling}
+        maxFontSizeMultiplier={BRAND_MAX_FONT_SCALE}
+        className="font-t3-bold text-foreground"
+        style={{ fontSize: 21 * scale, letterSpacing: -0.5 * scale }}
+      >
+        Cat
+      </Text>
       <Text
         allowFontScaling={props.allowFontScaling}
         maxFontSizeMultiplier={BRAND_MAX_FONT_SCALE}

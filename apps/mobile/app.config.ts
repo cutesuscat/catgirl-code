@@ -61,7 +61,7 @@ const PREVIEW_ASSETS = {
   androidSplashIcon: "./assets/android-splash-icon-nightly.png",
   androidMonochromeIcon: "./assets/android-icon-mark.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
-  androidNotificationColor: "#7565C7",
+  androidNotificationColor: "#EE8A2E",
 } as const;
 
 const RELEASE_ASSETS = {
@@ -74,7 +74,7 @@ const RELEASE_ASSETS = {
   androidSplashIcon: "./assets/android-splash-icon-prod.png",
   androidMonochromeIcon: "./assets/android-icon-mark.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
-  androidNotificationColor: "#FFFFFF",
+  androidNotificationColor: "#EE8A2E",
 } as const;
 
 const VARIANT_CONFIG = {
@@ -143,7 +143,7 @@ const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
       {
         name: "SubscriptionUsage",
         displayName: "Subscription usage",
-        description: "Subscription quotas from your connected T3 Code environments.",
+        description: "Subscription quotas from your connected Catgirl Code environments.",
         ios: {
           configuration: {
             title: "Subscription usage",
@@ -193,7 +193,7 @@ const widgetsPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
       {
         name: "AgentActivity",
         displayName: "Agent Activity",
-        description: "Shows the current state of active T3 Code agents.",
+        description: "Shows the current state of active Catgirl Code agents.",
         android: null,
         ios: {
           supportedFamilies: ["systemSmall", "systemMedium", "accessoryRectangular"],
@@ -276,10 +276,10 @@ const config: ExpoConfig = {
         NSAllowsArbitraryLoads: true,
       },
       NSLocalNetworkUsageDescription:
-        "Allow T3 Code to connect to T3 Code servers on your local network or tailnet.",
+        "Allow Catgirl Code to connect to Catgirl Code servers on your local network or tailnet.",
       // Built with the iOS 27 SDK, only view controllers can hide or style the status bar.
       UIViewControllerBasedStatusBarAppearance: true,
-      NSPhotoLibraryAddUsageDescription: "Allow T3 Code to save images to your photo library.",
+      NSPhotoLibraryAddUsageDescription: "Allow Catgirl Code to save images to your photo library.",
       // System picture in picture needs background audio to start and survive outside the app.
       UIBackgroundModes: ["audio"],
       ITSAppUsesNonExemptEncryption: false,
@@ -390,7 +390,7 @@ const config: ExpoConfig = {
     [
       "expo-audio",
       {
-        microphonePermission: "Allow T3 Code to use your microphone for voice input.",
+        microphonePermission: "Allow Catgirl Code to use your microphone for voice input.",
         recordAudioAndroid: true,
         enableBackgroundPlayback: false,
         enableBackgroundRecording: false,
@@ -399,7 +399,8 @@ const config: ExpoConfig = {
     [
       "expo-camera",
       {
-        cameraPermission: "Allow T3 Code to access your camera so you can scan pairing QR codes.",
+        cameraPermission:
+          "Allow Catgirl Code to access your camera so you can scan pairing QR codes.",
         microphonePermission: false,
         barcodeScannerEnabled: true,
         recordAudioAndroid: false,
@@ -410,7 +411,7 @@ const config: ExpoConfig = {
       {
         photosPermission: false,
         // `false` makes this plugin add RECORD_AUDIO to blockedPermissions, breaking Android dictation.
-        microphonePermission: "Allow T3 Code to use your microphone for voice input.",
+        microphonePermission: "Allow Catgirl Code to use your microphone for voice input.",
       },
     ],
     [
@@ -418,11 +419,11 @@ const config: ExpoConfig = {
       {
         image: variant.assets.splashIcon,
         resizeMode: "contain",
-        backgroundColor: "#ffffff",
+        backgroundColor: "#2B2522",
         imageWidth: 220,
         dark: {
           image: variant.assets.splashIcon,
-          backgroundColor: "#0a0a0a",
+          backgroundColor: "#2B2522",
         },
         android: {
           // Android 12+ masks the central two thirds of the 288dp canvas; adaptive layers avoid clipped corners.
