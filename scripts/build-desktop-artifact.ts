@@ -3042,8 +3042,34 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     buildConfig.win = winConfig;
   }
 
-  return buildConfig;
+  return rebrandDisplayText(buildConfig);
 });
+
+// Catgirl Code: renames the product in packaging text such as the macOS permission prompts.
+// Identifiers (app id, executable and artifact names, URL schemes) do not contain the phrase.
+function rebrandDisplayText<T>(value: T): T {
+  if (typeof value === "string") {
+    return value.replaceAll("T3 Code", "Catgirl Code") as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map(rebrandDisplayText) as T;
+  }
+  // Plain objects only: class instances such as redacted secrets pass through untouched.
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    Object.getPrototypeOf(value) === Object.prototype
+  ) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        // The bundle name is resolved elsewhere too (resolveDesktopProductName), so it stays as given.
+        key === "productName" ? entry : rebrandDisplayText(entry),
+      ]),
+    ) as T;
+  }
+  return value;
+}
 
 const assertPlatformBuildResources = Effect.fn("assertPlatformBuildResources")(function* (
   platform: typeof BuildPlatform.Type,
