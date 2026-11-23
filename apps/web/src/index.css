@@ -170,6 +170,14 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
    the variables and Settings -> Appearance can override them at runtime. The
    default stacks are mirrored in `appearanceFonts.ts`. */
 @theme {
+  /* The app icon's palette, for the sidebar's cat planets. */
+  --color-cat-light: #fdb14f;
+  --color-cat: #ee8a2e;
+  --color-cat-dark: #dc6a18;
+  --color-cat-cream: #fbf1dc;
+  --color-cat-pink: #f5b4a2;
+  --color-cat-peach: #ffd9a8;
+  --color-cat-shade: rgb(40 22 8 / 0.55);
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
   --font-mono:
@@ -608,6 +616,26 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   animation: var(--animate-spin);
   animation-play-state: var(--visible-animation-state, paused);
   will-change: var(--visible-animation-will-change, auto);
+}
+
+/* Moons round the sidebar's cat planets. The arm turns and the moon turns back by the same
+   amount, so only transforms animate and each moon stays round on its squashed orbit. */
+@keyframes cat-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility cat-orbit-arm {
+  animation: cat-orbit var(--cat-orbit-period, 10s) linear infinite;
+  animation-delay: var(--cat-orbit-delay, 0s);
+  animation-play-state: var(--visible-animation-state, paused);
+}
+
+@utility cat-orbit-unspin {
+  animation: cat-orbit var(--cat-orbit-period, 10s) linear infinite reverse;
+  animation-delay: var(--cat-orbit-delay, 0s);
+  animation-play-state: var(--visible-animation-state, paused);
 }
 
 @keyframes live-activity-focus {

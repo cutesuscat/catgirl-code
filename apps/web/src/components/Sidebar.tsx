@@ -258,6 +258,8 @@ import {
   useComboboxFilter,
 } from "./ui/combobox";
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
+import { SidebarCatFleet } from "./sidebar/SidebarCatFleet";
+import { summarizeCatFleet } from "./sidebar/SidebarCatFleet.logic";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import { TooltipProvider, TooltipScrollDismissArea } from "./ui/tooltip";
@@ -3113,9 +3115,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       ? shortcutLabelForCommand(keybindings, "chat.newLocal")
       : undefined);
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
+  // Every thread, not the listed ones: the fleet also shows sub-agents and hidden machines.
+  const catFleet = summarizeCatFleet({
+    environmentLabelById,
+    connectedEnvironmentIds,
+    threads,
+    isWorking: isThreadWorking,
+  });
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader isElectron={isElectron} />
+      <SidebarCatFleet machines={catFleet} />
       <SidebarContent
         ref={sidebarContentRef}
         className="min-h-full"
