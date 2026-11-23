@@ -2869,11 +2869,24 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "mac") {
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
+    if (resolveDesktopUpdateChannel(version) !== "nightly") {
+      buildConfig.extraResources = [
+        ...(buildConfig.extraResources as ReadonlyArray<unknown>),
+        {
+          from: path.join(repoRoot, "apps/desktop/resources/mac/en.lproj/InfoPlist.strings"),
+          to: "en.lproj/InfoPlist.strings",
+        },
+      ];
+    }
     buildConfig.mac = {
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
       extendInfo: {
+        // A ":" in a bundle's file name shows as "/" in Finder, so the bundle is "Catgirl Code.app"
+        // and en.lproj/InfoPlist.strings supplies the displayed "Catgirl Code :3".
+        CFBundleDisplayName: resolveDesktopProductName(version),
+        LSHasLocalizedDisplayName: true,
         // macOS 26 offers Messages/Mail codes in every text field unless opted out.
         NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac: true,
         NSLocalNetworkUsageDescription:

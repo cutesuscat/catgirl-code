@@ -4,8 +4,13 @@ export function formatAppDisplayName(input: {
   readonly baseName: string;
   readonly stageLabel: string;
 }): string {
-  if (input.stageLabel.trim().toLowerCase() === "latest") {
+  const stage = input.stageLabel.trim().toLowerCase();
+  if (stage === "latest") {
     return input.baseName;
+  }
+  // The regular build is "Catgirl Code :3"; other stages keep their label.
+  if (stage === "beta") {
+    return `${input.baseName} :3`;
   }
 
   return `${input.baseName} (${input.stageLabel})`;
