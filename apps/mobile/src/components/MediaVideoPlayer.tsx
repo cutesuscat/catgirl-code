@@ -32,6 +32,8 @@ function LoadedMediaVideo(props: {
   const [loadState, setLoadState] = useState<"pending" | "complete" | "error">("pending");
   const player = useVideoPlayer(null, (player) => {
     player.staysActiveInBackground = false;
+    // Android's native default is false, which raises the voice pitch at faster speeds.
+    player.preservesPitch = true;
     player.bufferOptions = { preferredForwardBufferDuration: 5 };
   });
   const playback = createAudioPlaybackSession(player, true);
