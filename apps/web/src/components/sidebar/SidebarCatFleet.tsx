@@ -3,11 +3,12 @@ import { memo, useId } from "react";
 
 import { cn } from "../../lib/utils";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
+import { Tooltip, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { fleetHashUnit, type CatFleetBody, type CatFleetMachine } from "./SidebarCatFleet.logic";
 
 // One planet, in CSS pixels. The cat head is the app icon's, drawn in the icon's own units.
-const PLANET = { width: 66, height: 38 };
+const PLANET = { width: 66, height: 42 };
 const HEAD = { x: 33, y: 20.5, radius: 11.5 };
 const HEAD_SCALE = HEAD.radius / 133;
 const HEAD_VIEW_BOX = `${256 - HEAD.x / HEAD_SCALE} ${261 - HEAD.y / HEAD_SCALE} ${PLANET.width / HEAD_SCALE} ${PLANET.height / HEAD_SCALE}`;
@@ -24,12 +25,16 @@ const STOPPED_SIZE = 4.2;
 const SUBAGENT = { size: 2.2, radius: 4.8, period: 3.2, max: 3 };
 const MOON_COLORS = ["var(--color-cat-pink)", "var(--color-cat-cream)", "var(--color-cat-peach)"];
 const MAX_BODIES = 14;
+// Stopped threads lie scattered under the cat's chin, as far out as this and this deep.
+const SCATTER = { halfWidth: 14, gap: 2.2, depth: 4.5, floor: 30.5 };
+const MAX_STOPPED = 16;
+const CARD_ROWS = 8;
 const POINT = "absolute top-0 left-0 size-0";
 const UNSQUASH = `scaleY(${1 / ORBIT_SQUASH})`;
 
 /**
- * Every machine as a cat planet. A running thread is a moon in orbit, a stopped one is a ring
- * frozen where it stopped, and a running sub-agent circles the thread that started it.
+ * Every machine as a cat planet. A running thread is a moon in orbit, a stopped one is a dim
+ * ring lying under the cat, and a running sub-agent circles the thread that started it.
  */
 export const SidebarCatFleet = memo(function SidebarCatFleet({
   machines,
@@ -38,11 +43,14 @@ export const SidebarCatFleet = memo(function SidebarCatFleet({
 }) {
   if (machines.length === 0) return null;
   return (
-    <div ref={observeVisibleAnimation} className="flex shrink-0 flex-wrap px-2 pb-1">
-      {machines.map((machine) => (
-        <CatPlanet key={machine.environmentId} machine={machine} />
-      ))}
-    </div>
+    // The same timing as the thread rows, so a cat's card opens the way a thread's does.
+    <TooltipProvider delay={150} closeDelay={0} timeout={400}>
+      <div ref={observeVisibleAnimation} className="flex shrink-0 flex-wrap px-2 pb-1">
+        {machines.map((machine) => (
+          <CatPlanet key={machine.environmentId} machine={machine} />
+        ))}
+      </div>
+    </TooltipProvider>
   );
 });
 
@@ -55,9 +63,21 @@ function describeMachine(machine: CatFleetMachine): string {
   return `${running} running${subagentNote}, ${machine.bodies.length - running} stopped`;
 }
 
+function moonColor(key: string): string {
+  return MOON_COLORS[Math.floor(fleetHashUnit(key) * 997) % MOON_COLORS.length]!;
+}
+
+// A stopped thread whose sub-agent still runs stays in the sky, so the sub-agent has
+// something to circle.
+function isInOrbit(body: CatFleetBody): boolean {
+  return body.running || body.subagents > 0;
+}
+
 function CatPlanet({ machine }: { machine: CatFleetMachine }) {
   const gradientId = useId();
-  const bodies = machine.offline ? [] : machine.bodies.slice(0, MAX_BODIES);
+  const shown = machine.offline ? [] : machine.bodies;
+  const bodies = shown.filter(isInOrbit).slice(0, MAX_BODIES);
+  const stopped = shown.filter((body) => !isInOrbit(body)).slice(0, MAX_STOPPED);
   const speed = 0.9 + fleetHashUnit(machine.environmentId) * 0.3;
   const summary = describeMachine(machine);
   const fill = machine.offline ? "currentColor" : `url(#${gradientId})`;
@@ -68,7 +88,7 @@ function CatPlanet({ machine }: { machine: CatFleetMachine }) {
         render={
           <div
             aria-label={`${machine.label}: ${summary}`}
-            className="flex flex-col items-center text-foreground"
+            className="flex flex-col items-center rounded-md pt-0.5 text-foreground hover:bg-sidebar-row-hover"
             role="img"
             style={{ width: PLANET.width }}
           />
@@ -108,6 +128,9 @@ function CatPlanet({ machine }: { machine: CatFleetMachine }) {
             />
             <circle cx="256" cy="261" fill={fill} r="133" />
           </svg>
+          {stopped.map((body, index) => (
+            <StoppedDot body={body} index={index} key={body.key} total={stopped.length} />
+          ))}
           <OrbitLayer side="front" bodies={bodies} speed={speed} />
         </div>
         <span
@@ -119,10 +142,79 @@ function CatPlanet({ machine }: { machine: CatFleetMachine }) {
           {machine.label}
         </span>
       </TooltipTrigger>
-      <TooltipPopup side="bottom">
-        {machine.label} · {summary}
-      </TooltipPopup>
+      <ThreadHoverCardPopup side="right" align="start" sideOffset={4}>
+        <ThreadHoverCard title={machine.label}>
+          {machine.offline ? (
+            <div>Offline</div>
+          ) : shown.length === 0 ? (
+            <div>Nothing running or waiting</div>
+          ) : (
+            shown.slice(0, CARD_ROWS).map((body) => <CardRow body={body} key={body.key} />)
+          )}
+          {shown.length > CARD_ROWS ? (
+            <div className="pl-5">+{shown.length - CARD_ROWS} more</div>
+          ) : null}
+        </ThreadHoverCard>
+      </ThreadHoverCardPopup>
     </Tooltip>
+  );
+}
+
+/** One thread in a cat's card, marked the way it is drawn: a moon if running, a ring if not. */
+function CardRow({ body }: { body: CatFleetBody }) {
+  const color = moonColor(body.key);
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="flex w-3 shrink-0 justify-center">
+        {body.running ? (
+          <span
+            className="rounded-full"
+            style={{
+              width: 6,
+              height: 6,
+              background: color,
+              boxShadow: `0 0 4px 1px color-mix(in srgb, ${color} 60%, transparent)`,
+            }}
+          />
+        ) : (
+          <span
+            className="rounded-full border border-current opacity-60"
+            style={{ width: 6, height: 6 }}
+          />
+        )}
+      </span>
+      <div className="min-w-0 truncate text-foreground/75">{body.title || "New thread"}</div>
+      {body.subagents > 0 ? (
+        <div className="shrink-0">
+          · {body.subagents} {body.subagents === 1 ? "sub-agent" : "sub-agents"}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A stopped thread, lying under the cat. The dots spread evenly from side to side so they do not
+ * stack, and each one's own key nudges it, so the row looks scattered and not ruled.
+ */
+function StoppedDot({ body, index, total }: { body: CatFleetBody; index: number; total: number }) {
+  const step = (2 * SCATTER.halfWidth) / total;
+  const x = (index + 0.5 + (fleetHashUnit(body.key) - 0.5) * 0.7) * step - SCATTER.halfWidth;
+  // Under the head the dots follow the chin. Beside it they rest on the same floor.
+  const chin = HEAD.y + Math.sqrt(Math.max(0, HEAD.radius ** 2 - x ** 2));
+  const y =
+    Math.max(chin + SCATTER.gap, SCATTER.floor) +
+    fleetHashUnit(`${body.key}:depth`) * SCATTER.depth;
+  return (
+    <span
+      className="pointer-events-none absolute z-[1] rounded-full border border-current opacity-60"
+      style={{
+        left: HEAD.x + x - STOPPED_SIZE / 2,
+        top: y - STOPPED_SIZE / 2,
+        width: STOPPED_SIZE,
+        height: STOPPED_SIZE,
+      }}
+    />
   );
 }
 
@@ -202,9 +294,10 @@ function OrbitingBody({
   radius: number;
 }) {
   const unit = fleetHashUnit(body.key);
-  const color = MOON_COLORS[Math.floor(unit * 997) % MOON_COLORS.length];
+  const color = moonColor(body.key);
   const subagents = Math.min(body.subagents, SUBAGENT.max);
-  // A stopped thread's arm is paused, not removed, so its ring stays where the moon stopped.
+  // Only a stopped thread with a running sub-agent is drawn here. Its arm is paused, so it
+  // waits as a ring where it stopped.
   const held = !body.running;
 
   return (

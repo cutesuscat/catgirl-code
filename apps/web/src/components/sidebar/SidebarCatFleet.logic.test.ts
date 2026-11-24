@@ -17,6 +17,7 @@ describe("summarizeCatFleet", () => {
     ) => ({
       environmentId,
       id,
+      title: `Thread ${id}`,
       working: overrides.working ?? false,
       lineage: {
         relationshipToParent: overrides.subagentOf === undefined ? null : ("subagent" as const),
@@ -53,16 +54,16 @@ describe("summarizeCatFleet", () => {
         label: "Mac",
         offline: false,
         bodies: [
-          { key: "running", running: true, subagents: 1 },
-          { key: "stopped", running: false, subagents: 0 },
-          { key: "settled-parent", running: false, subagents: 1 },
+          { key: "running", title: "Thread running", running: true, subagents: 1 },
+          { key: "stopped", title: "Thread stopped", running: false, subagents: 0 },
+          { key: "settled-parent", title: "Thread settled-parent", running: false, subagents: 1 },
         ],
       },
       {
         environmentId: "box",
         label: "Box",
         offline: true,
-        bodies: [{ key: "settled-running", running: true, subagents: 0 }],
+        bodies: [{ key: "settled-running", title: "Thread settled-running", running: true, subagents: 0 }],
       },
     ]);
   });

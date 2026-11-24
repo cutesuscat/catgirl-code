@@ -1,6 +1,7 @@
 export interface CatFleetBody {
   /** The thread's id. A body keeps its orbit, place and colour for as long as it is shown. */
   readonly key: string;
+  readonly title: string;
   readonly running: boolean;
   /** Sub-agents of this thread that are running now. */
   readonly subagents: number;
@@ -17,6 +18,7 @@ export interface CatFleetMachine {
 interface FleetThread {
   readonly environmentId: string;
   readonly id: string;
+  readonly title: string;
   readonly lineage: {
     readonly relationshipToParent: "fork" | "subagent" | null;
     readonly rootThreadId: string;
@@ -37,7 +39,8 @@ export function summarizeCatFleet<T extends FleetThread>(input: {
   readonly threads: readonly T[];
   readonly isWorking: (thread: T) => boolean;
 }): readonly CatFleetMachine[] {
-  type Body = { running: boolean; subagents: number };
+  type Body = { title: string; running: boolean; subagents: number };
+  const titleByThread = new Map<string, string>();
   const bodiesByMachine = new Map<string, Map<string, Body>>();
   const bodiesOf = (environmentId: string) => {
     const bodies = bodiesByMachine.get(environmentId) ?? new Map<string, Body>();
@@ -46,6 +49,7 @@ export function summarizeCatFleet<T extends FleetThread>(input: {
   };
   const runningSubagentRoots: Array<{ environmentId: string; rootThreadId: string }> = [];
   for (const thread of input.threads) {
+    titleByThread.set(`${thread.environmentId}:${thread.id}`, thread.title);
     const working = input.isWorking(thread);
     if (thread.lineage.relationshipToParent === "subagent") {
       if (working) {
@@ -59,13 +63,21 @@ export function summarizeCatFleet<T extends FleetThread>(input: {
     if (thread.lineage.sideChat === true || thread.archivedAt !== null) continue;
     const waiting = thread.settledOverride !== "settled" && thread.snoozedUntil === null;
     if (working || waiting) {
-      bodiesOf(thread.environmentId).set(thread.id, { running: working, subagents: 0 });
+      bodiesOf(thread.environmentId).set(thread.id, {
+        title: thread.title,
+        running: working,
+        subagents: 0,
+      });
     }
   }
   for (const { environmentId, rootThreadId } of runningSubagentRoots) {
     const bodies = bodiesOf(environmentId);
     // A settled thread whose sub-agent still runs shows as stopped, with that moon round it.
-    const body = bodies.get(rootThreadId) ?? { running: false, subagents: 0 };
+    const body = bodies.get(rootThreadId) ?? {
+      title: titleByThread.get(`${environmentId}:${rootThreadId}`) ?? "",
+      running: false,
+      subagents: 0,
+    };
     body.subagents += 1;
     bodies.set(rootThreadId, body);
   }
