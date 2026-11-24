@@ -1,7 +1,9 @@
 package expo.modules.t3clientcertificates
 
 import android.content.Context
+import android.os.SystemClock
 import android.security.KeyChain
+import android.util.Log
 import com.facebook.react.modules.network.CustomClientBuilder
 import com.facebook.react.modules.network.NetworkingModule
 import com.facebook.react.modules.network.OkHttpClientFactory
@@ -31,6 +33,7 @@ class T3CertificateTransport private constructor(private val context: Context) {
 
   // Accessed only under lock. Tokens distinguish remove/re-add and same-alias replacement.
   private val generations = CertificateGenerations()
+  private val identities = IdentityFactoryCache()
   private val trust: X509TrustManager
   private val defaultTls: SSLContext
   private val socketFactory: SSLSocketFactory
@@ -70,10 +73,12 @@ class T3CertificateTransport private constructor(private val context: Context) {
 
   internal fun invalidate(origin: String) {
     generations.invalidate(origin)
+    identities.clear()
   }
 
   internal fun invalidateAll() {
     generations.invalidateAll()
+    identities.clear()
   }
 
   /** Wraps another factory so its interceptors stay while every client gets this transport. */
@@ -101,9 +106,14 @@ class T3CertificateTransport private constructor(private val context: Context) {
     OkHttpClientProvider.setOkHttpClientFactory(CertificateClientFactory(current))
   }
 
-  @Suppress("TooGenericExceptionCaught") // Any KeyChain or TLS setup failure fails the connection.
   private fun identityFactory(origin: String): SSLSocketFactory {
     val alias = resolveCertificateAlias(preferences, origin) ?: return defaultTls.socketFactory
+    return identities.get(alias) { resolveIdentity(alias) }
+  }
+
+  @Suppress("TooGenericExceptionCaught") // Any KeyChain or TLS setup failure fails the connection.
+  private fun resolveIdentity(alias: String): SSLSocketFactory {
+    val startedAt = SystemClock.elapsedRealtime()
     return try {
       val key =
         checkNotNull(KeyChain.getPrivateKey(context, alias)) {
@@ -114,12 +124,15 @@ class T3CertificateTransport private constructor(private val context: Context) {
           "Client certificate chain is unavailable. Select it again in Connections."
         }
       chain.forEach { it.checkValidity() }
-      // Resolve the KeyChain grant on each new connection. No exported keys or TLS session
-      // resumption across a removed/replaced identity.
+      // No exported keys. The cache drops this context when the identity is removed or
+      // replaced, so no TLS session is resumed across that change.
       SSLContext
         .getInstance("TLS")
         .apply { init(arrayOf(SelectedIdentity(alias, key, chain)), arrayOf(trust), null) }
         .socketFactory
+        .also {
+          Log.i(TAG, "resolved client identity in ${SystemClock.elapsedRealtime() - startedAt} ms")
+        }
     } catch (error: Exception) {
       throw IOException("Client certificate '$alias' could not be used: ${error.message}", error)
     }
@@ -129,6 +142,8 @@ class T3CertificateTransport private constructor(private val context: Context) {
     builder.sslSocketFactory(socketFactory, trust).hostnameVerifier(originHostnameVerifier)
 
   companion object {
+    private const val TAG = "T3Certificates"
+
     @Volatile private var instance: T3CertificateTransport? = null
 
     @JvmStatic

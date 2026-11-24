@@ -116,6 +116,51 @@ internal class CertificateGenerations {
   }
 }
 
+/**
+ * Remembers the TLS identity resolved for each alias. Without it every new connection asks
+ * KeyChain for the key again and starts a full handshake, which costs seconds when the app
+ * reconnects to many hosts at once. One context per alias also lets a host resume its session.
+ * A changed or removed identity clears it, and an entry is resolved again after [maxAgeNanos].
+ */
+internal class IdentityFactoryCache(
+  private val maxAgeNanos: Long = 30L * 60 * 1_000_000_000,
+  private val now: () -> Long = System::nanoTime
+) {
+  private class Entry(val factory: SSLSocketFactory, val at: Long)
+
+  private val entries = HashMap<String, Entry>()
+  private val aliasLocks = HashMap<String, Any>()
+  private var epoch = 0L
+
+  @Synchronized private fun aliasLock(alias: String): Any = aliasLocks.getOrPut(alias) { Any() }
+
+  @Synchronized private fun epoch(): Long = epoch
+
+  @Synchronized private fun cached(alias: String): SSLSocketFactory? =
+    entries[alias]?.takeIf { now() - it.at < maxAgeNanos }?.factory
+
+  // A result resolved before a clear may belong to the identity that was removed.
+  @Synchronized private fun remember(alias: String, resolvedAt: Long, factory: SSLSocketFactory) {
+    if (resolvedAt == epoch) entries[alias] = Entry(factory, now())
+  }
+
+  /** Connections that start together for one alias wait for a single [resolve]. */
+  fun get(alias: String, resolve: () -> SSLSocketFactory): SSLSocketFactory {
+    cached(alias)?.let { return it }
+    return synchronized(aliasLock(alias)) {
+      cached(alias) ?: run {
+        val resolvedAt = epoch()
+        resolve().also { remember(alias, resolvedAt, it) }
+      }
+    }
+  }
+
+  @Synchronized fun clear() {
+    epoch += 1
+    entries.clear()
+  }
+}
+
 // OkHttp permits HTTP/2 connection coalescing across hosts only with its own verifier instance.
 // Delegating the same checks preserves HTTP/2 within an origin without sharing its client identity.
 internal val originHostnameVerifier: HostnameVerifier =

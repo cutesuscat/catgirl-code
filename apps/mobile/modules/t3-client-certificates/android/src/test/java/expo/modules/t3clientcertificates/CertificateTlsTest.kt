@@ -558,4 +558,66 @@ class CertificateTlsTest {
       server.shutdown()
     }
   }
+
+  private fun socketFactory() = SSLContext.getInstance("TLS").apply { init(null, null, null) }.socketFactory
+
+  @Test fun identityIsResolvedOnceForConnectionsThatStartTogether() {
+    val cache = IdentityFactoryCache()
+    val resolves = java.util.concurrent.atomic.AtomicInteger()
+    val started = CountDownLatch(1)
+    val pool = Executors.newFixedThreadPool(8)
+    try {
+      val results =
+        (1..8)
+          .map {
+            pool.submit<Any> {
+              started.await()
+              cache.get("phone") {
+                resolves.incrementAndGet()
+                Thread.sleep(50)
+                socketFactory()
+              }
+            }
+          }
+          .also { started.countDown() }
+          .map { it.get(5, TimeUnit.SECONDS) }
+      assertEquals(1, resolves.get())
+      results.forEach { assertSame(results.first(), it) }
+      // Another alias is another identity.
+      assertNotSame(results.first(), cache.get("laptop") { socketFactory() })
+    } finally {
+      pool.shutdownNow()
+    }
+  }
+
+  @Test fun changedIdentityIsResolvedAgain() {
+    val cache = IdentityFactoryCache()
+    val first = cache.get("phone") { socketFactory() }
+    assertSame(first, cache.get("phone") { fail("cached"); socketFactory() })
+    cache.clear()
+    assertNotSame(first, cache.get("phone") { socketFactory() })
+  }
+
+  @Test fun identityResolvedWhileItChangedIsNotRemembered() {
+    val cache = IdentityFactoryCache()
+    // The connection that asked still gets its answer; its generation check rejects it.
+    val stale = cache.get("phone") { cache.clear(); socketFactory() }
+    assertNotSame(stale, cache.get("phone") { socketFactory() })
+  }
+
+  @Test fun failedResolveIsRetriedAndOldIdentityExpires() {
+    var now = 0L
+    val cache = IdentityFactoryCache(maxAgeNanos = 100) { now }
+    try {
+      cache.get("phone") { throw IOException("KeyChain unavailable") }
+      fail("The failure must reach the connection")
+    } catch (_: IOException) {
+      // Expected.
+    }
+    val first = cache.get("phone") { socketFactory() }
+    now = 99
+    assertSame(first, cache.get("phone") { socketFactory() })
+    now = 100
+    assertNotSame(first, cache.get("phone") { socketFactory() })
+  }
 }
