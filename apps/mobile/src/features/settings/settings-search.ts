@@ -22,6 +22,11 @@ const SETTINGS_SEARCH_TERMS = {
     msg("remote", { $context: "settings search keyword" }),
     "tailscale",
   ],
+  SettingsConnectService: [
+    msg("relay", { $context: "settings search keyword" }),
+    msg("self-hosted", { $context: "settings search keyword" }),
+    msg("connect address", { $context: "settings search keyword" }),
+  ],
   SettingsNotifications: [
     msg("push", { $context: "settings search keyword" }),
     msg("alerts", { $context: "settings search keyword" }),

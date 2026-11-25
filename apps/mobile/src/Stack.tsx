@@ -142,6 +142,7 @@ import { UsageRouteScreen } from "./features/usage/UsageRouteScreen";
 import { WorkflowRunRouteScreen } from "./features/workflows/WorkflowRunRouteScreen";
 import { WorkflowStepSheet } from "./features/workflows/WorkflowStepSheet";
 import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRouteScreen";
+import { SettingsConnectServiceRouteScreen } from "./features/settings/SettingsConnectServiceRouteScreen";
 import { SettingsNotificationsRouteScreen } from "./features/settings/SettingsNotificationsRouteScreen";
 import { SettingsSshRouteScreen } from "./features/settings/SettingsSshRouteScreen";
 import { SettingsClientCertificateRouteScreen } from "./features/settings/SettingsClientCertificateRouteScreen";
@@ -185,6 +186,7 @@ const ROUTE_TITLES: Readonly<Record<string, string>> = {
   SettingsNotifications: msg("Notifications"),
   SettingsClientCertificate: msg("Client certificate"),
   SettingsSsh: "SSH",
+  SettingsConnectService: msg("T3 Connect service"),
   SettingsThreads: msg("Threads"),
   SettingsAbout: msg("About"),
   SettingsEnvironmentNew: msg("Add Environment"),
@@ -312,6 +314,11 @@ const SETTINGS_SCREENS = {
   SettingsSsh: createNativeStackScreen({
     screen: SettingsSshRouteScreen,
     linking: "settings/ssh",
+    options: settingsPage(),
+  }),
+  SettingsConnectService: createNativeStackScreen({
+    screen: SettingsConnectServiceRouteScreen,
+    linking: "settings/connect-service",
     options: settingsPage(),
   }),
   SettingsThreads: createNativeStackScreen({

@@ -4,6 +4,7 @@ export const SETTINGS_PAGE_TARGETS = [
   "SettingsNotifications",
   "SettingsSsh",
   "SettingsClientCertificate",
+  "SettingsConnectService",
   "SettingsThreads",
   "SettingsAbout",
   "SettingsArchive",

@@ -142,6 +142,7 @@ function ConfiguredSettingsRouteScreen() {
           target: "SettingsNotifications",
         },
         ...sshRows(gt),
+        connectServiceRow(gt("T3 Connect service")),
       ]}
     />
   );
@@ -155,6 +156,7 @@ function LocalSettingsRouteScreen() {
       connections={[
         environmentsRow(gt("Environments"), Object.keys(savedConnectionsById).length),
         ...sshRows(gt),
+        connectServiceRow(gt("T3 Connect service")),
       ]}
     />
   );
@@ -175,6 +177,14 @@ const sshRows = (gt: ReturnType<typeof useGT>): readonly SettingsListRow[] => [
       ]
     : []),
 ];
+function connectServiceRow(label: string): SettingsListRow {
+  return {
+    id: "SettingsConnectService",
+    icon: "globe",
+    label,
+    target: "SettingsConnectService",
+  };
+}
 
 function environmentsRow(label: string, count: number): SettingsListRow {
   return {

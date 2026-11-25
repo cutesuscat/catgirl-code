@@ -3,6 +3,8 @@ import { relayClerkTokenOptions } from "@t3tools/shared/relayAuth";
 import { normalizeSecureRelayUrl } from "@t3tools/shared/relayUrl";
 import * as Schema from "effect/Schema";
 
+import { savedConnectService } from "./connectService";
+
 export class CloudPublicConfigMissingError extends Schema.TaggedError<CloudPublicConfigMissingError>()(
   "CloudPublicConfigMissingError",
   {
@@ -56,7 +58,7 @@ function normalizeSecureUrl(value: unknown): string | null {
   }
 }
 
-export function resolveCloudPublicConfig(extra: ExpoExtra = Constants.expoConfig?.extra) {
+export function resolveBuiltInCloudPublicConfig(extra: ExpoExtra = Constants.expoConfig?.extra) {
   return {
     clerk: {
       publishableKey: trimNonEmpty(extra?.clerk?.publishableKey),
@@ -71,6 +73,18 @@ export function resolveCloudPublicConfig(extra: ExpoExtra = Constants.expoConfig
       tracesToken: trimNonEmpty(extra?.observability?.tracesToken),
     },
   } satisfies CloudPublicConfig;
+}
+
+/** A service saved on this device replaces the one the build ships with. */
+export function resolveCloudPublicConfig(extra?: ExpoExtra): CloudPublicConfig {
+  const builtIn = resolveBuiltInCloudPublicConfig(extra);
+  const saved = savedConnectService();
+  if (saved === null) return builtIn;
+  return {
+    ...builtIn,
+    clerk: { publishableKey: saved.clerkPublishableKey, jwtTemplate: saved.clerkJwtTemplate },
+    relay: { url: saved.relayUrl },
+  };
 }
 
 export function hasCloudPublicConfig(): boolean {
