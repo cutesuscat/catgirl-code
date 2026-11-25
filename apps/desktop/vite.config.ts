@@ -4,6 +4,7 @@ import * as NodeOS from "node:os";
 import { defaultInclude, defineConfig } from "vite-plus";
 import { Rolldown } from "vite-plus/pack";
 
+import { withCatgirlBranding } from "../../scripts/lib/catgirl-branding.ts";
 import { isDesktopRuntimeExternalDependency } from "../../scripts/lib/desktop-external-packages.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 
@@ -87,7 +88,7 @@ export default defineConfig({
       },
     },
   },
-  pack: [
+  pack: withCatgirlBranding([
     {
       format: "cjs",
       outDir: "dist-electron",
@@ -181,7 +182,7 @@ export default defineConfig({
       outExtensions: () => ({ js: ".cjs" }),
       entry: ["src/mac-permission-preload.ts"],
     },
-  ],
+  ]),
   test: {
     // The Windows lane runs workspace suites concurrently; filesystem-heavy
     // desktop integration tests can exceed Vitest's 5 second default there.

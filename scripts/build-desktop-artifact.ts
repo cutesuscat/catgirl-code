@@ -36,6 +36,7 @@ import {
   type WebAssetBrand,
 } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
+import { renameProduct } from "./lib/catgirl-branding.ts";
 import {
   findInlinedExternalPackages,
   selectCliRuntimeExternalDependencies,
@@ -2575,6 +2576,8 @@ export const stageDesktopDmgBackground = Effect.fn("stageDesktopDmgBackground")(
   if (!(yield* fs.exists(sourcePath))) {
     return yield* new DesktopDmgBackgroundSourceMissingError({ channel, sourcePath });
   }
+  // Catgirl Code: the staged copy of the picture tells people to drag Catgirl Code.
+  yield* fs.writeFileString(sourcePath, renameProduct(yield* fs.readFileString(sourcePath)));
 
   for (const output of [
     { suffix: "", width: 640, height: 432 },
@@ -3049,7 +3052,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
 // Identifiers (app id, executable and artifact names, URL schemes) do not contain the phrase.
 function rebrandDisplayText<T>(value: T): T {
   if (typeof value === "string") {
-    return value.replaceAll("T3 Code", "Catgirl Code") as T;
+    return renameProduct(value) as T;
   }
   if (Array.isArray(value)) {
     return value.map(rebrandDisplayText) as T;
@@ -4033,7 +4036,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     },
   };
 
-  const stagePackageJsonString = yield* encodeJsonString(stagePackageJson);
+  const stagePackageJsonString = yield* encodeJsonString(rebrandDisplayText(stagePackageJson));
   yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
   const stageWorkspaceConfig = createStageWorkspaceConfig({
     platform: options.platform,
