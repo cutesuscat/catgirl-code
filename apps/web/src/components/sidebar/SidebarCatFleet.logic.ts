@@ -95,6 +95,45 @@ export function summarizeCatFleet<T extends FleetThread>(input: {
   });
 }
 
+/** Running threads and running sub-agents: how busy a machine is right now. */
+export function catFleetActivity(machine: CatFleetMachine): number {
+  if (machine.offline) return 0;
+  return machine.bodies.reduce((total, body) => total + (body.running ? 1 : 0) + body.subagents, 0);
+}
+
+/** How many cells the fleet takes in the sidebar unless the user picks another number. */
+export const CAT_FLEET_DEFAULT_LIMIT = 8;
+
+/**
+ * Busiest machines first, then those with the most threads waiting, then idle ones, with
+ * offline machines last. Equal machines keep catalog order. The fleet fills at most `limit`
+ * cells: when machines are left over, the last cell is kept for the "+N" that stands for them.
+ */
+export function arrangeCatFleet(
+  machines: readonly CatFleetMachine[],
+  limit: number,
+): { readonly shown: readonly CatFleetMachine[]; readonly hidden: readonly CatFleetMachine[] } {
+  const ranked = machines
+    .map((machine, index) => ({
+      machine,
+      index,
+      activity: catFleetActivity(machine),
+      waiting: machine.offline ? 0 : machine.bodies.length,
+    }))
+    .toSorted(
+      (left, right) =>
+        Number(left.machine.offline) - Number(right.machine.offline) ||
+        right.activity - left.activity ||
+        right.waiting - left.waiting ||
+        left.index - right.index,
+    )
+    .map((entry) => entry.machine);
+  const cells = Math.max(0, Math.floor(limit));
+  if (ranked.length <= cells) return { shown: ranked, hidden: [] };
+  const kept = Math.max(Math.min(cells, 1), cells - 1);
+  return { shown: ranked.slice(0, kept), hidden: ranked.slice(kept) };
+}
+
 /** A stable number in [0, 1) for a key, so a body keeps its place and colour across renders. */
 export function fleetHashUnit(key: string): number {
   let hash = 2166136261;

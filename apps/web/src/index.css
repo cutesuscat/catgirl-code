@@ -178,6 +178,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-cat-pink: #f5b4a2;
   --color-cat-peach: #ffd9a8;
   --color-cat-shade: rgb(40 22 8 / 0.55);
+  --color-cat-honey: #ffd45c;
+  --color-cat-rust: #c9462a;
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
   --font-mono:
@@ -636,6 +638,50 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   animation: cat-orbit var(--cat-orbit-period, 10s) linear infinite reverse;
   animation-delay: var(--cat-orbit-delay, 0s);
   animation-play-state: var(--visible-animation-state, paused);
+}
+
+/* A running thread's moon. Pale moons vanish on a light sidebar, so there they get an edge and
+   a warm halo; on a dark one their own glow is enough. Over the cat, an edge only. */
+@utility cat-moon {
+  background: var(--cat-moon-color);
+  box-shadow:
+    0 0 0 0.8px var(--color-cat-shade),
+    0 0 4px 1.2px color-mix(in srgb, var(--color-cat) 70%, transparent);
+
+  @variant dark {
+    box-shadow: 0 0 4px 0.8px color-mix(in srgb, var(--cat-moon-color) 60%, transparent);
+  }
+}
+
+@utility cat-moon-near {
+  background: var(--cat-moon-color);
+  box-shadow: 0 0 0 0.8px var(--color-cat-shade);
+}
+
+/* Orbit lines: an orbit with a moon on it is drawn clearer than an empty one, and the half
+   behind the cat shows through it as dots. */
+@utility cat-orbit-line {
+  opacity: 0.2;
+
+  @variant dark {
+    opacity: 0.16;
+  }
+}
+
+@utility cat-orbit-line-busy {
+  opacity: 0.45;
+
+  @variant dark {
+    opacity: 0.34;
+  }
+}
+
+@utility cat-orbit-far {
+  opacity: 0.3;
+}
+
+@utility cat-orbit-far-busy {
+  opacity: 0.6;
 }
 
 @keyframes live-activity-focus {

@@ -1,18 +1,41 @@
 /* oxlint-disable t3code/no-untranslated-copy -- Catgirl Code feature, English only: upstream's catalogs stay untouched */
 import type { CSSProperties } from "react";
-import { memo, useId } from "react";
+import { memo, useId, useState } from "react";
 
 import { cn } from "../../lib/utils";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { Tooltip, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { fleetHashUnit, type CatFleetBody, type CatFleetMachine } from "./SidebarCatFleet.logic";
+import {
+  arrangeCatFleet,
+  CAT_FLEET_DEFAULT_LIMIT,
+  catFleetActivity,
+  fleetHashUnit,
+  type CatFleetBody,
+  type CatFleetMachine,
+} from "./SidebarCatFleet.logic";
 
 // One planet, in CSS pixels. The cat head is the app icon's, drawn in the icon's own units.
 const PLANET = { width: 66, height: 42 };
 const HEAD = { x: 33, y: 20.5, radius: 11.5 };
 const HEAD_SCALE = HEAD.radius / 133;
 const HEAD_VIEW_BOX = `${256 - HEAD.x / HEAD_SCALE} ${261 - HEAD.y / HEAD_SCALE} ${PLANET.width / HEAD_SCALE} ${PLANET.height / HEAD_SCALE}`;
+const EAR_LEFT = "M 126.04,232.73 L 154.09,103.79 Q 156,95 163.87,99.37 L 222.92,132.18 Z";
+const EAR_RIGHT = "M 289.08,132.18 L 348.13,99.37 Q 356,95 357.91,103.79 L 385.96,232.73 Z";
+// The cat's outline in CSS pixels, to clip what shows through it. Every part winds the same
+// way: parts that wind against each other would cut holes where they overlap.
+const HEAD_CLIP = `path("${[
+  EAR_LEFT,
+  EAR_RIGHT,
+  "M 123,261 A 133 133 0 1 1 389,261 A 133 133 0 1 1 123,261 Z",
+]
+  .join(" ")
+  .replace(/(-?[\d.]+),(-?[\d.]+)/g, (_, x: string, y: string) => {
+    const left = HEAD.x + (Number(x) - 256) * HEAD_SCALE;
+    const top = HEAD.y + (Number(y) - 261) * HEAD_SCALE;
+    return `${left.toFixed(2)},${top.toFixed(2)}`;
+  })
+  .replace(/A 133 133/g, `A ${HEAD.radius} ${HEAD.radius}`)}")`;
 const ORBIT_CENTER = { x: HEAD.x, y: HEAD.y + 0.15 * HEAD.radius };
 const ORBIT_SQUASH = 68.6 / 207;
 // Outer orbits turn more slowly, as real ones do.
@@ -21,10 +44,16 @@ const ORBITS = [
   { radius: 23.5, tilt: 9, period: 10.5 },
   { radius: 29.5, tilt: -9, period: 14 },
 ];
-const MOON_SIZE = 5;
+const MOON_SIZE = 6;
 const STOPPED_SIZE = 4.2;
 const SUBAGENT = { size: 2.2, radius: 4.8, period: 3.2, max: 3 };
 const MOON_COLORS = ["var(--color-cat-pink)", "var(--color-cat-cream)", "var(--color-cat-peach)"];
+// Each cat's coat leans up to this far from the icon's orange, towards honey or towards rust.
+// A cat with nothing running is paled with cream, to this share of its own colour.
+const COAT = { lean: 55, resting: 52 };
+const COAT_STOPS = ["var(--color-cat-light)", "var(--color-cat)", "var(--color-cat-dark)"];
+// Orbit lines: thin where they pass round the cat, dotted where they pass behind it.
+const LINE = { width: 0.7, dot: 1.1, gap: 2.5 };
 const MAX_BODIES = 14;
 // Stopped threads lie scattered just under the cat: across this arc of its outline, and from
 // just overlapping it to this far off.
@@ -37,22 +66,34 @@ const POINT = "absolute top-0 left-0 size-0";
 const UNSQUASH = `scaleY(${1 / ORBIT_SQUASH})`;
 
 /**
- * Every machine as a cat planet. A running thread is a moon in orbit, a stopped one is a dim
- * ring lying just under the cat, and a running sub-agent circles the thread that started it.
+ * The busiest machines as cat planets. A running thread is a moon in orbit, a stopped one is a
+ * dim ring lying just under the cat, and a running sub-agent circles the thread that started it.
  */
 export const SidebarCatFleet = memo(function SidebarCatFleet({
   machines,
+  limit = CAT_FLEET_DEFAULT_LIMIT,
 }: {
   machines: readonly CatFleetMachine[];
+  /** How many cells the fleet may take. Zero hides it. */
+  limit?: number;
 }) {
-  if (machines.length === 0) return null;
+  const [expanded, setExpanded] = useState(false);
+  if (machines.length === 0 || limit <= 0) return null;
+  const { shown, hidden } = arrangeCatFleet(machines, limit);
   return (
     // The same timing as the thread rows, so a cat's card opens the way a thread's does.
     <TooltipProvider delay={150} closeDelay={0} timeout={400}>
       <div ref={observeVisibleAnimation} className="flex shrink-0 flex-wrap px-2 pb-1">
-        {machines.map((machine) => (
+        {(expanded ? [...shown, ...hidden] : shown).map((machine) => (
           <CatPlanet key={machine.environmentId} machine={machine} />
         ))}
+        {hidden.length > 0 ? (
+          <FleetOverflow
+            expanded={expanded}
+            machines={hidden}
+            onToggle={() => setExpanded((value) => !value)}
+          />
+        ) : null}
       </div>
     </TooltipProvider>
   );
@@ -77,16 +118,34 @@ function isInOrbit(body: CatFleetBody): boolean {
   return body.running || body.subagents > 0;
 }
 
+function orbitIndexOf(body: CatFleetBody): number {
+  return Math.floor(fleetHashUnit(body.key) * 7919) % ORBITS.length;
+}
+
+/** The three stops of a cat's coat, top to bottom. Its machine's id picks the shade. */
+function coatStops(environmentId: string, resting: boolean): readonly string[] {
+  const lean = fleetHashUnit(`${environmentId}:coat`) * 2 - 1;
+  const tint = lean < 0 ? "var(--color-cat-rust)" : "var(--color-cat-honey)";
+  const own = 100 - Math.round(Math.abs(lean) * COAT.lean);
+  return COAT_STOPS.map((stop) => {
+    const coat = `color-mix(in srgb, ${stop} ${own}%, ${tint})`;
+    return resting ? `color-mix(in srgb, ${coat} ${COAT.resting}%, var(--color-cat-cream))` : coat;
+  });
+}
+
 function CatPlanet({ machine }: { machine: CatFleetMachine }) {
   const gradientId = useId();
+  const clipId = useId();
   const shown = machine.offline ? [] : machine.bodies;
   const bodies = shown.filter(isInOrbit).slice(0, MAX_BODIES);
   const stopped = shown.filter((body) => !isInOrbit(body)).slice(0, MAX_STOPPED);
-  const active = shown.reduce((total, body) => total + (body.running ? 1 : 0) + body.subagents, 0);
+  const active = catFleetActivity(machine);
   const glow = Math.min(1, active / GLOW.full);
   const speed = 0.9 + fleetHashUnit(machine.environmentId) * 0.3;
   const summary = describeMachine(machine);
   const fill = machine.offline ? "currentColor" : `url(#${gradientId})`;
+  const coat = coatStops(machine.environmentId, active === 0);
+  const busyOrbits = new Set(bodies.map(orbitIndexOf));
 
   return (
     <Tooltip>
@@ -113,6 +172,25 @@ function CatPlanet({ machine }: { machine: CatFleetMachine }) {
               }}
             />
           ) : null}
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-0 size-full overflow-visible stroke-current"
+            fill="none"
+            viewBox={`0 0 ${PLANET.width} ${PLANET.height}`}
+          >
+            {ORBITS.map((orbit, index) => (
+              <ellipse
+                className={busyOrbits.has(index) ? "cat-orbit-line-busy" : "cat-orbit-line"}
+                cx={ORBIT_CENTER.x}
+                cy={ORBIT_CENTER.y}
+                key={orbit.radius}
+                rx={orbit.radius}
+                ry={orbit.radius * ORBIT_SQUASH}
+                strokeWidth={LINE.width}
+                transform={`rotate(${orbit.tilt} ${ORBIT_CENTER.x} ${ORBIT_CENTER.y})`}
+              />
+            ))}
+          </svg>
           <OrbitLayer side="back" bodies={bodies} speed={speed} />
           <svg
             aria-hidden="true"
@@ -131,21 +209,33 @@ function CatPlanet({ machine }: { machine: CatFleetMachine }) {
                 y1="95"
                 y2="394"
               >
-                <stop offset="0" stopColor="var(--color-cat-light)" />
-                <stop offset=".55" stopColor="var(--color-cat)" />
-                <stop offset="1" stopColor="var(--color-cat-dark)" />
+                <stop offset="0" style={{ stopColor: coat[0] }} />
+                <stop offset=".55" style={{ stopColor: coat[1] }} />
+                <stop offset="1" style={{ stopColor: coat[2] }} />
               </linearGradient>
+              <clipPath id={clipId}>
+                <path d={EAR_LEFT} />
+                <path d={EAR_RIGHT} />
+                <circle cx="256" cy="261" r="133" />
+              </clipPath>
             </defs>
-            <path
-              d="M 126.04,232.73 L 154.09,103.79 Q 156,95 163.87,99.37 L 222.92,132.18 Z"
-              fill={fill}
-            />
-            <path
-              d="M 385.96,232.73 L 357.91,103.79 Q 356,95 348.13,99.37 L 289.08,132.18 Z"
-              fill={fill}
-            />
+            <path d={EAR_LEFT} fill={fill} />
+            <path d={EAR_RIGHT} fill={fill} />
             <circle cx="256" cy="261" fill={fill} r="133" />
+            <g className="stroke-foreground" clipPath={`url(#${clipId})`} fill="none">
+              {ORBITS.map((orbit, index) => (
+                <OrbitThroughCat busy={busyOrbits.has(index)} key={orbit.radius} orbit={orbit} />
+              ))}
+            </g>
           </svg>
+          {bodies.length > 0 ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-[1]"
+              style={{ clipPath: HEAD_CLIP }}
+            >
+              <OrbitLayer side="through" bodies={bodies} speed={speed} />
+            </div>
+          ) : null}
           {stopped.map((body, index) => (
             <StoppedDot body={body} index={index} key={body.key} total={stopped.length} />
           ))}
@@ -178,6 +268,90 @@ function CatPlanet({ machine }: { machine: CatFleetMachine }) {
   );
 }
 
+/**
+ * One orbit where it crosses the cat, in the icon's units: dotted on the far half, which the
+ * cat hides, and a plain line on the near half, which passes in front.
+ */
+function OrbitThroughCat({ orbit, busy }: { orbit: (typeof ORBITS)[number]; busy: boolean }) {
+  const center = { x: 256, y: 261 + 0.15 * 133 };
+  const rx = orbit.radius / HEAD_SCALE;
+  const ry = rx * ORBIT_SQUASH;
+  const left = `${center.x - rx},${center.y}`;
+  const right = `${center.x + rx},${center.y}`;
+  return (
+    <g transform={`rotate(${orbit.tilt} ${center.x} ${center.y})`}>
+      <path
+        className={busy ? "cat-orbit-far-busy" : "cat-orbit-far"}
+        d={`M ${left} A ${rx} ${ry} 0 0 1 ${right}`}
+        strokeDasharray={`0 ${LINE.gap / HEAD_SCALE}`}
+        strokeLinecap="round"
+        strokeWidth={LINE.dot / HEAD_SCALE}
+      />
+      <path
+        className={busy ? "cat-orbit-line-busy" : "cat-orbit-line"}
+        d={`M ${right} A ${rx} ${ry} 0 0 1 ${left}`}
+        strokeWidth={LINE.width / HEAD_SCALE}
+      />
+    </g>
+  );
+}
+
+/** The cell that stands for the machines that did not fit. Clicking it shows or hides them. */
+function FleetOverflow({
+  machines,
+  expanded,
+  onToggle,
+}: {
+  machines: readonly CatFleetMachine[];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            aria-expanded={expanded}
+            aria-label={expanded ? "Show fewer machines" : `Show ${machines.length} more machines`}
+            className="flex flex-col items-center rounded-md pt-0.5 text-muted-foreground hover:bg-sidebar-row-hover hover:text-foreground"
+            onClick={onToggle}
+            style={{ width: PLANET.width }}
+            type="button"
+          />
+        }
+      >
+        <span className="relative block" style={PLANET}>
+          <span
+            className="absolute flex items-center justify-center rounded-full border border-dashed border-current/40 text-2xs tabular-nums"
+            style={{
+              left: HEAD.x - HEAD.radius,
+              top: HEAD.y - HEAD.radius,
+              width: 2 * HEAD.radius,
+              height: 2 * HEAD.radius,
+            }}
+          >
+            {expanded ? "−" : `+${machines.length}`}
+          </span>
+        </span>
+        <span className="max-w-full truncate px-0.5 text-3xs">{expanded ? "fewer" : "more"}</span>
+      </TooltipTrigger>
+      {expanded ? null : (
+        <ThreadHoverCardPopup side="right" align="start" sideOffset={4}>
+          <ThreadHoverCard title={`${machines.length} more machines`}>
+            {machines.slice(0, CARD_ROWS).map((machine) => (
+              <div className="flex min-w-0 items-baseline gap-2" key={machine.environmentId}>
+                <div className="min-w-0 truncate text-foreground/75">{machine.label}</div>
+                <div className="shrink-0">{describeMachine(machine)}</div>
+              </div>
+            ))}
+            {machines.length > CARD_ROWS ? <div>+{machines.length - CARD_ROWS} more</div> : null}
+          </ThreadHoverCard>
+        </ThreadHoverCardPopup>
+      )}
+    </Tooltip>
+  );
+}
+
 /** One thread in a cat's card, marked the way it is drawn: a moon if running, a ring if not. */
 function CardRow({ body }: { body: CatFleetBody }) {
   const color = moonColor(body.key);
@@ -186,13 +360,8 @@ function CardRow({ body }: { body: CatFleetBody }) {
       <span className="flex w-3 shrink-0 justify-center">
         {body.running ? (
           <span
-            className="rounded-full"
-            style={{
-              width: 6,
-              height: 6,
-              background: color,
-              boxShadow: `0 0 4px 1px color-mix(in srgb, ${color} 60%, transparent)`,
-            }}
+            className="cat-moon rounded-full"
+            style={{ width: 6, height: 6, "--cat-moon-color": color } as CSSProperties}
           />
         ) : (
           <span
@@ -240,53 +409,49 @@ function StoppedDot({ body, index, total }: { body: CatFleetBody; index: number;
 /**
  * Each orbit is a flat circle squashed and tilted by one static transform; only rotations
  * animate, so the compositor moves the moons without repainting. The back copy is whole and
- * sits behind the cat. The front copy shows the near half over it.
+ * sits behind the cat. The front copy shows the near half over it, and the through copy shows
+ * the far half as outlines, inside the cat only.
  */
 function OrbitLayer({
   side,
   bodies,
   speed,
 }: {
-  side: "back" | "front";
+  side: "back" | "through" | "front";
   bodies: readonly CatFleetBody[];
   speed: number;
 }) {
-  const front = side === "front";
   return ORBITS.map((orbit, orbitIndex) => {
+    const onOrbit = bodies.filter((body) => orbitIndexOf(body) === orbitIndex);
+    if (onOrbit.length === 0) return null;
     const halfBox = orbit.radius + 8;
     return (
       <div
         className={cn(
-          "pointer-events-none absolute origin-top",
-          front ? "z-[2] overflow-hidden" : "z-0",
+          "pointer-events-none absolute",
+          side === "back" && "z-0 origin-top",
+          side === "through" && "origin-bottom overflow-hidden",
+          side === "front" && "z-[2] origin-top overflow-hidden",
         )}
         key={orbit.radius}
         style={{
           left: ORBIT_CENTER.x - halfBox,
-          top: ORBIT_CENTER.y,
+          top: side === "through" ? ORBIT_CENTER.y - halfBox : ORBIT_CENTER.y,
           width: 2 * halfBox,
           height: halfBox,
           transform: `rotate(${orbit.tilt}deg) scaleY(${ORBIT_SQUASH})`,
         }}
       >
-        <div className="absolute top-0 left-1/2 size-0">
-          <span
-            className="absolute rounded-full border border-current opacity-10"
-            style={{ width: 2 * orbit.radius, height: 2 * orbit.radius, margin: -orbit.radius }}
-          />
-          {bodies
-            .filter(
-              (body) => Math.floor(fleetHashUnit(body.key) * 7919) % ORBITS.length === orbitIndex,
-            )
-            .map((body) => (
-              <OrbitingBody
-                body={body}
-                front={front}
-                key={body.key}
-                period={orbit.period * speed}
-                radius={orbit.radius}
-              />
-            ))}
+        <div className={cn("absolute left-1/2 size-0", side === "through" ? "top-full" : "top-0")}>
+          {onOrbit.map((body) => (
+            <OrbitingBody
+              body={body}
+              key={body.key}
+              period={orbit.period * speed}
+              radius={orbit.radius}
+              side={side}
+            />
+          ))}
         </div>
       </div>
     );
@@ -303,51 +468,43 @@ function orbitStyle(period: number, phase: number, held = false): CSSProperties 
 
 function OrbitingBody({
   body,
-  front,
+  side,
   period,
   radius,
 }: {
   body: CatFleetBody;
-  front: boolean;
+  side: "back" | "through" | "front";
   period: number;
   radius: number;
 }) {
   const unit = fleetHashUnit(body.key);
-  const color = moonColor(body.key);
-  const subagents = Math.min(body.subagents, SUBAGENT.max);
+  const subagents = side === "through" ? 0 : Math.min(body.subagents, SUBAGENT.max);
   // Only a stopped thread with a running sub-agent is drawn here. Its arm is paused, so it
   // waits as a ring where it stopped.
   const held = !body.running;
+  const size = body.running ? MOON_SIZE : STOPPED_SIZE;
+  const moon = { width: size, height: size, margin: -size / 2, transform: UNSQUASH };
 
   return (
     <span className={cn(POINT, "cat-orbit-arm")} style={orbitStyle(period, unit, held)}>
       <span className={POINT} style={{ transform: `translateX(${radius}px)` }}>
         <span className={cn(POINT, "cat-orbit-unspin")} style={orbitStyle(period, unit, held)}>
-          {body.running ? (
+          {side === "through" ? (
             <span
-              className="absolute rounded-full"
-              style={{
-                width: MOON_SIZE,
-                height: MOON_SIZE,
-                margin: -MOON_SIZE / 2,
-                background: color,
-                // Over the cat a glow would vanish into the orange, so the near copy gets an edge.
-                boxShadow: front
-                  ? "0 0 0 0.8px var(--color-cat-shade)"
-                  : `0 0 ${MOON_SIZE * 0.7}px ${MOON_SIZE * 0.12}px color-mix(in srgb, ${color} 60%, transparent)`,
-                transform: UNSQUASH,
-              }}
+              className="absolute rounded-full border border-dotted border-current"
+              style={moon}
+            />
+          ) : body.running ? (
+            <span
+              // Over the cat a glow would vanish into the orange, so the near copy has an edge only.
+              className={cn(
+                "absolute rounded-full",
+                side === "front" ? "cat-moon-near" : "cat-moon",
+              )}
+              style={{ ...moon, "--cat-moon-color": moonColor(body.key) } as CSSProperties}
             />
           ) : (
-            <span
-              className="absolute rounded-full border border-current opacity-60"
-              style={{
-                width: STOPPED_SIZE,
-                height: STOPPED_SIZE,
-                margin: -STOPPED_SIZE / 2,
-                transform: UNSQUASH,
-              }}
-            />
+            <span className="absolute rounded-full border border-current opacity-60" style={moon} />
           )}
           {Array.from({ length: subagents }, (_, index) => {
             const phase = index / subagents + unit;

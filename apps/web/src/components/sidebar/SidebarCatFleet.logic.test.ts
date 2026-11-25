@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { summarizeCatFleet } from "./SidebarCatFleet.logic";
+import { arrangeCatFleet, summarizeCatFleet } from "./SidebarCatFleet.logic";
 
 describe("summarizeCatFleet", () => {
   it("lists each machine's running and unsettled threads and counts sub-agents on their thread", () => {
@@ -68,5 +68,75 @@ describe("summarizeCatFleet", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("arrangeCatFleet", () => {
+  const machine = (environmentId: string, running: number, stopped: number, offline = false) => ({
+    environmentId,
+    label: environmentId,
+    offline,
+    bodies: [
+      ...Array.from({ length: running }, (_, index) => ({
+        key: `${environmentId}-run-${index}`,
+        title: "",
+        running: true,
+        subagents: 0,
+      })),
+      ...Array.from({ length: stopped }, (_, index) => ({
+        key: `${environmentId}-stop-${index}`,
+        title: "",
+        running: false,
+        subagents: 0,
+      })),
+    ],
+  });
+
+  it("puts the busiest machines first and offline ones last", () => {
+    const fleet = [
+      machine("idle", 0, 0),
+      machine("offline-busy", 4, 0, true),
+      machine("waiting", 0, 3),
+      machine("busy", 2, 0),
+      machine("busier", 3, 1),
+      machine("idle-too", 0, 0),
+    ];
+    const { shown, hidden } = arrangeCatFleet(fleet, 6);
+
+    expect(shown.map((entry) => entry.environmentId)).toEqual([
+      "busier",
+      "busy",
+      "waiting",
+      "idle",
+      "idle-too",
+      "offline-busy",
+    ]);
+    expect(hidden).toEqual([]);
+  });
+
+  it("keeps the last cell for the machines that do not fit", () => {
+    const fleet = [
+      machine("a", 0, 0),
+      machine("b", 5, 0),
+      machine("c", 0, 2),
+      machine("d", 1, 0),
+      machine("e", 0, 0),
+    ];
+    const { shown, hidden } = arrangeCatFleet(fleet, 4);
+
+    expect(shown.map((entry) => entry.environmentId)).toEqual(["b", "d", "c"]);
+    expect(hidden.map((entry) => entry.environmentId)).toEqual(["a", "e"]);
+    expect(arrangeCatFleet(fleet, 1).shown.map((entry) => entry.environmentId)).toEqual(["b"]);
+    expect(arrangeCatFleet(fleet, 0).shown).toEqual([]);
+  });
+
+  it("counts a running sub-agent as activity", () => {
+    const delegating = {
+      ...machine("delegating", 0, 0),
+      bodies: [{ key: "parent", title: "", running: false, subagents: 2 }],
+    };
+    const { shown } = arrangeCatFleet([machine("one", 1, 5), delegating], 8);
+
+    expect(shown.map((entry) => entry.environmentId)).toEqual(["delegating", "one"]);
   });
 });
