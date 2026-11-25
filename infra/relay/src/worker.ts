@@ -30,6 +30,7 @@ import {
 } from "./http/Api.ts";
 import * as CloudMintSigner from "./auth/CloudMintSigner.ts";
 import * as RelayHttpApi from "./http/Api.ts";
+import * as ConnectServiceDiscovery from "./http/ConnectServiceDiscovery.ts";
 import { ManagedEndpointZone, RelayApiZone, RelayDeploymentConfig } from "./zone.ts";
 import { RelayObservability } from "./observability.ts";
 import * as Observability from "./observability.ts";
@@ -173,6 +174,19 @@ export const layer = Api.make(
     const clerkSecretKey = yield* Config.Redacted("CLERK_SECRET_KEY");
     const clerkPublishableKey = yield* Config.String("CLERK_PUBLISHABLE_KEY");
     const clerkJwtAudience = yield* Config.String("CLERK_JWT_AUDIENCE");
+    // Public values apps read from the well-known document; without a template none is served.
+    const clerkJwtTemplate = Option.getOrUndefined(
+      Option.filter(
+        yield* Config.option(Config.String("CLERK_JWT_TEMPLATE")),
+        (value) => value.trim().length > 0,
+      ),
+    );
+    const clerkCliOAuthClientId = Option.getOrUndefined(
+      Option.filter(
+        yield* Config.option(Config.String("CLERK_CLI_OAUTH_CLIENT_ID")),
+        (value) => value.trim().length > 0,
+      ),
+    );
     const clerkWebhookSigningSecret = Option.getOrUndefined(
       Option.filter(
         yield* Config.option(Config.Redacted("CLERK_WEBHOOK_SIGNING_SECRET")),
@@ -563,6 +577,12 @@ export const layer = Api.make(
         ),
         HttpApiScalar.layer(RelayApi, { path: "/docs" }),
         RelayHttpApi.layerDocsRedirectRoute,
+        ConnectServiceDiscovery.layerRoute({
+          relayUrl: relayPublicOrigin,
+          clerkPublishableKey,
+          clerkJwtTemplate,
+          clerkCliOAuthClientId,
+        }),
       ).pipe(
         Layer.provide([Etag.layerWeak, layerHttpPlatformNotSupported, RelayHttpApi.layerCors]),
       ),
