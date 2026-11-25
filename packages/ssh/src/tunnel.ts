@@ -1028,7 +1028,8 @@ if [ -z "$REMOTE_PORT" ]; then
   # earlier launch can still hold the old log open and keep writing to it.
   rm -f "$LOG_FILE"
   (umask 077 && : >"$LOG_FILE")
-  nohup env T3CODE_NO_BROWSER=1 "$RUNNER_FILE" serve --host 127.0.0.1 --port "$REMOTE_PORT" --base-dir "$DEFAULT_SERVER_HOME" >>"$LOG_FILE" 2>&1 < /dev/null &
+  # The runner may fetch upstream's own build, which reports usage unless told not to.
+  nohup env T3CODE_NO_BROWSER=1 T3CODE_TELEMETRY_ENABLED="\${T3CODE_TELEMETRY_ENABLED:-false}" "$RUNNER_FILE" serve --host 127.0.0.1 --port "$REMOTE_PORT" --base-dir "$DEFAULT_SERVER_HOME" >>"$LOG_FILE" 2>&1 < /dev/null &
   REMOTE_PID="$!"
   printf '%s\\n' "$REMOTE_PID" >"$PID_FILE"
   printf '%s\\n' "$REMOTE_PORT" >"$PORT_FILE"

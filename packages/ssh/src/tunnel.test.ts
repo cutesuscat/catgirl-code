@@ -1739,6 +1739,7 @@ const canBind = (port) =>
           origin: "http://127.0.0.1:" + port,
           startedAt: new Date().toISOString(),
           serverVersion: version,
+          telemetry: process.env.T3CODE_TELEMETRY_ENABLED,
         }),
       );
     });
@@ -1848,18 +1849,37 @@ const canBind = (port) =>
           }),
         ),
       );
-      const connect = (archiveVersion: string) =>
+      // `profile` stands in for what the host's login shell exports before the script runs.
+      const connect = (archiveVersion: string, profile = "") =>
         Effect.gen(function* () {
           const launch = `${root}/launch-${archiveVersion}.sh`;
-          yield* fs.writeFileString(launch, SshTunnel.buildRemoteLaunchScript({ archiveVersion }));
+          yield* fs.writeFileString(
+            launch,
+            profile + SshTunnel.buildRemoteLaunchScript({ archiveVersion }),
+          );
           const result = yield* runScript(home, [launch, "test-state"]);
           assert.equal(result.exitCode, 0, result.stderr);
           const pid = yield* readManagedPid;
           launchedPids.add(pid);
           return pid;
         });
-      return { connect, readManagedPid, readServerVersion };
+      const readServerTelemetry = fs
+        .readFileString(`${home}/.t3/userdata/server-runtime.json`)
+        .pipe(Effect.map((raw) => (JSON.parse(raw) as { telemetry?: string }).telemetry));
+      return { connect, readManagedPid, readServerVersion, readServerTelemetry };
     });
+
+  it.live.skipIf(windowsHost)("starts the server with telemetry off unless the host opted in", () =>
+    Effect.gen(function* () {
+      const unset = yield* prepareLaunch(["0.1.6"]);
+      yield* unset.connect("0.1.6");
+      assert.equal(yield* unset.readServerTelemetry, "false");
+
+      const optedIn = yield* prepareLaunch(["0.1.6"]);
+      yield* optedIn.connect("0.1.6", "export T3CODE_TELEMETRY_ENABLED=true\n");
+      assert.equal(yield* optedIn.readServerTelemetry, "true");
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
 
   it.live.skipIf(windowsHost)(
     "a reconnect from an older client keeps a newer managed server running",
