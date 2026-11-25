@@ -14,18 +14,6 @@ export function useManagedPolicy(
   return environmentId == null ? undefined : serverConfigs.get(environmentId)?.managedPolicy;
 }
 
-/**
- * Whether this machine's server says it sends no usage data, as a Catgirl Code server does unless
- * asked. The relay tracing flag is the one answer the server gives, and it follows the same switches.
- */
-export function useUsageDataOff(environmentId: EnvironmentId | null | undefined): boolean {
-  const serverConfigs = useServerConfigs();
-  return (
-    environmentId != null &&
-    serverConfigs.get(environmentId)?.observability.relayTracingAllowed === false
-  );
-}
-
 export function usePrimaryManagedPolicy(): ManagedPolicySummary | undefined {
   return useManagedPolicy(usePrimaryEnvironmentId());
 }
