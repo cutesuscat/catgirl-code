@@ -178,6 +178,8 @@ export interface PersistedServerObservabilitySettings {
   readonly otlpTracesUrl: string | undefined;
   readonly otlpMetricsUrl: string | undefined;
   readonly otlpLogsUrl: string | undefined;
+  readonly analyticsUrl?: string | undefined;
+  readonly analyticsKey?: string | undefined;
 }
 
 function normalizePersistedServerSettingString(
@@ -192,12 +194,16 @@ function extractPersistedServerObservabilitySettings(input: {
     readonly otlpTracesUrl?: string;
     readonly otlpMetricsUrl?: string;
     readonly otlpLogsUrl?: string;
+    readonly analyticsUrl?: string;
+    readonly analyticsKey?: string;
   };
 }): PersistedServerObservabilitySettings {
   return {
     otlpTracesUrl: normalizePersistedServerSettingString(input.observability?.otlpTracesUrl),
     otlpMetricsUrl: normalizePersistedServerSettingString(input.observability?.otlpMetricsUrl),
     otlpLogsUrl: normalizePersistedServerSettingString(input.observability?.otlpLogsUrl),
+    analyticsUrl: normalizePersistedServerSettingString(input.observability?.analyticsUrl),
+    analyticsKey: normalizePersistedServerSettingString(input.observability?.analyticsKey),
   };
 }
 

@@ -262,6 +262,7 @@ import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts";
 import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
 import * as HostResources from "./resourceTelemetry/HostResources.ts";
+import * as AnalyticsDestination from "./telemetry/AnalyticsDestination.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import { commandFeatureUsage, featureUsage } from "./telemetry/FeatureUsage.ts";
 import type { TelemetryOwner } from "./telemetry/Identify.ts";
@@ -1591,6 +1592,7 @@ export const layerWsRpc = (
       const databaseStorage = yield* DatabaseStorage.DatabaseStorage;
       const serverSettings = yield* ServerSettings.ServerSettingsService;
       const hostEnvironment = yield* HostProcess.Environment;
+      const analyticsTarget = yield* AnalyticsDestination.resolved;
       const secretResolver = yield* SecretResolver.SecretResolver;
       const peerLinks = yield* PeerLinks.PeerLinks;
       const peerLinkRequests = yield* PeerLinkRequests.PeerLinkRequests;
@@ -1952,6 +1954,11 @@ export const layerWsRpc = (
             relayTracingAllowed: RelayTracing.allowedFor(
               hostEnvironment,
               serverSettings.managedPolicy,
+            ),
+            ...AnalyticsDestination.describeAnalytics(
+              hostEnvironment,
+              serverSettings.managedPolicy,
+              analyticsTarget,
             ),
           },
           settings,

@@ -385,6 +385,12 @@ export const ServerObservability = Schema.Struct({
   otlpLogsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Relay tracing policy for browsers opened from this server. */
   relayTracingAllowed: Schema.optionalKey(Schema.Boolean),
+  /** Where this server was told to send product usage analytics. Nothing is built in. */
+  analyticsUrl: Schema.optional(TrimmedNonEmptyString),
+  analyticsUrlSource: Schema.optional(OtlpEndpointSource),
+  analyticsKeySource: Schema.optional(OtlpEndpointSource),
+  /** Whether usage analytics are being sent. Absent from servers that predate the setting. */
+  analyticsEnabled: Schema.optionalKey(Schema.Boolean),
 });
 export type ServerObservability = typeof ServerObservability.Type;
 

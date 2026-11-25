@@ -477,3 +477,31 @@ describe("isRelayTracingEnabled", () => {
     }),
   );
 });
+
+describe("isAnalyticsAllowed", () => {
+  it("allows analytics unless something says no, and never needs an opt-in of its own", () => {
+    assert.isTrue(OtelEnvironment.isAnalyticsAllowed({}));
+    assert.isTrue(OtelEnvironment.isAnalyticsAllowed({ T3CODE_TELEMETRY_ENABLED: "true" }));
+    assert.isTrue(OtelEnvironment.isAnalyticsAllowed({ DO_NOT_TRACK: "0" }));
+    assert.isFalse(OtelEnvironment.isAnalyticsAllowed({ T3CODE_TELEMETRY_ENABLED: "false" }));
+    assert.isFalse(OtelEnvironment.isAnalyticsAllowed({ T3CODE_TELEMETRY_ENABLED: "off" }));
+    assert.isFalse(OtelEnvironment.isAnalyticsAllowed({ DO_NOT_TRACK: "1" }));
+    assert.isFalse(
+      OtelEnvironment.isAnalyticsAllowed({ DO_NOT_TRACK: "1", T3CODE_TELEMETRY_ENABLED: "true" }),
+    );
+  });
+
+  it("is off on a CI runner unless T3CODE_TELEMETRY_ENABLED turns it on", () => {
+    assert.isFalse(OtelEnvironment.isAnalyticsAllowed({ CI: "true" }));
+    assert.isFalse(OtelEnvironment.isAnalyticsAllowed({ GITHUB_ACTIONS: "true" }));
+    assert.isTrue(OtelEnvironment.isAnalyticsAllowed({ CI: "false" }));
+    assert.isTrue(
+      OtelEnvironment.isAnalyticsAllowed({ CI: "true", T3CODE_TELEMETRY_ENABLED: "true" }),
+    );
+  });
+
+  it("does not follow the OpenTelemetry kill switches, which are about exporting traces", () => {
+    assert.isTrue(OtelEnvironment.isAnalyticsAllowed({ OTEL_SDK_DISABLED: "true" }));
+    assert.isTrue(OtelEnvironment.isAnalyticsAllowed({ T3CODE_OTEL_SDK_DISABLED: "true" }));
+  });
+});

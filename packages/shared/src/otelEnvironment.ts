@@ -342,17 +342,30 @@ export const isCiEnvironment = (env: Readonly<Record<string, string | undefined>
     return value !== undefined && value !== "" && value !== "false" && value !== "0";
   });
 
-// Catgirl Code is a fork: analytics and relay traces go to upstream's accounts, so both stay off
+// Catgirl Code is a fork: relay traces go to an account baked into the build, so they stay off
 // until `T3CODE_TELEMETRY_ENABLED=true` asks for them. Set this to true for upstream's default.
+// Product analytics do not read it: they have no built-in destination (`isAnalyticsAllowed`).
 const TELEMETRY_ON_BY_DEFAULT: boolean = false;
 
-/** Whether product analytics and relay tracing are on when `T3CODE_TELEMETRY_ENABLED` is unset. */
+/** Whether relay tracing is on when `T3CODE_TELEMETRY_ENABLED` is unset. */
 export const isTelemetryOnByDefault = (env: Readonly<Record<string, string | undefined>>) =>
   TELEMETRY_ON_BY_DEFAULT && !isCiEnvironment(env);
 
 /** The cross-tool `DO_NOT_TRACK=1` convention turns off product analytics and relay tracing. */
 export const isDoNotTrackSet = (env: Readonly<Record<string, string | undefined>>) =>
   T3CODE_TRUE.includes(env.DO_NOT_TRACK?.trim().toLowerCase() ?? "");
+
+/**
+ * Whether the environment lets product analytics run once the machine has named a destination:
+ * on unless `T3CODE_TELEMETRY_ENABLED` says no, `DO_NOT_TRACK` is set, or a CI runner did not ask.
+ */
+export const isAnalyticsAllowed = (env: Readonly<Record<string, string | undefined>>) =>
+  flag("T3CODE_TELEMETRY_ENABLED", T3CODE_TRUE, T3CODE_FALSE, String).pipe(
+    Effect.map((telemetry) => (telemetry.value ?? !isCiEnvironment(env)) && !isDoNotTrackSet(env)),
+    Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord(env))),
+    Effect.orDie,
+    Effect.runSync,
+  );
 
 export const isRelayTracingEnabled = (env: Readonly<Record<string, string | undefined>>) =>
   Config.all({

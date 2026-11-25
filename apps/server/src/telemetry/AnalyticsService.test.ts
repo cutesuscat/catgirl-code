@@ -335,45 +335,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
     }),
   );
 
-  it.effect("sends nothing unless the environment opts in", () =>
-    Effect.gen(function* () {
-      const offCi = (telemetryEnv: Parameters<typeof analyticsLayerWith>[2]) =>
-        sendFor(1, respondWithStatus(204), recordTwentyEvents, undefined, telemetryEnv).pipe(
-          Effect.provideService(HostProcess.Environment, {}),
-        );
-      assert.deepEqual(yield* offCi({}), []);
-      assert.deepEqual(yield* offCi({ T3CODE_TELEMETRY_ENABLED: false }), []);
-      assert.equal((yield* offCi({ T3CODE_TELEMETRY_ENABLED: true })).length, 1);
-    }),
-  );
-
-  it.effect("a desktop login shell can opt in after the server has started", () =>
-    Effect.gen(function* () {
-      const env: NodeJS.ProcessEnv = { T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING: "1" };
-      const batches = yield* sendFor(
-        0,
-        respondWithStatus(204),
-        Effect.gen(function* () {
-          const analytics = yield* AnalyticsService.AnalyticsService;
-          yield* analytics.record("test.before-discovery");
-          yield* analytics.flush;
-          delete env.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING;
-          yield* analytics.record("test.no-preference");
-          yield* analytics.flush;
-          env.T3CODE_TELEMETRY_ENABLED = "true";
-          yield* analytics.record("test.opted-in");
-          yield* analytics.flush;
-        }),
-        undefined,
-        {},
-      ).pipe(Effect.provideService(HostProcess.Environment, env));
-      assert.deepEqual(
-        batches.flat().map((event) => event.event),
-        ["test.opted-in"],
-      );
-    }),
-  );
-
   it.effect("drops a batch the endpoint rejects without sending it again", () =>
     Effect.gen(function* () {
       const batches = yield* sendFor(10, respondWithStatus(400));

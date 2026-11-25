@@ -19,6 +19,7 @@ import {
 } from "@t3tools/shared/observability";
 import * as OtelEnvironment from "@t3tools/shared/otelEnvironment";
 import { type ReleaseChannel, releaseResourceAttributes } from "@t3tools/shared/releaseResource";
+import type { PersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
 import packageJson from "../package.json" with { type: "json" };
 
 // Official release workflows set this telemetry channel; other builds report dev.
@@ -85,6 +86,10 @@ export class ServerConfig extends Context.Service<
     readonly otlpLogsSource?: OtlpEndpointSource;
     readonly otlpLogsVariable?: string;
     readonly otelEnvironment: OtelEnvironment.OtelEnvironment;
+    /** The usage analytics destination that was saved in settings when the server started. */
+    readonly savedAnalytics?:
+      | Pick<PersistedServerObservabilitySettings, "analyticsUrl" | "analyticsKey">
+      | undefined;
     readonly mode: RuntimeMode;
     readonly port: number;
     readonly host: string | undefined;
