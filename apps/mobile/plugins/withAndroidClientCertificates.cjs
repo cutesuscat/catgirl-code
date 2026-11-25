@@ -12,7 +12,10 @@ function reassertAfterLifecycle(source) {
     throw new Error("Cannot re-assert client certificates after Expo lifecycle startup");
   const offset = matches[0].index + matches[0][0].length;
   if (source.includes(reassert)) {
-    if (!source.slice(offset).trimStart().startsWith(reassert) || source.split(reassert).length !== 2)
+    if (
+      !source.slice(offset).trimStart().startsWith(reassert) ||
+      source.split(reassert).length !== 2
+    )
       throw new Error(
         "Client certificate transport must be re-asserted immediately after Expo lifecycle startup",
       );

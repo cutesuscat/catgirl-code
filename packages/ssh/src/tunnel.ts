@@ -31,7 +31,6 @@ import {
   resolveSshCommand,
   resolveSshTarget,
   runSshCommand,
-  shellSingleQuote,
   sshTargetLogFields,
   targetConnectionKey,
 } from "./command.ts";
@@ -55,6 +54,7 @@ import {
   REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS,
   REMOTE_LAUNCH_BASE_TIMEOUT_MS,
   REMOTE_LAUNCH_TIMEOUT_MS,
+  remoteLoginShellArgs,
   type RemoteT3RunnerOptions,
   validLauncherId,
 } from "./remoteScripts.ts";
@@ -156,16 +156,6 @@ function normalizeSshErrorMessage(stderr: string, fallbackMessage: string): stri
   const cleaned = stderr.trim();
   return cleaned.length > 0 ? cleaned : fallbackMessage;
 }
-
-// Shells known to take `-l -c` with a POSIX-style `exec` read their own login
-// profiles first; any other shell (csh, pwsh, ...) keeps the plain `sh -l` launch.
-const remoteLoginShellArgs = (args = "") => [
-  "sh",
-  "-c",
-  shellSingleQuote(
-    `case "\${SHELL##*/}" in bash|zsh|ksh|fish|nu) exec "$SHELL" -l -c "exec sh -s${args ? ` -- ${args}` : ""}" ;; *) exec sh -l -s${args ? ` -- ${args}` : ""} ;; esac`,
-  ),
-];
 
 export const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemoteServer")(
   function* (

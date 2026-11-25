@@ -25,6 +25,7 @@ import {
   decodeRemoteLaunchOutput,
   decodeRemotePairingOutput,
   REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS,
+  remoteLoginShellArgs,
   targetConnectionKey,
 } from "@t3tools/ssh/remoteScripts";
 import * as Effect from "effect/Effect";
@@ -37,7 +38,7 @@ import { parseSshConfig, resolveSshHost } from "./sshConfig";
  * The t3 release a host is given when it has no server running yet. The desktop passes its
  * own version here; keep this in step with the server version this build is paired with.
  */
-export const REMOTE_T3_VERSION = "0.1.12";
+const REMOTE_T3_VERSION = "0.1.12";
 
 export interface SshGatewayDependencies {
   readonly native: SshNative;
@@ -126,7 +127,7 @@ export const makeSshGateway = Effect.fn("mobile.ssh.makeGateway")(function* (
       const launch = yield* call(() =>
         native.exec(
           sessionId,
-          `sh -l -s -- ${stateKey}`,
+          remoteLoginShellArgs(stateKey).join(" "),
           buildRemoteLaunchScript(runner),
           REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS,
         ),
@@ -174,7 +175,7 @@ export const makeSshGateway = Effect.fn("mobile.ssh.makeGateway")(function* (
           const pairing = yield* call(() =>
             native.exec(
               sessionId,
-              "sh -s",
+              remoteLoginShellArgs().join(" "),
               buildRemotePairingScript(stateKey, runner),
               REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS,
             ),

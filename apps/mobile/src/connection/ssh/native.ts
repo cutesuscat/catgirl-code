@@ -1,4 +1,7 @@
 import { requireOptionalNativeModule } from "expo";
+import { msg } from "gt-react-native";
+
+import { m } from "../../i18n/messages";
 
 export interface SshPublicKey {
   readonly line: string;
@@ -79,9 +82,14 @@ export function sshErrorCode(cause: unknown): string | null {
 export function sshFailureMessage(cause: unknown): string {
   switch (sshErrorCode(cause)) {
     case "ERR_SSH_AUTH":
-      return "The host did not accept this device's SSH key. Add the key from Settings > SSH to its authorized_keys.";
+      return m(
+        msg(
+          "The host did not accept this device's SSH key. Add the key from Settings > SSH to its {file}.",
+          { file: "authorized_keys" },
+        ),
+      );
     case "ERR_SSH_NO_KEY":
-      return "Create an SSH key in Settings > SSH first.";
+      return m(msg("Create an SSH key in Settings > SSH first."));
     default:
       return cause instanceof Error ? cause.message : String(cause);
   }

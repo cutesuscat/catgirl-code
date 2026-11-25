@@ -16,7 +16,7 @@ import * as Schema from "effect/Schema";
 
 const DEFAULT_REMOTE_PORT = 3773;
 const REMOTE_PORT_SCAN_WINDOW = 200;
-export const SSH_READY_PROBE_TIMEOUT_MS = 1_000;
+const SSH_READY_PROBE_TIMEOUT_MS = 1_000;
 const REMOTE_READY_TIMEOUT_MS = 60_000;
 export const REMOTE_LAUNCH_BASE_TIMEOUT_MS = 90_000;
 // Cold archive launches download and extract ~70 MB and may wait on an install lock.
@@ -1114,6 +1114,16 @@ export function buildRemoteLogTailScript(stateKey: string): string {
     T3_STATE_KEY: stateKey,
   });
 }
+
+// Shells known to take `-l -c` with a POSIX-style `exec` read their own login
+// profiles first; any other shell (csh, pwsh, ...) keeps the plain `sh -l` launch.
+export const remoteLoginShellArgs = (args = "") => [
+  "sh",
+  "-c",
+  shellSingleQuote(
+    `case "\${SHELL##*/}" in bash|zsh|ksh|fish|nu) exec "$SHELL" -l -c "exec sh -s${args ? ` -- ${args}` : ""}" ;; *) exec sh -l -s${args ? ` -- ${args}` : ""} ;; esac`,
+  ),
+];
 
 export function targetConnectionKey(target: DesktopSshEnvironmentTarget): string {
   return `${target.alias}\u0000${target.hostname}\u0000${target.username ?? ""}\u0000${target.port ?? ""}`;

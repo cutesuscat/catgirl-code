@@ -1,3 +1,4 @@
+import { useGT } from "gt-react-native";
 import { useState, useSyncExternalStore } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,10 +23,11 @@ function subscribe(listener: () => void) {
 }
 
 export function SettingsClientCertificateRouteScreen() {
+  const gt = useGT();
   const insets = useSafeAreaInsets();
   const origin = relayCertificateOrigin();
   return (
-    <SettingsScreen title="Client certificate">
+    <SettingsScreen title={gt("Client certificate")}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -35,11 +37,11 @@ export function SettingsClientCertificateRouteScreen() {
       >
         {!clientCertificatesAvailable ? (
           <Text className="px-4 text-foreground-muted">
-            Client certificates need the Android custom build.
+            {gt("Client certificates need the Android custom build.")}
           </Text>
         ) : origin === null ? (
           <Text className="px-4 text-foreground-muted">
-            This build has no T3 Connect relay configured.
+            {gt("This build has no {product} relay configured.", { product: "T3 Connect" })}
           </Text>
         ) : (
           <DefaultCertificate origin={origin} />
@@ -50,6 +52,7 @@ export function SettingsClientCertificateRouteScreen() {
 }
 
 function DefaultCertificate({ origin }: { readonly origin: string }) {
+  const gt = useGT();
   const domain = origin.slice("https://".length, -1);
   const alias = useSyncExternalStore(
     subscribe,
@@ -62,21 +65,26 @@ function DefaultCertificate({ origin }: { readonly origin: string }) {
     void (remove ? removeClientCertificate(origin) : chooseClientCertificate(origin))
       .catch((error: unknown) => {
         Dialog.alert(
-          "Client certificate",
-          error instanceof Error ? error.message : "Could not select certificate.",
+          gt("Client certificate"),
+          error instanceof Error ? error.message : gt("Could not select certificate."),
         );
       })
       .finally(() => setBusy(false));
   };
   return (
     <SettingsSection
-      title="Default for T3 Connect machines"
-      footer={`Sent to every machine under ${domain} that asks for one, including machines added later. A certificate chosen for one environment's own address takes priority.`}
+      title={gt("Default for {product} machines", { product: "T3 Connect" })}
+      footer={gt(
+        "Sent to every machine under {domain} that asks for one, including machines added later. A certificate chosen for one environment's own address takes priority.",
+        { domain },
+      )}
     >
       <View className="gap-3 px-4 py-4">
         <View className="gap-1">
-          <Text className="text-sm text-foreground-muted">Selected certificate</Text>
-          <Text className="text-base text-foreground">{alias ?? "None"}</Text>
+          <Text className="text-sm text-foreground-muted">{gt("Selected certificate")}</Text>
+          <Text className="text-base text-foreground">
+            {alias ?? gt("None", { $context: "no client certificate is selected" })}
+          </Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -85,7 +93,11 @@ function DefaultCertificate({ origin }: { readonly origin: string }) {
           className="rounded-xl bg-input px-4 py-3"
         >
           <Text className="text-foreground">
-            {busy ? "Please wait…" : alias ? "Change certificate" : "Select certificate"}
+            {busy
+              ? gt("Please wait…")
+              : alias
+                ? gt("Change certificate")
+                : gt("Select certificate")}
           </Text>
         </Pressable>
         {alias ? (
@@ -95,7 +107,7 @@ function DefaultCertificate({ origin }: { readonly origin: string }) {
             onPress={() => act(true)}
             className="px-4 py-2"
           >
-            <Text className="text-danger-foreground">Remove certificate</Text>
+            <Text className="text-danger-foreground">{gt("Remove certificate")}</Text>
           </Pressable>
         ) : null}
       </View>

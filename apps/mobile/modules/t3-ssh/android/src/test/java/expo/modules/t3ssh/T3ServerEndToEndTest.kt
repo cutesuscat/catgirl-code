@@ -42,7 +42,8 @@ class T3ServerEndToEndTest {
       scripts != null && home != null && TestSshd.available
     )
     scripts!!
-    val stateKey = File(scripts, "state-key").readText().trim()
+    val launchCommand = File(scripts, "launch-command").readText()
+    val pairingCommand = File(scripts, "pairing-command").readText()
 
     val target =
       sshd("environment=\"HOME=$home\" ${key.publicKeyLine("e2e")}", "PermitUserEnvironment yes")
@@ -60,11 +61,8 @@ class T3ServerEndToEndTest {
     )
     val session = (result as SshConnectResult.Connected).session.also(cleanup::add)
 
-    val launch = session.exec(
-      "sh -l -s -- $stateKey",
-      File(scripts, "launch.sh").readText(),
-      LAUNCH_TIMEOUT_MS
-    )
+    val launch =
+      session.exec(launchCommand, File(scripts, "launch.sh").readText(), LAUNCH_TIMEOUT_MS)
     assertEquals(launch.stderr, 0, launch.exitCode)
     val remotePort = field(launch.stdout, "remotePort").toInt()
     try {
@@ -73,7 +71,8 @@ class T3ServerEndToEndTest {
       val descriptor = http(localPort, "/.well-known/t3/environment")
       assertTrue(descriptor, descriptor.contains("\"environmentId\""))
 
-      val pairing = session.exec("sh -s", File(scripts, "pairing.sh").readText(), LAUNCH_TIMEOUT_MS)
+      val pairing =
+        session.exec(pairingCommand, File(scripts, "pairing.sh").readText(), LAUNCH_TIMEOUT_MS)
       assertEquals(pairing.stderr, 0, pairing.exitCode)
       val token = http(
         localPort,
@@ -89,11 +88,8 @@ class T3ServerEndToEndTest {
       assertTrue(sessionState, sessionState.contains("\"authenticated\":true"))
 
       // A second launch finds the running server instead of starting another.
-      val again = session.exec(
-        "sh -l -s -- $stateKey",
-        File(scripts, "launch.sh").readText(),
-        LAUNCH_TIMEOUT_MS
-      )
+      val again =
+        session.exec(launchCommand, File(scripts, "launch.sh").readText(), LAUNCH_TIMEOUT_MS)
       assertEquals(remotePort, field(again.stdout, "remotePort").toInt())
     } finally {
       session.exec("sh -s", File(scripts, "stop.sh").readText(), 60_000)

@@ -1,5 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
+import { useGT } from "gt-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Share, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +24,7 @@ const KEY_COMMENT = "t3code-android";
 const CONFIG_PLACEHOLDER = "Host my-server\n  HostName server.example.com\n  User me";
 
 export function SettingsSshRouteScreen() {
+  const gt = useGT();
   const insets = useSafeAreaInsets();
   return (
     <SettingsScreen title="SSH">
@@ -35,7 +37,9 @@ export function SettingsSshRouteScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
         {sshNative === null ? (
-          <Text className="px-4 text-foreground-muted">SSH environments need the Android app.</Text>
+          <Text className="px-4 text-foreground-muted">
+            {gt("SSH environments need the Android app.")}
+          </Text>
         ) : (
           <SshSettings native={sshNative} />
         )}
@@ -45,6 +49,7 @@ export function SettingsSshRouteScreen() {
 }
 
 function SshSettings({ native }: { readonly native: SshNative }) {
+  const gt = useGT();
   const [key, setKey] = useState<SshPublicKey | null>(null);
   const [savedConfig, setSavedConfig] = useState("");
   const [config, setConfig] = useState("");
@@ -95,9 +100,9 @@ function SshSettings({ native }: { readonly native: SshNative }) {
 
   const forgetHost = (host: SshKnownHost) =>
     Dialog.confirm({
-      title: `Remove ${host.names.join(", ")}?`,
-      message: "You will be asked to check its key again on the next connection.",
-      confirmText: "Remove",
+      title: gt("Remove {hosts}?", { hosts: host.names.join(", ") }),
+      message: gt("You will be asked to check its key again on the next connection."),
+      confirmText: gt("Remove"),
       destructive: true,
       onConfirm: () =>
         void run(null, async () => {
@@ -109,17 +114,19 @@ function SshSettings({ native }: { readonly native: SshNative }) {
   return (
     <>
       <SettingsSection
-        title="This device's key"
+        title={gt("This device's key")}
         footer={
           key === null
-            ? "An ed25519 key that stays on this device and is never backed up."
-            : "Add this line to ~/.ssh/authorized_keys on each host. It is the only key the app uses."
+            ? gt("An ed25519 key that stays on this device and is never backed up.")
+            : gt("Add this line to {path} on each host. It is the only key the app uses.", {
+                path: "~/.ssh/authorized_keys",
+              })
         }
       >
         {key === null ? (
           <ListActionRow
             icon="plus"
-            label="Create SSH key"
+            label={gt("Create SSH key")}
             loading={busy === "key"}
             onPress={createKey}
           />
@@ -134,24 +141,26 @@ function SshSettings({ native }: { readonly native: SshNative }) {
             <View className="ml-4 border-t border-border-subtle" />
             <ListActionRow
               icon="doc.on.doc"
-              label="Copy public key"
+              label={gt("Copy public key")}
               onPress={() => copyKey(key.line)}
             />
             <ListActionRow
               icon="square.and.arrow.up"
-              label="Share public key"
+              label={gt("Share public key")}
               onPress={() => void Share.share({ message: key.line })}
             />
             <ListActionRow
               icon="arrow.clockwise"
-              label="Replace key"
+              label={gt("Replace key")}
               tone="danger"
               loading={busy === "key"}
               onPress={() =>
                 Dialog.confirm({
-                  title: "Replace this device's SSH key?",
-                  message: "Hosts stop accepting this device until you add the new key to them.",
-                  confirmText: "Replace",
+                  title: gt("Replace this device's SSH key?"),
+                  message: gt(
+                    "Hosts stop accepting this device until you add the new key to them.",
+                  ),
+                  confirmText: gt("Replace"),
                   destructive: true,
                   onConfirm: createKey,
                 })
@@ -162,11 +171,13 @@ function SshSettings({ native }: { readonly native: SshNative }) {
       </SettingsSection>
 
       <SettingsSection
-        title="SSH config"
-        footer="Uses Host, HostName, User, Port, ProxyJump and HostKeyAlias, as in ~/.ssh/config."
+        title={gt("SSH config")}
+        footer={gt("Uses Host, HostName, User, Port, ProxyJump and HostKeyAlias, as in {path}.", {
+          path: "~/.ssh/config",
+        })}
       >
         <AppTextInput
-          accessibilityLabel="SSH config"
+          accessibilityLabel={gt("SSH config")}
           multiline
           autoCapitalize="none"
           autoCorrect={false}
@@ -185,7 +196,7 @@ function SshSettings({ native }: { readonly native: SshNative }) {
         <View className="ml-4 border-t border-border-subtle" />
         <ListActionRow
           icon="checkmark.circle"
-          label="Save config"
+          label={gt("Save config")}
           disabled={config === savedConfig}
           loading={busy === "config"}
           onPress={saveConfig}
@@ -193,11 +204,11 @@ function SshSettings({ native }: { readonly native: SshNative }) {
       </SettingsSection>
 
       <SettingsSection
-        title="Trusted host keys"
-        footer="A host's key is added when you confirm it while adding an environment."
+        title={gt("Trusted host keys")}
+        footer={gt("A host's key is added when you confirm it while adding an environment.")}
       >
         {knownHosts.length === 0 ? (
-          <ListActionRow label="None yet" disabled onPress={() => undefined} />
+          <ListActionRow label={gt("None yet")} disabled onPress={() => undefined} />
         ) : (
           knownHosts.map((host) => (
             <ListActionRow

@@ -141,7 +141,7 @@ function ConfiguredSettingsRouteScreen() {
           label: gt("Notifications"),
           target: "SettingsNotifications",
         },
-        ...sshRows,
+        ...sshRows(gt),
       ]}
     />
   );
@@ -154,13 +154,13 @@ function LocalSettingsRouteScreen() {
     <SettingsList
       connections={[
         environmentsRow(gt("Environments"), Object.keys(savedConnectionsById).length),
-        ...sshRows,
+        ...sshRows(gt),
       ]}
     />
   );
 }
 
-const sshRows: readonly SettingsListRow[] = [
+const sshRows = (gt: ReturnType<typeof useGT>): readonly SettingsListRow[] => [
   ...(sshNative === null
     ? []
     : [{ id: "SettingsSsh", icon: "terminal", label: "SSH", target: "SettingsSsh" } as const]),
@@ -169,7 +169,7 @@ const sshRows: readonly SettingsListRow[] = [
         {
           id: "SettingsClientCertificate",
           icon: { ios: "lock", android: "lock" },
-          label: "Client certificate",
+          label: gt("Client certificate"),
           target: "SettingsClientCertificate",
         } as const,
       ]

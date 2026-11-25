@@ -8,6 +8,7 @@ import {
   buildRemoteLaunchScript,
   buildRemotePairingScript,
   buildRemoteStopScript,
+  remoteLoginShellArgs,
 } from "@t3tools/ssh/remoteScripts";
 
 const [outDir, archiveVersion] = process.argv.slice(2);
@@ -19,9 +20,14 @@ const stateKey = "0123456789abcdef";
 const runner = { archiveVersion };
 NodeFS.mkdirSync(outDir, { recursive: true });
 NodeFS.writeFileSync(NodePath.join(outDir, "state-key"), stateKey);
+NodeFS.writeFileSync(
+  NodePath.join(outDir, "launch-command"),
+  remoteLoginShellArgs(stateKey).join(" "),
+);
+NodeFS.writeFileSync(NodePath.join(outDir, "pairing-command"), remoteLoginShellArgs().join(" "));
 NodeFS.writeFileSync(NodePath.join(outDir, "launch.sh"), buildRemoteLaunchScript(runner));
 NodeFS.writeFileSync(
   NodePath.join(outDir, "pairing.sh"),
   buildRemotePairingScript(stateKey, runner),
 );
-NodeFS.writeFileSync(NodePath.join(outDir, "stop.sh"), buildRemoteStopScript(stateKey));
+NodeFS.writeFileSync(NodePath.join(outDir, "stop.sh"), buildRemoteStopScript(stateKey, null));

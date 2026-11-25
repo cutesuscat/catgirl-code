@@ -31,6 +31,11 @@ vi.mock("@t3tools/client-runtime/authorization", () => ({
 import { makeSshGateway } from "./gateway";
 import type { SshConnectResult, SshNative } from "./native";
 
+// The desktop's login-shell wrapper: the user's own shell reads its profile, then runs sh.
+const loginShell = (args: string) =>
+  `sh -c 'case "\${SHELL##*/}" in bash|zsh|ksh|fish|nu) exec "$SHELL" -l -c "exec sh -s${args}" ;; *) exec sh -l -s${args} ;; esac'`;
+const PAIRING_COMMAND = loginShell("");
+
 const CONFIG = `
 Host jump
   HostName jump.example
@@ -73,9 +78,13 @@ function setup(options: { readonly connect?: () => SshConnectResult } = {}) {
       return { status: "connected", sessionId };
     }),
     exec: vi.fn(async (_id: string, command: string, _stdin: string, _timeoutMs: number) =>
-      command.startsWith("sh -l -s")
-        ? { exitCode: 0, stdout: 'motd\n{"remotePort":3777,"serverKind":"external"}\n', stderr: "" }
-        : { exitCode: 0, stdout: '{"credential":"pairing-1"}\n', stderr: "" },
+      command === PAIRING_COMMAND
+        ? { exitCode: 0, stdout: '{"credential":"pairing-1"}\n', stderr: "" }
+        : {
+            exitCode: 0,
+            stdout: 'motd\n{"remotePort":3777,"serverKind":"external"}\n',
+            stderr: "",
+          },
     ),
     forward: vi.fn(async (_id: string, _remotePort: number) => 41001),
     isOpen: (id: string) => open.has(id),
@@ -118,8 +127,8 @@ describe("mobile SSH gateway", () => {
         { host: "127.0.0.1", port: 2222, user: "dev", hostKeyAlias: null },
       ]);
       expect(native.exec.mock.calls.map((call) => call[1])).toEqual([
-        `sh -l -s -- ${stateKey}`,
-        "sh -s",
+        loginShell(` -- ${stateKey}`),
+        PAIRING_COMMAND,
       ]);
       expect(native.forward).toHaveBeenCalledWith("session-1", 3777);
       expect(http.exchange).toHaveBeenCalledWith(
@@ -174,7 +183,7 @@ describe("mobile SSH gateway", () => {
       });
 
       expect(prepared.bearerToken).toBe("token-new");
-      expect(native.exec.mock.calls.map((call) => call[1])).toContain("sh -s");
+      expect(native.exec.mock.calls.map((call) => call[1])).toContain(PAIRING_COMMAND);
     }),
   );
 

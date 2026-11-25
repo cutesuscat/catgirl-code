@@ -1,3 +1,4 @@
+import { useGT } from "gt-react-native";
 import { useState, useSyncExternalStore } from "react";
 import { Pressable, View } from "react-native";
 
@@ -33,14 +34,15 @@ export function ClientCertificateField(props: {
   );
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const gt = useGT();
   if (!clientCertificatesAvailable) return null;
   const act = (remove: boolean) => {
     setBusy(true);
     void (remove ? removeClientCertificate(endpoint) : chooseClientCertificate(endpoint))
       .catch((error: unknown) => {
         Dialog.alert(
-          "Client certificate",
-          error instanceof Error ? error.message : "Could not select certificate.",
+          gt("Client certificate"),
+          error instanceof Error ? error.message : gt("Could not select certificate."),
         );
       })
       .finally(() => setBusy(false));
@@ -55,9 +57,9 @@ export function ClientCertificateField(props: {
         className="flex-row items-center justify-between px-4 py-3"
       >
         <View className="gap-1">
-          <Text className="text-sm text-foreground-muted">Advanced settings</Text>
+          <Text className="text-sm text-foreground-muted">{gt("Advanced settings")}</Text>
           {alias ? (
-            <Text className="text-xs text-foreground-muted">Certificate selected</Text>
+            <Text className="text-xs text-foreground-muted">{gt("Certificate selected")}</Text>
           ) : null}
         </View>
         <SymbolView
@@ -69,12 +71,14 @@ export function ClientCertificateField(props: {
       {expanded ? (
         <View className="gap-2 px-4 pb-3">
           <Text className="text-2xs font-t3-bold uppercase text-foreground-muted">
-            Client certificate (optional)
+            {gt("Client certificate (optional)")}
           </Text>
           <Text className="text-sm text-foreground-muted">
-            {alias ?? "None selected"}.{" "}
+            {alias ?? gt("None selected")}.{" "}
             {props.description ??
-              "Applies to this HTTPS host and port, including other environments using the same address."}
+              gt(
+                "Applies to this HTTPS host and port, including other environments using the same address.",
+              )}
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -83,7 +87,11 @@ export function ClientCertificateField(props: {
             className="rounded-xl bg-input px-4 py-3"
           >
             <Text className="text-foreground">
-              {busy ? "Please wait…" : alias ? "Change certificate" : "Select certificate"}
+              {busy
+                ? gt("Please wait…")
+                : alias
+                  ? gt("Change certificate")
+                  : gt("Select certificate")}
             </Text>
           </Pressable>
           {alias ? (
@@ -93,7 +101,7 @@ export function ClientCertificateField(props: {
               onPress={() => act(true)}
               className="px-4 py-2"
             >
-              <Text className="text-danger-foreground">Remove certificate</Text>
+              <Text className="text-danger-foreground">{gt("Remove certificate")}</Text>
             </Pressable>
           ) : null}
         </View>

@@ -246,7 +246,10 @@ export function ConnectionEnvironmentRow(props: {
                 <ClientCertificateField
                   host={relayCertificateScope}
                   endpoint={relayCertificateScope}
-                  description={`Applies to every machine under ${relayCertificateScope.slice(8, -1)}, including T3 Connect machines added later. A certificate chosen for one exact address takes priority.`}
+                  description={gt(
+                    "Applies to every machine under {domain}, including {product} machines added later. A certificate chosen for one exact address takes priority.",
+                    { domain: relayCertificateScope.slice(8, -1), product: "T3 Connect" },
+                  )}
                 />
               ) : null}
             </>

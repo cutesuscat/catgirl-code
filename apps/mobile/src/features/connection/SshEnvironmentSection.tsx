@@ -2,6 +2,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import * as Haptics from "expo-haptics";
+import { msg, useGT } from "gt-react-native";
 import { useCallback, useState } from "react";
 import { View } from "react-native";
 
@@ -22,6 +23,7 @@ import {
   type SshConfig,
   type SshConfigHost,
 } from "../../connection/ssh/sshConfig";
+import { m } from "../../i18n/messages";
 import { useAtomCommand } from "../../state/use-atom-command";
 
 /** Hosts from the app's SSH config, on platforms with the SSH module. */
@@ -33,6 +35,7 @@ export function SshEnvironmentSection(props: { readonly onConnected: () => void 
 
 function SshHosts(props: { readonly native: SshNative; readonly onConnected: () => void }) {
   const { native, onConnected } = props;
+  const gt = useGT();
   const navigation = useNavigation();
   const connectSsh = useAtomCommand(connectSshEnvironment, { reportFailure: false });
   const [config, setConfig] = useState<SshConfig>({ hosts: [], problems: [] });
@@ -66,9 +69,9 @@ function SshHosts(props: { readonly native: SshNative; readonly onConnected: () 
 
   const connect = async (alias: string) => {
     if (!hasKey) {
-      Dialog.alert("Create an SSH key first", "Then add its public key to the host.", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Open SSH settings", onPress: openSettings },
+      Dialog.alert(gt("Create an SSH key first"), gt("Then add its public key to the host."), [
+        { text: gt("Cancel"), style: "cancel" },
+        { text: gt("Open SSH settings"), onPress: openSettings },
       ]);
       return;
     }
@@ -82,12 +85,14 @@ function SshHosts(props: { readonly native: SshNative; readonly onConnected: () 
         : Haptics.NotificationFeedbackType.Error,
     );
     if (failure === null) onConnected();
-    else Dialog.alert("Could not connect", failure);
+    else Dialog.alert(gt("Could not connect"), failure);
   };
 
   return (
     <View collapsable={false} className="gap-2">
-      <Text className="px-4 text-sm font-t3-medium text-foreground-muted">Or connect over SSH</Text>
+      <Text className="px-4 text-sm font-t3-medium text-foreground-muted">
+        {gt("Or connect over SSH")}
+      </Text>
       <View className="overflow-hidden rounded-[26px] border-continuous bg-grouped-card">
         {config.hosts.map((host) => (
           <ListActionRow
@@ -102,13 +107,15 @@ function SshHosts(props: { readonly native: SshNative; readonly onConnected: () 
         ))}
         <ListActionRow
           icon="slider.horizontal.3"
-          label={config.hosts.length === 0 ? "Set up SSH" : "SSH key and hosts"}
+          label={config.hosts.length === 0 ? gt("Set up SSH") : gt("SSH key and hosts")}
           disabled={connecting !== null}
           onPress={openSettings}
         />
       </View>
       <Text className="px-4 text-sm leading-normal text-foreground-muted">
-        Starts T3 Code on the host if needed, using this device's own SSH key.
+        {gt("Starts {product} on the host if needed, using this device's own SSH key.", {
+          product: "T3 Code",
+        })}
       </Text>
     </View>
   );
@@ -123,9 +130,18 @@ function describeHost(host: SshConfigHost): string {
 function confirmHostKey(rejection: SshHostKeyRejection): Promise<boolean> {
   return new Promise((resolve) =>
     Dialog.confirm({
-      title: `Trust ${rejection.knownHostsName}?`,
-      message: `This is the first connection to this host. Its ${rejection.keyType} key fingerprint is\n\n${rejection.fingerprint}\n\nCheck it against ssh-keygen -lf on the host before trusting it.`,
-      confirmText: "Trust",
+      title: m(msg("Trust {host}?", { host: rejection.knownHostsName })),
+      message: m(
+        msg(
+          "This is the first connection to this host. Its {keyType} key fingerprint is\n\n{fingerprint}\n\nCheck it against {command} on the host before trusting it.",
+          {
+            keyType: rejection.keyType,
+            fingerprint: rejection.fingerprint,
+            command: "ssh-keygen -lf",
+          },
+        ),
+      ),
+      confirmText: m(msg("Trust", { $context: "verb, button that accepts an SSH host key" })),
       onConfirm: () => resolve(true),
       onCancel: () => resolve(false),
     }),
