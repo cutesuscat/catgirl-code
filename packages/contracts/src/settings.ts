@@ -173,13 +173,13 @@ export const InterfaceFontSize = Schema.Int.check(
 export type InterfaceFontSize = typeof InterfaceFontSize.Type;
 export const DEFAULT_INTERFACE_FONT_SIZE: InterfaceFontSize = 16;
 
-export const MIN_SIDEBAR_CAT_FLEET_LIMIT = 1;
+const MIN_SIDEBAR_CAT_FLEET_LIMIT = 1;
 export const MAX_SIDEBAR_CAT_FLEET_LIMIT = 48;
 export const SidebarCatFleetLimit = Schema.Int.check(
   Schema.isBetween({ minimum: MIN_SIDEBAR_CAT_FLEET_LIMIT, maximum: MAX_SIDEBAR_CAT_FLEET_LIMIT }),
 );
 export type SidebarCatFleetLimit = typeof SidebarCatFleetLimit.Type;
-export const DEFAULT_SIDEBAR_CAT_FLEET_LIMIT: SidebarCatFleetLimit = 8;
+const DEFAULT_SIDEBAR_CAT_FLEET_LIMIT: SidebarCatFleetLimit = 8;
 
 export const MIN_PROMPT_FONT_SIZE = 12;
 export const MAX_PROMPT_FONT_SIZE = 20;

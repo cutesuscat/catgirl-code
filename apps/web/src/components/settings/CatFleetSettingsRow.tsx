@@ -17,7 +17,8 @@ const LIMITS: readonly SidebarCatFleetLimit[] = [4, 8, 12, 16, MAX_SIDEBAR_CAT_F
 export function CatFleetSettingsRow() {
   const enabled = useClientSettings((s) => s.sidebarCatFleetEnabled);
   const limit = useClientSettings((s) => s.sidebarCatFleetLimit);
-  const label = (value: number) => (value >= MAX_SIDEBAR_CAT_FLEET_LIMIT ? "All" : `Up to ${value}`);
+  const label = (value: number) =>
+    value >= MAX_SIDEBAR_CAT_FLEET_LIMIT ? "All" : `Up to ${value}`;
   const isDefault =
     enabled === DEFAULT_CLIENT_SETTINGS.sidebarCatFleetEnabled &&
     limit === DEFAULT_CLIENT_SETTINGS.sidebarCatFleetLimit;
