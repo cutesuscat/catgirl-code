@@ -8,7 +8,6 @@ import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { Tooltip, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import {
   arrangeCatFleet,
-  CAT_FLEET_DEFAULT_LIMIT,
   catFleetActivity,
   fleetHashUnit,
   type CatFleetBody,
@@ -71,11 +70,11 @@ const UNSQUASH = `scaleY(${1 / ORBIT_SQUASH})`;
  */
 export const SidebarCatFleet = memo(function SidebarCatFleet({
   machines,
-  limit = CAT_FLEET_DEFAULT_LIMIT,
+  limit,
 }: {
   machines: readonly CatFleetMachine[];
-  /** How many cells the fleet may take. Zero hides it. */
-  limit?: number;
+  /** How many cells the fleet may take. */
+  limit: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (machines.length === 0 || limit <= 0) return null;

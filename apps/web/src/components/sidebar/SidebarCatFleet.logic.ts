@@ -101,9 +101,6 @@ export function catFleetActivity(machine: CatFleetMachine): number {
   return machine.bodies.reduce((total, body) => total + (body.running ? 1 : 0) + body.subagents, 0);
 }
 
-/** How many cells the fleet takes in the sidebar unless the user picks another number. */
-export const CAT_FLEET_DEFAULT_LIMIT = 8;
-
 /**
  * Busiest machines first, then those with the most threads waiting, then idle ones, with
  * offline machines last. Equal machines keep catalog order. The fleet fills at most `limit`

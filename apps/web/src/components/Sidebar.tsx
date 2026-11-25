@@ -970,6 +970,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
   const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
   const timestampFormat = useClientSettings((s) => s.timestampFormat);
+  const catFleetEnabled = useClientSettings((s) => s.sidebarCatFleetEnabled);
+  const catFleetLimit = useClientSettings((s) => s.sidebarCatFleetLimit);
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
   const {
     settleThread,
@@ -3116,20 +3118,22 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       : undefined);
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
   // Every thread, not the listed ones: the fleet also shows sub-agents and hidden machines.
-  const catFleet = summarizeCatFleet({
-    environmentLabelById,
-    connectedEnvironmentIds,
-    threads,
-    isWorking: isThreadWorking,
-  });
+  const catFleet = catFleetEnabled
+    ? summarizeCatFleet({
+        environmentLabelById,
+        connectedEnvironmentIds,
+        threads,
+        isWorking: isThreadWorking,
+      })
+    : [];
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader isElectron={isElectron} />
-      <SidebarCatFleet machines={catFleet} />
       <SidebarContent
         ref={sidebarContentRef}
         className="min-h-full"
         fixedHeader={
+          <>
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
               hasProjects={projectGroups.length > 0}
@@ -3380,6 +3384,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               onClearSearch={clearThreadSearch}
             />
           </SidebarGroup>
+          <SidebarCatFleet machines={catFleet} limit={catFleetLimit} />
+          </>
         }
       >
         <SidebarGroup className="flex-1" role="presentation">

@@ -173,6 +173,14 @@ export const InterfaceFontSize = Schema.Int.check(
 export type InterfaceFontSize = typeof InterfaceFontSize.Type;
 export const DEFAULT_INTERFACE_FONT_SIZE: InterfaceFontSize = 16;
 
+export const MIN_SIDEBAR_CAT_FLEET_LIMIT = 1;
+export const MAX_SIDEBAR_CAT_FLEET_LIMIT = 48;
+export const SidebarCatFleetLimit = Schema.Int.check(
+  Schema.isBetween({ minimum: MIN_SIDEBAR_CAT_FLEET_LIMIT, maximum: MAX_SIDEBAR_CAT_FLEET_LIMIT }),
+);
+export type SidebarCatFleetLimit = typeof SidebarCatFleetLimit.Type;
+export const DEFAULT_SIDEBAR_CAT_FLEET_LIMIT: SidebarCatFleetLimit = 8;
+
 export const MIN_PROMPT_FONT_SIZE = 12;
 export const MAX_PROMPT_FONT_SIZE = 20;
 export const PromptFontSize = Schema.Int.check(
@@ -571,6 +579,11 @@ export const ClientSettingsSchema = Schema.Struct({
   // Names this device shows for machines, by environment id, in place of the machine's own.
   environmentLabelOverrides: Schema.Record(TrimmedNonEmptyString, TrimmedNonEmptyString).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
+  ),
+  // The machines drawn as cat planets in the sidebar, and how many cells they may take.
+  sidebarCatFleetEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  sidebarCatFleetLimit: SidebarCatFleetLimit.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_SIDEBAR_CAT_FLEET_LIMIT)),
   ),
   sidebarProjectGroupingMode: SidebarProjectGroupingMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_SIDEBAR_PROJECT_GROUPING_MODE)),
@@ -2180,6 +2193,8 @@ export const ClientSettingsPatch = Schema.Struct({
   environmentLabelOverrides: Schema.optionalKey(
     Schema.Record(TrimmedNonEmptyString, TrimmedNonEmptyString),
   ),
+  sidebarCatFleetEnabled: Schema.optionalKey(Schema.Boolean),
+  sidebarCatFleetLimit: Schema.optionalKey(SidebarCatFleetLimit),
   sidebarProjectGroupingMode: Schema.optionalKey(SidebarProjectGroupingMode),
   sidebarProjectGroupingOverrides: Schema.optionalKey(
     Schema.Record(TrimmedNonEmptyString, SidebarProjectGroupingMode),
