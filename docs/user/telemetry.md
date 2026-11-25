@@ -1,10 +1,13 @@
 # Product usage data
 
 > **Catgirl Code** is a fork of T3 Code and sends none of what this page describes unless you turn
-> it on. Product usage events and relay connection traces stay off until you set
-> `T3CODE_TELEMETRY_ENABLED=true` in the server's environment. The mobile app's crash reports and
-> connection traces stay off until you turn them on in **Settings > About > Diagnostics**. The rest
-> of this page describes what each one sends once it is on.
+> it on. Product usage events have no built-in destination and never go to `ingest.t3.codes`: they
+> go only to an address you enter, see
+> [Usage analytics in Catgirl Code](#usage-analytics-in-catgirl-code). Relay connection traces stay
+> off until you set `T3CODE_TELEMETRY_ENABLED=true` in the server's environment. The mobile app's
+> crash reports and connection traces stay off until you turn them on in
+> **Settings > About > Diagnostics**. The rest of this page describes what each one sends once it
+> is on.
 
 The T3 Code server sends product usage events to T3 Code's own endpoint at `ingest.t3.codes`,
 associated with a hashed random identifier for the installation. To count how many installations one person
@@ -141,3 +144,23 @@ settings. An overridden signal shows **Set by environment** and names the variab
 receivers that need authentication and `T3CODE_OTLP_PROTOCOL=http/protobuf` for receivers that do
 not accept JSON. An endpoint set with `OTEL_EXPORTER_OTLP_*` takes its headers and protocol from
 `OTEL_EXPORTER_OTLP_HEADERS` and `OTEL_EXPORTER_OTLP_PROTOCOL` instead.
+
+## Usage analytics in Catgirl Code
+
+A Catgirl Code server has nowhere to send product usage events until you give it an address. Open
+**Settings > Maintenance > Diagnostics**, select an environment, and under **Usage analytics** enter
+the address of a PostHog-compatible service (PostHog's own, such as `https://eu.i.posthog.com`, or
+one you host) and its project key. Save, then restart that environment's server. Events are posted
+to `<address>/batch/`.
+
+Entering both is the opt-in; there is no second switch. With either field empty, nothing is sent or
+queued, whatever `T3CODE_TELEMETRY_ENABLED` says. Everything above that turns product events off
+still does: `T3CODE_TELEMETRY_ENABLED=false`, `DO_NOT_TRACK=1`, a managed policy, and a CI runner
+that did not ask.
+
+`T3CODE_POSTHOG_HOST` and `T3CODE_POSTHOG_KEY` override the saved address and key. A field they set
+shows **Set by environment**, and the section shows **Sending to** with the host name while events
+go out. The Welcome page and **Settings > About** then name that host rather than T3 Code.
+
+A machine that runs an official T3 Code server does not have this setting. The section says so, and
+that server follows the rules in the rest of this page.

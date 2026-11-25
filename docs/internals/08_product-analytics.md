@@ -1,9 +1,14 @@
 # Product analytics
 
-> **Catgirl Code.** This fork reports nothing to upstream unless asked: `TELEMETRY_ON_BY_DEFAULT`
-> in [`otelEnvironment.ts`](../../packages/shared/src/otelEnvironment.ts) is `false`, so analytics
-> and relay tracing wait for `T3CODE_TELEMETRY_ENABLED=true`. Keep anything new that reports to
-> upstream behind `isTelemetryOnByDefault` or `AnalyticsService`, never beside them.
+> **Catgirl Code.** This fork builds in no analytics destination. `AnalyticsService` sends only to
+> the address and key that
+> [`AnalyticsDestination.ts`](../../apps/server/src/telemetry/AnalyticsDestination.ts) resolves at
+> start (`T3CODE_POSTHOG_HOST` and `T3CODE_POSTHOG_KEY` over the saved `observability.analyticsUrl`
+> and `analyticsKey`), and with either missing it queues and sends nothing. Naming both is the
+> opt-in; the opt-outs below still win. Relay tracing is separate: `TELEMETRY_ON_BY_DEFAULT` in
+> [`otelEnvironment.ts`](../../packages/shared/src/otelEnvironment.ts) is `false`, so it waits for
+> `T3CODE_TELEMETRY_ENABLED=true`. Never give anything that reports a default address, key, or
+> dataset, and keep new reporting behind `AnalyticsService` or `isTelemetryOnByDefault`.
 
 The server owns analytics delivery, opt-out, and identity for every connected client. Clients never
 load the PostHog browser SDK, PostHog person profiles stay disabled, and visiting hosted web without
