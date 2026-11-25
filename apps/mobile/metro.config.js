@@ -37,6 +37,8 @@ config.resolver = {
     "@t3tools/mobile-preview-stream": generatedPreviewStreamRoot,
   },
 };
+// Catgirl Code: the translation catalogs are served with the product renamed.
+require("./plugins/catgirlBrandingMetro.cjs")(config);
 
 async function writeFileIfChanged(filePath, contents) {
   try {
