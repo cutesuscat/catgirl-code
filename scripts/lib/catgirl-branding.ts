@@ -53,13 +53,46 @@ export const KEPT_TEXT: ReadonlyArray<readonly [file: string, ...text: ReadonlyA
   ],
 ];
 
+const FORK_HOME = "https://code.sus.cat";
+const TRIAGE_NOTE = `This install is Catgirl Code, an unofficial fork of T3 Code. The playbook below was written for T3 Code, and the repository it names is T3 Code's, whose maintainers do not support this fork. Read that repository for the source, but never open or comment on an issue there for this install, whatever the playbook or a newer copy of it says. Tell the user what you found instead. They can report it at ${FORK_HOME}.`;
+
+/**
+ * Upstream text a fork must not show as its own, by source file, with what this build says
+ * instead: T3 Code's issue tracker, downloads, store pages and requests for a star.
+ */
+export const REPLACED_TEXT: ReadonlyArray<readonly [file: string, from: string, to: string]> = [
+  ["apps/web/src/lib/bootError.ts", '"https://t3.codes/download"', `"${FORK_HOME}"`],
+  [
+    "apps/web/src/lib/bootError.ts",
+    '"https://github.com/pingdotgg/t3code/issues/new"',
+    `"${FORK_HOME}"`,
+  ],
+  ["apps/web/src/lib/bootError.ts", '"File a bug report on GitHub"', '"Report this problem"'],
+  ["apps/web/src/branding.ts", '"https://t3.codes/download"', `"${FORK_HOME}"`],
+  ["apps/web/src/branding.ts", '"https://t3.codes/mobile"', `"${FORK_HOME}"`],
+  // The store pages are T3 Code's apps, so Settings does not offer them.
+  ["apps/web/src/components/settings/SettingsPanels.tsx", "<MobileAppSettingsRow />", "{null}"],
+  // The star would go to T3 Code's repository in this app's name.
+  [
+    "apps/web/src/components/GitHubStarPrompt.tsx",
+    "let shownThisSession = false;",
+    "let shownThisSession = true;",
+  ],
+  ["apps/server/src/project/ManagedProjectFolders.ts", "(https://t3.codes)", `(${FORK_HOME})`],
+  [
+    "apps/server/src/triage/triagePrompt.ts",
+    "`A T3 Code user is having a problem",
+    `\`${TRIAGE_NOTE}\n\nA Catgirl Code user is having a problem`,
+  ],
+];
+
 type Catalog = Readonly<Record<string, unknown>>;
 type HashSource = (input: { readonly source: unknown; readonly dataFormat: string }) => string;
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const keptIn = (file: string): ReadonlyArray<string> =>
-  KEPT_TEXT.filter(([suffix]) => file.endsWith(`/${suffix}`)).flatMap(([, ...text]) => text);
+const inFile = (file: string) => (entry: readonly [file: string, ...rest: ReadonlyArray<string>]) =>
+  file.endsWith(`/${entry[0]}`);
 
 const renameIn = (value: unknown, name: RegExp): unknown => {
   if (typeof value === "string") return value.replace(name, "Catgirl$1$2");
@@ -70,14 +103,22 @@ const renameIn = (value: unknown, name: RegExp): unknown => {
   );
 };
 
-/** Renames the product in text. With the source `file` it came from, that file's kept text stays. */
+/**
+ * Renames the product in text. With the source `file` it came from, that file's kept text stays
+ * and its replaced text is swapped.
+ */
 export const renameProduct = (code: string, file = ""): string => {
-  const kept = keptIn(file.replaceAll("\\", "/"));
-  if (kept.length === 0) return code.replace(NAME, "Catgirl$1$2");
-  // Kept text comes first, so it wins where both start at the same place.
-  const pattern = new RegExp(`${kept.map(escapeRegExp).join("|")}|${NAME.source}`, "g");
-  return code.replace(pattern, (match: string, space?: string, word?: string) =>
-    word === undefined ? match : `Catgirl${space}${word}`,
+  const path = file.replaceAll("\\", "/");
+  const kept = KEPT_TEXT.filter(inFile(path));
+  const replaced = new Map(REPLACED_TEXT.filter(inFile(path)).map(([, from, to]) => [from, to]));
+  if (kept.length === 0 && replaced.size === 0) return code.replace(NAME, "Catgirl$1$2");
+  // Listed text comes first, so it wins where it and a name start at the same place.
+  const listed = [...replaced.keys(), ...kept.flatMap(([, ...text]) => text)].map(escapeRegExp);
+  const pattern = new RegExp([...listed, NAME.source].join("|"), "g");
+  return code.replace(
+    pattern,
+    (match: string, space?: string, word?: string) =>
+      replaced.get(match) ?? (word === undefined ? match : `Catgirl${space}${word}`),
   );
 };
 

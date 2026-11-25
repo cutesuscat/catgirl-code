@@ -4,7 +4,13 @@ import * as NodeURL from "node:url";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { KEPT_TEXT, loadHashSource, rebrandCatalog, renameProduct } from "./catgirl-branding.ts";
+import {
+  KEPT_TEXT,
+  REPLACED_TEXT,
+  loadHashSource,
+  rebrandCatalog,
+  renameProduct,
+} from "./catgirl-branding.ts";
 
 const repoFile = (path: string) => NodeURL.fileURLToPath(new URL(`../../${path}`, import.meta.url));
 const readCatalog = (app: string, locale: string): Record<string, unknown> =>
@@ -48,6 +54,24 @@ describe("renameProduct", () => {
         expect(renamed).toContain(text);
       }
     }
+  });
+
+  // Fails when upstream rewords a link or a line this build replaces: update REPLACED_TEXT.
+  it("replaces text that every listed file still contains", () => {
+    for (const [file, from, to] of REPLACED_TEXT) {
+      const source = NodeFS.readFileSync(repoFile(file), "utf8");
+      const renamed = renameProduct(source, repoFile(file));
+      expect(source, `${file} no longer contains ${from}`).toContain(from);
+      expect(renamed).toContain(to);
+      expect(renamed).not.toContain(from);
+    }
+  });
+
+  it("tells a triage agent that this is a fork, in words the rename leaves alone", () => {
+    const file = repoFile("apps/server/src/triage/triagePrompt.ts");
+    const renamed = renameProduct(NodeFS.readFileSync(file, "utf8"), file);
+    expect(renamed).toContain("This install is Catgirl Code, an unofficial fork of T3 Code.");
+    expect(renamed).toContain("A Catgirl Code user is having a problem with their install");
   });
 });
 
