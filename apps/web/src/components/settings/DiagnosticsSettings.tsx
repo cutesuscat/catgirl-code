@@ -51,6 +51,7 @@ import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { TelemetryExportSettings } from "./TelemetryExportSettings";
+import { UsageAnalyticsSettings } from "./UsageAnalyticsSettings";
 
 const NUMBER_FORMAT = new Intl.NumberFormat();
 
@@ -1443,6 +1444,7 @@ function DiagnosticsSettingsBody() {
         )}
       </SettingsSection>
       {exportFormEnvironmentId === environmentId && <TelemetryExportSettings />}
+      {exportFormEnvironmentId === environmentId && <UsageAnalyticsSettings />}
     </SettingsPageContainer>
   );
 }

@@ -1017,6 +1017,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("OTel OTLP telemetry export endpoints logs traces metrics Grafana")],
   },
   {
+    id: "usage-analytics",
+    title: msg("Usage analytics"),
+    to: "/settings/diagnostics",
+    targetId: "usage-analytics",
+    scope: "environment",
+    searchTerms: [msg("telemetry analytics usage data tracking PostHog address key opt in")],
+  },
+  {
     id: "diagnostics",
     title: msg("Diagnostics"),
     to: "/settings/maintenance",
