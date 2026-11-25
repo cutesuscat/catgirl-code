@@ -85,7 +85,11 @@ import { newProjectId, randomUUID } from "../../lib/utils";
 import { agentSessionImport } from "../../state/agentSessions";
 import { readProjects, useProjects, waitForProject } from "../../state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
-import { managedTelemetryOffMessage, useManagedPolicy } from "../../state/managedPolicy";
+import {
+  managedTelemetryOffMessage,
+  useManagedPolicy,
+  useUsageDataOff,
+} from "../../state/managedPolicy";
 import { useProjectScans } from "../../onboarding/useProjectScans";
 import { projectEnvironment } from "../../state/projects";
 import { serverEnvironment } from "../../state/server";
@@ -346,6 +350,8 @@ export function WelcomePage({
 function TelemetryNotice({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const messages = useMessages();
   const telemetryOff = managedTelemetryOffMessage(useManagedPolicy(environmentId), messages);
+  const usageDataOff = useUsageDataOff(environmentId);
+  if (telemetryOff === undefined && usageDataOff) return null;
   return (
     <p className="mt-auto pt-12 text-2xs leading-relaxed text-muted-foreground/70">
       {telemetryOff === undefined ? (

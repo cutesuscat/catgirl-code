@@ -72,7 +72,11 @@ import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { ThreadTitleInstructionsSettings } from "./ThreadTitleInstructionsSettings";
 import { SnoozePresetsRow } from "./SnoozePresetsSettings";
 import { useDesktopUpdateState } from "../../state/desktopUpdate";
-import { managedTelemetryOffMessage, usePrimaryManagedPolicy } from "../../state/managedPolicy";
+import {
+  managedTelemetryOffMessage,
+  usePrimaryManagedPolicy,
+  useUsageDataOff,
+} from "../../state/managedPolicy";
 import {
   getTextGenerationModelOptionsByInstance,
   resolveAppModelSelectionState,
@@ -2531,6 +2535,7 @@ export function AboutSettingsPanel() {
   // The Welcome page sets up this computer, so it needs one.
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const telemetryOff = managedTelemetryOffMessage(primaryPolicy, messages);
+  const usageDataOff = useUsageDataOff(primaryEnvironmentId);
   return (
     <SettingsPageContainer>
       <SettingsSection id="about" title={gt("App")}>
@@ -2586,7 +2591,8 @@ export function AboutSettingsPanel() {
           {...setting("privacy-policy")}
           description={
             telemetryOff === undefined
-              ? gt("How we handle your data, including the anonymous usage data T3 Code collects.")
+              ? !usageDataOff &&
+                gt("How we handle your data, including the anonymous usage data T3 Code collects.")
               : gt("How we handle your data. {telemetryOff}", { telemetryOff })
           }
           control={
