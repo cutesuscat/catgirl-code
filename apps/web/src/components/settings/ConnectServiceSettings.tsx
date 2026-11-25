@@ -173,6 +173,8 @@ export function ConnectServiceForm({
         }
       >
         <form
+          // The address is checked on save, with a message that says what to fix.
+          noValidate
           className="flex flex-wrap items-center gap-2 pt-3 pb-2"
           onSubmit={(event) => {
             event.preventDefault();

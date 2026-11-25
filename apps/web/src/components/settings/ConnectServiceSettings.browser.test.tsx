@@ -68,7 +68,8 @@ it("opens the sign-in values when the relay publishes none, and saves nothing", 
   const { props, calls } = setup({ _tag: "NotPublished" });
   await using screen = await render(<ConnectServiceForm {...props} />);
 
-  await screen.getByRole("textbox", { name: "Connect address" }).fill("https://relay.example.test");
+  // Not a URL to the browser either: the form's own check must still be the one that answers.
+  await screen.getByRole("textbox", { name: "Connect address" }).fill("relay.example.test");
   await screen.getByRole("button", { name: "Save" }).click();
 
   await expect
