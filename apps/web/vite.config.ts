@@ -18,6 +18,7 @@ import { DEV_PROXIED_PATH_PREFIXES } from "@t3tools/shared/devProxy";
 import { loadRepoEnv } from "../../scripts/lib/public-config";
 import { resolveTaggedSourceVersion } from "../../scripts/lib/tagged-source-version";
 import { thirdPartyLicensesPlugin } from "../../scripts/lib/third-party-licenses";
+import { catgirlBrandingPlugin } from "./vite/catgirlBranding";
 import { tailwindPlugins } from "./vite/tailwind";
 import { warmBundledDevPlugin } from "./vite/warmBundledDev";
 import { formatAppDisplayName, resolveWebAppStageLabel } from "./src/branding.logic";
@@ -292,23 +293,6 @@ function bootstrapTitlePlugin(): Plugin {
       });
       const title = formatAppDisplayName({ baseName: "Catgirl Code", stageLabel });
       return html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
-    },
-  };
-}
-
-// Catgirl Code: renames the product in display text at build time, so upstream's strings need no
-// patching one by one and new ones are covered too. "T3 Chat" is a separate product and stays.
-// Tests run without it, so they still assert upstream's wording.
-function catgirlBrandingPlugin(): Plugin {
-  return {
-    name: "catgirl:branding",
-    enforce: "pre",
-    transform(code, id) {
-      const file = id.split("?")[0] ?? id;
-      if (file.includes("/node_modules/") || !/\.[cm]?[jt]sx?$/.test(file)) return null;
-      // \s+ also covers a name that JSX text wraps across two lines.
-      if (!/T3\s+(?:Code|Connect)\b/.test(code)) return null;
-      return { code: code.replace(/T3(\s+)(Code|Connect)\b/g, "Catgirl$1$2"), map: null };
     },
   };
 }
