@@ -11,9 +11,12 @@ import { useSettingsSearchTargetId } from "./settingsLayout";
  */
 export function AdvancedSettings({
   targetIds,
+  openRequested = false,
   children,
 }: {
   readonly targetIds: ReadonlyArray<string>;
+  /** Opens the fold when it turns true, for a row inside that now needs attention. */
+  readonly openRequested?: boolean;
   readonly children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -22,6 +25,11 @@ export function AdvancedSettings({
   if (seenSearchTargetId !== searchTargetId) {
     setSeenSearchTargetId(searchTargetId);
     if (searchTargetId !== null && targetIds.includes(searchTargetId)) setOpen(true);
+  }
+  const [seenOpenRequested, setSeenOpenRequested] = useState(false);
+  if (seenOpenRequested !== openRequested) {
+    setSeenOpenRequested(openRequested);
+    if (openRequested) setOpen(true);
   }
 
   return (

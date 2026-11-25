@@ -2,10 +2,10 @@ import {
   clerkFrontendApiHostnameFromPublishableKey,
   relayClerkTokenOptions,
 } from "@t3tools/shared/relayAuth";
-import { normalizeSecureRelayUrl } from "@t3tools/shared/relayUrl";
 import * as Schema from "effect/Schema";
 
 import { isHostedStaticApp } from "../hostedPairing";
+import { appliedConnectService } from "./connectService";
 
 export class CloudPublicConfigMissingError extends Schema.TaggedError<CloudPublicConfigMissingError>()(
   "CloudPublicConfigMissingError",
@@ -43,14 +43,12 @@ function normalizeSecureUrl(value: string): string | null {
 }
 
 export function resolveCloudPublicConfig(): CloudPublicConfig {
+  // A service saved on this device replaces the one the build ships with.
+  const service = appliedConnectService();
   return {
-    clerkPublishableKey: trimNonEmpty(
-      import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined,
-    ),
-    clerkJwtTemplate: trimNonEmpty(import.meta.env.VITE_CLERK_JWT_TEMPLATE as string | undefined),
-    relayUrl: normalizeSecureRelayUrl(
-      (import.meta.env.VITE_T3CODE_RELAY_URL as string | undefined) ?? "",
-    ),
+    clerkPublishableKey: service.clerkPublishableKey,
+    clerkJwtTemplate: service.clerkJwtTemplate,
+    relayUrl: service.relayUrl,
     relayTracing: {
       tracesUrl: normalizeSecureUrl(
         (import.meta.env.VITE_RELAY_OTLP_TRACES_URL as string | undefined) ?? "",

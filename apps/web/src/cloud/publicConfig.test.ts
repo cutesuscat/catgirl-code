@@ -1,10 +1,68 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { hasCloudPublicConfig } from "./publicConfig.ts";
+import { __resetSavedConnectServiceForTests, appliedConnectService } from "./connectService.ts";
+import { hasCloudPublicConfig, resolveCloudPublicConfig } from "./publicConfig.ts";
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  __resetSavedConnectServiceForTests();
+});
+
+describe("a T3 Connect service saved on this device", () => {
+  const saved = {
+    relayUrl: "https://relay.saved.test",
+    clerkPublishableKey: `pk_test_${btoa("saved.clerk.accounts.dev$")}`,
+    clerkJwtTemplate: "saved-template",
+    clerkCliOAuthClientId: null,
+    source: "discovered",
+  };
+  const browser = (stored: string | null) => ({
+    location: new URL("http://localhost:3773"),
+    localStorage: { getItem: () => stored },
+  });
+
+  it("turns T3 Connect on in a browser whose build ships no service", () => {
+    vi.stubGlobal("window", browser(JSON.stringify(saved)));
+
+    expect(resolveCloudPublicConfig()).toMatchObject({
+      relayUrl: saved.relayUrl,
+      clerkPublishableKey: saved.clerkPublishableKey,
+      clerkJwtTemplate: saved.clerkJwtTemplate,
+    });
+    expect(hasCloudPublicConfig()).toBe(true);
+  });
+
+  it("replaces every built-in value in the desktop app", () => {
+    vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", `pk_live_${btoa("clerk.example.com$")}`);
+    vi.stubEnv("VITE_CLERK_JWT_TEMPLATE", "t3-relay");
+    vi.stubEnv("VITE_CLERK_CLI_OAUTH_CLIENT_ID", "built-in-client");
+    vi.stubEnv("VITE_T3CODE_RELAY_URL", "https://relay.example.test");
+    vi.stubGlobal("window", {
+      location: new URL("t3code://app/index.html"),
+      desktopBridge: { getConnectService: () => saved },
+    });
+
+    expect(appliedConnectService()).toEqual(saved);
+  });
+
+  it.each([
+    ["nothing", null],
+    ["a value that is not a service", JSON.stringify({ relayUrl: "https://relay.saved.test" })],
+    ["a secret key", JSON.stringify({ ...saved, clerkPublishableKey: "sk_live_secret" })],
+  ])("keeps the built-in service when storage holds %s", (_name, stored) => {
+    vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "pk_test_example");
+    vi.stubEnv("VITE_CLERK_JWT_TEMPLATE", "t3-relay");
+    vi.stubEnv("VITE_T3CODE_RELAY_URL", "https://relay.example.test");
+    vi.stubGlobal("window", browser(stored));
+
+    expect(appliedConnectService()).toMatchObject({
+      source: "built-in",
+      relayUrl: "https://relay.example.test",
+      clerkPublishableKey: "pk_test_example",
+    });
+    expect(hasCloudPublicConfig()).toBe(true);
+  });
 });
 
 describe("hasCloudPublicConfig", () => {

@@ -51,6 +51,7 @@ import { useSearchableSetting } from "./settingsSearch";
 import { ConnectDeviceApprovalSettings } from "./ConnectDeviceApprovalSettings";
 import { EnvironmentIconMenu } from "./EnvironmentIconPicker";
 import { FoldedSettingsSection } from "./FoldedSettingsSection";
+import { ConnectServiceSettings } from "./ConnectServiceSettings";
 import { EnvironmentsMap } from "./EnvironmentsMap";
 import { LinkedEnvironmentsSettings } from "./LinkedEnvironmentsSettings";
 import { addEnvironmentPrefillAtom } from "~/state/linkedThreadView";
@@ -1947,6 +1948,7 @@ function ConnectionsSettingsContent({
         : null}
       <LoadBalancingSettings environments={loadBalancingEnvironments} />
       <PullRequestRoutingSettings environments={loadBalancingEnvironments} />
+      <ConnectServiceSettings />
     </SettingsPageContainer>
   );
 }
