@@ -11,6 +11,7 @@ import { resolveMobileStageLabel } from "../lib/mobileBranding";
 import { useAndroidControlSizing } from "./ui/useAndroidControlSizing";
 
 const BRAND_MAX_FONT_SCALE = 1.4;
+const WORDMARK_PREFIX = "Cat";
 const WORDMARK_SUFFIX = "Code";
 
 export function brandTitleOffset(): number {
@@ -60,7 +61,7 @@ export function CompactBrandTitle(
         className="font-t3-bold text-foreground"
         style={{ fontSize: 21 * scale, letterSpacing: -0.5 * scale }}
       >
-        Cat
+        {WORDMARK_PREFIX}
       </Text>
       <Text
         allowFontScaling={props.allowFontScaling}

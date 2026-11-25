@@ -13,6 +13,7 @@ export function T3Wordmark(props: {
   const aspectRatio = 286 / 310;
   return (
     <Svg
+      // oxlint-disable-next-line t3code/no-untranslated-copy -- product wordmark
       accessibilityLabel="Catgirl"
       height={props.height}
       width={props.height * aspectRatio}
