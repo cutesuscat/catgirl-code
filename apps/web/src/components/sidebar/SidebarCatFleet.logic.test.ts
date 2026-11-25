@@ -63,7 +63,9 @@ describe("summarizeCatFleet", () => {
         environmentId: "box",
         label: "Box",
         offline: true,
-        bodies: [{ key: "settled-running", title: "Thread settled-running", running: true, subagents: 0 }],
+        bodies: [
+          { key: "settled-running", title: "Thread settled-running", running: true, subagents: 0 },
+        ],
       },
     ]);
   });

@@ -1,3 +1,4 @@
+/* oxlint-disable t3code/no-untranslated-copy -- Catgirl Code feature, English only: upstream's catalogs stay untouched */
 import type { CSSProperties } from "react";
 import { memo, useId } from "react";
 

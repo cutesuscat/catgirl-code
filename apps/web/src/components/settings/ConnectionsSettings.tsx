@@ -46,6 +46,7 @@ import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsL
 import { ManagedByOrganization } from "../ManagedPolicy";
 import { LocalEnvironmentSetting } from "./LocalEnvironmentSetting";
 import { DeviceNameRow } from "./DeviceNameRow";
+import { SidebarVisibilityRow } from "./SidebarVisibilityRow";
 import { useSearchableSetting } from "./settingsSearch";
 import { ConnectDeviceApprovalSettings } from "./ConnectDeviceApprovalSettings";
 import { EnvironmentIconMenu } from "./EnvironmentIconPicker";
@@ -118,11 +119,7 @@ import {
   usePrimaryEnvironment,
 } from "~/state/environments";
 import { requestConfirmDialog } from "~/confirmDialog";
-import {
-  updateClientSettings,
-  useClientSettings,
-  useUpdateEnvironmentSettings,
-} from "~/hooks/useSettings";
+import { useUpdateEnvironmentSettings } from "~/hooks/useSettings";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { environmentIdsKey } from "~/state/environmentAtomList";
 import { environmentUpdateStatesAtom, serverEnvironment } from "~/state/server";
@@ -171,31 +168,6 @@ const BACKEND_VALUE_DEFAULT_WSL = "backend:default-wsl";
 const BACKEND_VALUE_WSL_OFF = "backend:wsl-off";
 
 // Subscribes on its own so desktop download progress does not re-render the page.
-/** Per device: whether this machine's threads are listed in the sidebar. */
-function SidebarVisibilityRow({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const hiddenEnvironmentIds = useClientSettings((s) => s.sidebarHiddenEnvironmentIds);
-  const shown = !hiddenEnvironmentIds.includes(environmentId);
-  return (
-    <SettingsRow
-      title="Show threads in sidebar"
-      description="Off keeps this machine's threads out of the sidebar on this device. Search, links and open threads still reach them."
-      control={
-        <Switch
-          checked={shown}
-          aria-label="Show this machine's threads in the sidebar"
-          onCheckedChange={(checked) =>
-            void updateClientSettings({
-              sidebarHiddenEnvironmentIds: checked
-                ? hiddenEnvironmentIds.filter((id) => id !== environmentId)
-                : [...hiddenEnvironmentIds, environmentId],
-            })
-          }
-        />
-      }
-    />
-  );
-}
-
 function LocalVersionStatusLabel() {
   const m = useMessages();
   const updateState = useDesktopUpdateState();
