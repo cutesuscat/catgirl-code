@@ -1,5 +1,11 @@
 # Product usage data
 
+> **Catgirl Code** is a fork of T3 Code and sends none of what this page describes unless you turn
+> it on. Product usage events and relay connection traces stay off until you set
+> `T3CODE_TELEMETRY_ENABLED=true` in the server's environment. The mobile app's crash reports and
+> connection traces stay off until you turn them on in **Settings > About > Diagnostics**. The rest
+> of this page describes what each one sends once it is on.
+
 The T3 Code server sends product usage events to T3 Code's own endpoint at `ingest.t3.codes`,
 associated with a hashed random identifier for the installation. To count how many installations one person
 uses, the server also sends a hashed identifier for your T3 Connect account when you are signed in

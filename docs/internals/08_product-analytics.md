@@ -1,5 +1,10 @@
 # Product analytics
 
+> **Catgirl Code.** This fork reports nothing to upstream unless asked: `TELEMETRY_ON_BY_DEFAULT`
+> in [`otelEnvironment.ts`](../../packages/shared/src/otelEnvironment.ts) is `false`, so analytics
+> and relay tracing wait for `T3CODE_TELEMETRY_ENABLED=true`. Keep anything new that reports to
+> upstream behind `isTelemetryOnByDefault` or `AnalyticsService`, never beside them.
+
 The server owns analytics delivery, opt-out, and identity for every connected client. Clients never
 load the PostHog browser SDK, PostHog person profiles stay disabled, and visiting hosted web without
 an authenticated connection does not count as product use.
