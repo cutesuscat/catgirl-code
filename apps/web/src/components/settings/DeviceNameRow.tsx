@@ -33,7 +33,9 @@ export function DeviceNameRow({ environmentId }: { readonly environmentId: Envir
           spellCheck={false}
           value={saved}
           onCommit={(next) => {
-            const { [environmentId]: _previous, ...others } = overrides;
+            const others = Object.fromEntries(
+              Object.entries(overrides).filter(([id]) => id !== environmentId),
+            );
             const name = next.trim();
             void updateClientSettings({
               environmentLabelOverrides:
