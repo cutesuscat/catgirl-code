@@ -1,4 +1,17 @@
 /* oxlint-disable t3code/no-untranslated-copy -- Catgirl Code feature, English only: upstream's catalogs stay untouched */
+import {
+  CAT_FLEET_RESTING_SHARE,
+  arrangeCatFleet,
+  catFleetActivity,
+  catFleetCoat,
+  catFleetMoonToneOf,
+  catFleetOrbitOf,
+  catFleetScatterOf,
+  fleetHashUnit,
+  isCatFleetBodyInOrbit,
+  type CatFleetBody,
+  type CatFleetMachine,
+} from "@t3tools/client-runtime/state/cat-fleet";
 import type { CSSProperties } from "react";
 import { memo, useId, useState } from "react";
 
@@ -6,13 +19,6 @@ import { cn } from "../../lib/utils";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { Tooltip, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import {
-  arrangeCatFleet,
-  catFleetActivity,
-  fleetHashUnit,
-  type CatFleetBody,
-  type CatFleetMachine,
-} from "./SidebarCatFleet.logic";
 
 // One planet, in CSS pixels. The cat head is the app icon's, drawn in the icon's own units.
 const PLANET = { width: 66, height: 42 };
@@ -47,10 +53,8 @@ const MOON_SIZE = 6;
 const STOPPED_SIZE = 4.2;
 const SUBAGENT = { size: 2.2, radius: 4.8, period: 3.2, max: 3 };
 const MOON_COLORS = ["var(--color-cat-pink)", "var(--color-cat-cream)", "var(--color-cat-peach)"];
-// Each cat's coat leans up to this far from the icon's orange, towards honey or towards rust.
-// A cat with nothing running is paled with cream, to this share of its own colour.
-const COAT = { lean: 55, resting: 52 };
 const COAT_STOPS = ["var(--color-cat-light)", "var(--color-cat)", "var(--color-cat-dark)"];
+const COAT_TINTS = { honey: "var(--color-cat-honey)", rust: "var(--color-cat-rust)" };
 // Orbit lines: thin where they pass round the cat, dotted where they pass behind it.
 const LINE = { width: 0.7, dot: 1.1, gap: 2.5 };
 const MAX_BODIES = 14;
@@ -116,27 +120,25 @@ function describeMachine(machine: CatFleetMachine): string {
 }
 
 function moonColor(key: string): string {
-  return MOON_COLORS[Math.floor(fleetHashUnit(key) * 997) % MOON_COLORS.length]!;
+  return MOON_COLORS[catFleetMoonToneOf(key, MOON_COLORS.length)]!;
 }
 
 // A stopped thread whose sub-agent still runs stays in the sky, so the sub-agent has
 // something to circle.
-function isInOrbit(body: CatFleetBody): boolean {
-  return body.running || body.subagents > 0;
-}
+const isInOrbit = isCatFleetBodyInOrbit;
 
 function orbitIndexOf(body: CatFleetBody): number {
-  return Math.floor(fleetHashUnit(body.key) * 7919) % ORBITS.length;
+  return catFleetOrbitOf(body.key, ORBITS.length);
 }
 
 /** The three stops of a cat's coat, top to bottom. Its machine's id picks the shade. */
 function coatStops(environmentId: string, resting: boolean): readonly string[] {
-  const lean = fleetHashUnit(`${environmentId}:coat`) * 2 - 1;
-  const tint = lean < 0 ? "var(--color-cat-rust)" : "var(--color-cat-honey)";
-  const own = 100 - Math.round(Math.abs(lean) * COAT.lean);
+  const { tint, ownShare } = catFleetCoat(environmentId);
   return COAT_STOPS.map((stop) => {
-    const coat = `color-mix(in srgb, ${stop} ${own}%, ${tint})`;
-    return resting ? `color-mix(in srgb, ${coat} ${COAT.resting}%, var(--color-cat-cream))` : coat;
+    const coat = `color-mix(in srgb, ${stop} ${ownShare}%, ${COAT_TINTS[tint]})`;
+    return resting
+      ? `color-mix(in srgb, ${coat} ${CAT_FLEET_RESTING_SHARE}%, var(--color-cat-cream))`
+      : coat;
   });
 }
 
@@ -392,14 +394,9 @@ function CardRow({ body }: { body: CatFleetBody }) {
  * not stack, and its key places it within that share and sets how far off the cat it lies.
  */
 function StoppedDot({ body, index, total }: { body: CatFleetBody; index: number; total: number }) {
-  const share = SCATTER.arc / total;
-  const along = (index + 0.5 - total / 2 + (fleetHashUnit(body.key) - 0.5) * 0.9) * share;
-  const angle = ((90 + along) * Math.PI) / 180;
-  const distance =
-    HEAD.radius +
-    SCATTER.size / 2 -
-    SCATTER.overlap +
-    fleetHashUnit(`${body.key}:drift`) * SCATTER.drift;
+  const { along, drift } = catFleetScatterOf(body.key, index, total);
+  const angle = ((90 + along * SCATTER.arc) * Math.PI) / 180;
+  const distance = HEAD.radius + SCATTER.size / 2 - SCATTER.overlap + drift * SCATTER.drift;
   return (
     <span
       className="pointer-events-none absolute z-[1] rounded-full border border-current opacity-60"

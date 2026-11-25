@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { arrangeCatFleet, summarizeCatFleet } from "./SidebarCatFleet.logic";
+import {
+  arrangeCatFleet,
+  catFleetCoat,
+  catFleetMoonToneOf,
+  catFleetOrbitOf,
+  catFleetScatterOf,
+  isCatFleetBodyInOrbit,
+  summarizeCatFleet,
+} from "./catFleet.ts";
 
 describe("summarizeCatFleet", () => {
   it("lists each machine's running and unsettled threads and counts sub-agents on their thread", () => {
@@ -138,5 +146,47 @@ describe("arrangeCatFleet", () => {
     const { shown } = arrangeCatFleet([machine("one", 1, 5), delegating], 8);
 
     expect(shown.map((entry) => entry.environmentId)).toEqual(["delegating", "one"]);
+  });
+});
+
+describe("how a cat and its bodies are drawn", () => {
+  it("gives a machine one coat and a thread one orbit, colour and place, every time", () => {
+    const machines = ["mac", "box", "slop-box", "nickybox", "i9", "cfh-box"];
+    const coats = machines.map(catFleetCoat);
+
+    expect(coats).toEqual(machines.map(catFleetCoat));
+    expect(new Set(coats.map((coat) => `${coat.tint}:${coat.ownShare}`)).size).toBeGreaterThan(3);
+    for (const coat of coats) {
+      expect(coat.ownShare).toBeGreaterThanOrEqual(45);
+      expect(coat.ownShare).toBeLessThanOrEqual(100);
+    }
+    expect(catFleetOrbitOf("thread-1", 3)).toBe(catFleetOrbitOf("thread-1", 3));
+    for (const key of ["thread-1", "thread-2", "thread-3", "thread-4"]) {
+      expect([0, 1, 2]).toContain(catFleetOrbitOf(key, 3));
+      expect([0, 1, 2]).toContain(catFleetMoonToneOf(key, 3));
+    }
+  });
+
+  it("keeps a stopped thread with a running sub-agent in the sky", () => {
+    const body = { key: "a", title: "", running: false, subagents: 0 };
+
+    expect(isCatFleetBodyInOrbit(body)).toBe(false);
+    expect(isCatFleetBodyInOrbit({ ...body, running: true })).toBe(true);
+    expect(isCatFleetBodyInOrbit({ ...body, subagents: 1 })).toBe(true);
+  });
+
+  it("scatters stopped threads across the arc in order, each within its own share", () => {
+    const keys = ["a", "b", "c", "d", "e"];
+    const spots = keys.map((key, index) => catFleetScatterOf(key, index, keys.length));
+
+    for (const [index, spot] of spots.entries()) {
+      const middle = (index + 0.5) / keys.length - 0.5;
+      expect(Math.abs(spot.along - middle)).toBeLessThanOrEqual(0.45 / keys.length);
+      expect(spot.drift).toBeGreaterThanOrEqual(0);
+      expect(spot.drift).toBeLessThan(1);
+    }
+    expect(spots.map((spot) => spot.along)).toEqual(
+      spots.map((spot) => spot.along).toSorted((left, right) => left - right),
+    );
   });
 });

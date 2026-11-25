@@ -259,7 +259,7 @@ import {
 } from "./ui/combobox";
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarCatFleet } from "./sidebar/SidebarCatFleet";
-import { summarizeCatFleet } from "./sidebar/SidebarCatFleet.logic";
+import { summarizeCatFleet } from "@t3tools/client-runtime/state/cat-fleet";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import { TooltipProvider, TooltipScrollDismissArea } from "./ui/tooltip";

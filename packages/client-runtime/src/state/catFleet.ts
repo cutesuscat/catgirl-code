@@ -117,7 +117,8 @@ export function arrangeCatFleet(
       activity: catFleetActivity(machine),
       waiting: machine.offline ? 0 : machine.bodies.length,
     }))
-    .toSorted(
+    // Sorted in place: the map above made this array, and Hermes has no toSorted.
+    .sort(
       (left, right) =>
         Number(left.machine.offline) - Number(right.machine.offline) ||
         right.activity - left.activity ||
@@ -141,4 +142,52 @@ export function fleetHashUnit(key: string): number {
   hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
   hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
   return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296;
+}
+
+/** A body stays in the sky while it runs or while a sub-agent of it does. */
+export function isCatFleetBodyInOrbit(body: CatFleetBody): boolean {
+  return body.running || body.subagents > 0;
+}
+
+/** Which of `count` orbits a body circles on. */
+export function catFleetOrbitOf(key: string, count: number): number {
+  return Math.floor(fleetHashUnit(key) * 7919) % count;
+}
+
+/** Which of `count` moon colours a body wears. */
+export function catFleetMoonToneOf(key: string, count: number): number {
+  return Math.floor(fleetHashUnit(key) * 997) % count;
+}
+
+/**
+ * Where a stopped thread lies under its cat. Each gets its own share of the arc so they do not
+ * stack: `along` is its place on the arc, from -0.5 to 0.5 about the middle, and `drift` is how
+ * far off the cat it lies, from 0 to 1. Its key sets both within its share.
+ */
+export function catFleetScatterOf(
+  key: string,
+  index: number,
+  total: number,
+): { readonly along: number; readonly drift: number } {
+  return {
+    along: (index + 0.5 - total / 2 + (fleetHashUnit(key) - 0.5) * 0.9) / total,
+    drift: fleetHashUnit(`${key}:drift`),
+  };
+}
+
+// Each cat's coat leans up to this far from the icon's orange, towards honey or towards rust.
+const COAT_LEAN = 55;
+/** A cat with nothing running is paled with cream, to this share of its own colour. */
+export const CAT_FLEET_RESTING_SHARE = 52;
+
+/** A cat's own shade, picked by its machine's id: the tint it leans to and the orange it keeps. */
+export function catFleetCoat(environmentId: string): {
+  readonly tint: "honey" | "rust";
+  readonly ownShare: number;
+} {
+  const lean = fleetHashUnit(`${environmentId}:coat`) * 2 - 1;
+  return {
+    tint: lean < 0 ? "rust" : "honey",
+    ownShare: 100 - Math.round(Math.abs(lean) * COAT_LEAN),
+  };
 }
