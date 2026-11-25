@@ -71,10 +71,13 @@ const UNSQUASH = `scaleY(${1 / ORBIT_SQUASH})`;
 export const SidebarCatFleet = memo(function SidebarCatFleet({
   machines,
   limit,
+  singleRow = false,
 }: {
   machines: readonly CatFleetMachine[];
   /** How many cells the fleet may take. */
   limit: number;
+  /** On a phone: only the busiest cats that fit one row, with no cell for the rest. */
+  singleRow?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (machines.length === 0 || limit <= 0) return null;
@@ -82,11 +85,16 @@ export const SidebarCatFleet = memo(function SidebarCatFleet({
   return (
     // The same timing as the thread rows, so a cat's card opens the way a thread's does.
     <TooltipProvider delay={150} closeDelay={0} timeout={400}>
-      <div ref={observeVisibleAnimation} className="flex shrink-0 flex-wrap px-2 pb-1">
-        {(expanded ? [...shown, ...hidden] : shown).map((machine) => (
+      <div
+        ref={observeVisibleAnimation}
+        className={cn("flex shrink-0 flex-wrap px-2", singleRow ? "mb-1 overflow-hidden" : "pb-1")}
+        // One cell is the planet, its top padding and one line of the name; later rows are cut off.
+        style={singleRow ? { maxHeight: `calc(${PLANET.height + 2}px + 0.875rem)` } : undefined}
+      >
+        {(expanded && !singleRow ? [...shown, ...hidden] : shown).map((machine) => (
           <CatPlanet key={machine.environmentId} machine={machine} />
         ))}
-        {hidden.length > 0 ? (
+        {hidden.length > 0 && !singleRow ? (
           <FleetOverflow
             expanded={expanded}
             machines={hidden}
