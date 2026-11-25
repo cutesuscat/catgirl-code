@@ -14,6 +14,7 @@ import { AuthAccessTokenResult, AuthSessionState } from "./auth.ts";
 import { AdvertisedEndpoint } from "./remoteAccess.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
 import { type ClientSettings, type QuitConfirmationMode, SnapShotShortcut } from "./settings.ts";
+import type { ConnectServiceSettings } from "./connectService.ts";
 import type { EditorId } from "./editor.ts";
 import { KeybindingShortcut, type PreviewForwardedShortcut } from "./keybindings.ts";
 
@@ -1143,6 +1144,10 @@ export interface DesktopBridge {
   /** The environment ID recorded in this app's T3 home, such as its own machine's background service. */
   getHostEnvironmentId?: () => Promise<string | null>;
   getLocalEnvironmentBearerToken: () => Promise<string>;
+  /** The T3 Connect service saved on this device, as read when the app started. */
+  getConnectService?: () => ConnectServiceSettings | null;
+  /** Saves it and relaunches the app; `null` returns to the service the build ships with. */
+  setConnectService?: (settings: ConnectServiceSettings | null) => Promise<void>;
   getClientSettings: () => Promise<ClientSettings | null>;
   setClientSettings: (settings: ClientSettings) => Promise<void>;
   getConnectionCatalog: () => Promise<string | null>;

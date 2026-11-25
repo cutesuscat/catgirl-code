@@ -45,6 +45,7 @@ import * as PreviewManager from "../preview/Manager.ts";
 import * as PreviewPasskeys from "../preview/Passkeys.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
+import * as DesktopConnectService from "../settings/DesktopConnectService.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import { m } from "../i18n/messages.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
@@ -406,6 +407,7 @@ export const make = Effect.gen(function* () {
   const primaryPaste = yield* DesktopPrimaryPaste.DesktopPrimaryPaste;
   const desktopSettings = yield* DesktopAppSettings.DesktopAppSettings;
   const clientSettings = yield* DesktopClientSettings.DesktopClientSettings;
+  const connectService = yield* DesktopConnectService.optional;
   const electronApp = yield* ElectronApp.ElectronApp;
   const rendererHistory = yield* DesktopRendererHistory.DesktopRendererHistory;
   const backendReadyRef = yield* Ref.make(false);
@@ -1063,7 +1065,8 @@ export const make = Effect.gen(function* () {
       {
         desktopOrigin: getDesktopOrigin(environment.isDevelopment),
         mainWebContentsId: window.webContents.id,
-        clerkFrontendApiHostname: DesktopClerk.desktopClerkFrontendApiHostname,
+        clerkFrontendApiHostname:
+          connectService?.clerkFrontendApiHostname ?? DesktopClerk.desktopClerkFrontendApiHostname,
         devServerOrigin: Option.getOrUndefined(
           Option.map(environment.devServerUrl, (url) => url.origin),
         ),

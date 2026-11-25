@@ -163,6 +163,12 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   setLocalEnvironmentEnabled: (enabled) =>
     ipcRenderer.invoke(IpcChannels.SET_LOCAL_ENVIRONMENT_ENABLED_CHANNEL, enabled),
   getHostEnvironmentId: () => ipcRenderer.invoke(IpcChannels.GET_HOST_ENVIRONMENT_ID_CHANNEL),
+  getConnectService: () =>
+    (ipcRenderer.sendSync(IpcChannels.GET_CONNECT_SERVICE_CHANNEL) ?? null) as ReturnType<
+      NonNullable<DesktopBridge["getConnectService"]>
+    >,
+  setConnectService: (settings) =>
+    ipcRenderer.invoke(IpcChannels.SET_CONNECT_SERVICE_CHANNEL, settings),
   getClientSettings: () => ipcRenderer.invoke(IpcChannels.GET_CLIENT_SETTINGS_CHANNEL),
   setClientSettings: (settings) =>
     ipcRenderer.invoke(IpcChannels.SET_CLIENT_SETTINGS_CHANNEL, settings),
