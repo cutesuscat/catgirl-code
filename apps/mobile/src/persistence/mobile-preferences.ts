@@ -154,6 +154,8 @@ export interface Preferences {
   readonly codeFontSize?: number | null;
   readonly codeWordBreak?: boolean;
   readonly mathRenderingEnabled?: boolean;
+  /** Unset means on: the row of cat planets above the thread list. */
+  readonly catFleetEnabled?: boolean;
   /** Unset means off: Catgirl Code sends crash reports only once the user turns them on. */
   readonly crashReportsEnabled?: boolean;
   /** Unset means off: Catgirl Code sends connection traces only once the user turns them on. */
@@ -253,6 +255,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     codeFontSize?: number | null;
     codeWordBreak?: boolean;
     mathRenderingEnabled?: boolean;
+    catFleetEnabled?: boolean;
     crashReportsEnabled?: boolean;
     connectionTracesEnabled?: boolean;
     connectOnboardingOptOutAccounts?: ReadonlyArray<string>;
@@ -353,6 +356,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   if (typeof parsed.codeWordBreak === "boolean") preferences.codeWordBreak = parsed.codeWordBreak;
   if (typeof parsed.mathRenderingEnabled === "boolean")
     preferences.mathRenderingEnabled = parsed.mathRenderingEnabled;
+  if (typeof parsed.catFleetEnabled === "boolean") {
+    preferences.catFleetEnabled = parsed.catFleetEnabled;
+  }
   if (typeof parsed.crashReportsEnabled === "boolean") {
     preferences.crashReportsEnabled = parsed.crashReportsEnabled;
   }

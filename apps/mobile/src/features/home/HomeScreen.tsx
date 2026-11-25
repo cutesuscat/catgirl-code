@@ -104,6 +104,7 @@ import { holdLaunchSplashForHomeRows, settleLaunchSplashHomeRows } from "./home-
 import { useWorkspaceTabs } from "../layout/workspace/WorkspaceTabsContext";
 import { ThreadListFilters } from "./ThreadListFilters";
 import { deriveHomeEmptyState } from "./home-empty-state";
+import { HomeCatFleet } from "./HomeCatFleet";
 
 interface HomeScreenProps {
   /** Whether this list is the one on screen; see `useHomeRouteVisible`. */
@@ -680,9 +681,20 @@ export function HomeScreen(props: HomeScreenProps) {
 
   const listHeader = Platform.OS === "ios" ? undefined : <HomeTopContentSpacer />;
 
+  const catFleet = (
+    <HomeCatFleet
+      visible={props.visible}
+      pane={sidebarSurface ? "sidebar" : "screen"}
+      environments={props.environments}
+      selectedEnvironmentId={props.selectedEnvironmentId}
+      onEnvironmentChange={props.onEnvironmentChange}
+    />
+  );
+
   const v2ListHeader = (
     <>
       {listHeader}
+      {catFleet}
       {Platform.OS === "ios" && workspace ? (
         <ThreadListFilters
           gutter={sidebarSurface ? 8 : 0}
@@ -751,6 +763,13 @@ export function HomeScreen(props: HomeScreenProps) {
   if (Platform.OS === "android" && threadListV2Items.length === 0) {
     return (
       <ScreenContent surface="screen">
+        {/* A machine picked from the cats can list nothing: they stay, as the way back. */}
+        {props.selectedEnvironmentId !== null ? (
+          <>
+            <HomeTopContentSpacer />
+            {catFleet}
+          </>
+        ) : null}
         <View
           className="flex-1 items-center justify-center px-4"
           style={{ paddingBottom: insets.bottom }}
