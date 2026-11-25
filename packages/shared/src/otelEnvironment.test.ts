@@ -400,6 +400,8 @@ describe("isCiEnvironment", () => {
 });
 
 describe("isRelayTracingEnabled", () => {
+  const optedIn = { T3CODE_TELEMETRY_ENABLED: "true" };
+
   it("turns off for DO_NOT_TRACK, even when T3 telemetry is on", () => {
     assert.isFalse(OtelEnvironment.isRelayTracingEnabled({ DO_NOT_TRACK: "1" }));
     assert.isFalse(
@@ -408,21 +410,32 @@ describe("isRelayTracingEnabled", () => {
         T3CODE_TELEMETRY_ENABLED: "1",
       }),
     );
-    assert.isTrue(OtelEnvironment.isRelayTracingEnabled({ DO_NOT_TRACK: "0" }));
-    assert.isTrue(OtelEnvironment.isRelayTracingEnabled({ DO_NOT_TRACK: "" }));
+    assert.isTrue(OtelEnvironment.isRelayTracingEnabled({ ...optedIn, DO_NOT_TRACK: "0" }));
+    assert.isTrue(OtelEnvironment.isRelayTracingEnabled({ ...optedIn, DO_NOT_TRACK: "" }));
   });
 
-  it("defaults on and respects the T3CODE SDK override of the standard kill switch", () => {
-    assert.isTrue(OtelEnvironment.isRelayTracingEnabled({}));
-    assert.isFalse(OtelEnvironment.isRelayTracingEnabled({ OTEL_SDK_DISABLED: "true" }));
+  it("stays off until T3CODE_TELEMETRY_ENABLED asks for it", () => {
+    assert.isFalse(OtelEnvironment.isTelemetryOnByDefault({}));
+    assert.isFalse(OtelEnvironment.isRelayTracingEnabled({}));
+    assert.isFalse(OtelEnvironment.isRelayTracingEnabled({ DO_NOT_TRACK: "0" }));
+    assert.isFalse(OtelEnvironment.isRelayTracingEnabled({ T3CODE_OTEL_SDK_DISABLED: "false" }));
+    assert.isTrue(OtelEnvironment.isRelayTracingEnabled(optedIn));
+  });
+
+  it("respects the T3CODE SDK override of the standard kill switch", () => {
+    assert.isFalse(
+      OtelEnvironment.isRelayTracingEnabled({ ...optedIn, OTEL_SDK_DISABLED: "true" }),
+    );
     assert.isTrue(
       OtelEnvironment.isRelayTracingEnabled({
+        ...optedIn,
         OTEL_SDK_DISABLED: "true",
         T3CODE_OTEL_SDK_DISABLED: "false",
       }),
     );
     assert.isFalse(
       OtelEnvironment.isRelayTracingEnabled({
+        ...optedIn,
         OTEL_SDK_DISABLED: "false",
         T3CODE_OTEL_SDK_DISABLED: "true",
       }),

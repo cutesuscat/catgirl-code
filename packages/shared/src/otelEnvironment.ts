@@ -342,6 +342,14 @@ export const isCiEnvironment = (env: Readonly<Record<string, string | undefined>
     return value !== undefined && value !== "" && value !== "false" && value !== "0";
   });
 
+// Catgirl Code is a fork: analytics and relay traces go to upstream's accounts, so both stay off
+// until `T3CODE_TELEMETRY_ENABLED=true` asks for them. Set this to true for upstream's default.
+const TELEMETRY_ON_BY_DEFAULT: boolean = false;
+
+/** Whether product analytics and relay tracing are on when `T3CODE_TELEMETRY_ENABLED` is unset. */
+export const isTelemetryOnByDefault = (env: Readonly<Record<string, string | undefined>>) =>
+  TELEMETRY_ON_BY_DEFAULT && !isCiEnvironment(env);
+
 /** The cross-tool `DO_NOT_TRACK=1` convention turns off product analytics and relay tracing. */
 export const isDoNotTrackSet = (env: Readonly<Record<string, string | undefined>>) =>
   T3CODE_TRUE.includes(env.DO_NOT_TRACK?.trim().toLowerCase() ?? "");
@@ -353,7 +361,7 @@ export const isRelayTracingEnabled = (env: Readonly<Record<string, string | unde
   }).pipe(
     Effect.map(
       ({ telemetry, t3, spec }) =>
-        (telemetry.value ?? !isCiEnvironment(env)) &&
+        (telemetry.value ?? isTelemetryOnByDefault(env)) &&
         !isDoNotTrackSet(env) &&
         !(t3.value ?? spec.value ?? false),
     ),

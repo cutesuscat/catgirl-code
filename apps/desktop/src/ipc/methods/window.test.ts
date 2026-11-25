@@ -266,6 +266,7 @@ describe("toLocalBackendPath", () => {
 });
 
 describe("installRelayTelemetryEnabled", () => {
+  const optedIn = { T3CODE_TELEMETRY_ENABLED: "true" };
   // The renderer reads this over sync IPC, so the answer must not wait on the filesystem.
   const relayTelemetryEnabled = (
     env: NodeJS.ProcessEnv,
@@ -312,13 +313,20 @@ describe("installRelayTelemetryEnabled", () => {
         beforeDiscovery: false,
         afterDiscovery: false,
       });
-      // Undecided until the login shell is read, so the renderer asks again instead of opting out.
+      // Off unless asked for: with nothing set, the renderer is told no without waiting.
       assert.deepEqual(yield* relayTelemetryEnabled({}), {
+        beforeDiscovery: false,
+        afterDiscovery: false,
+      });
+      // Undecided until the login shell is read, so the renderer asks again instead of opting out.
+      assert.deepEqual(yield* relayTelemetryEnabled({ ...optedIn }), {
         beforeDiscovery: null,
         afterDiscovery: true,
       });
       assert.deepEqual(
-        yield* relayTelemetryEnabled({}, undefined, { T3CODE_TELEMETRY_ENABLED: "false" }),
+        yield* relayTelemetryEnabled({ ...optedIn }, undefined, {
+          T3CODE_TELEMETRY_ENABLED: "false",
+        }),
         { beforeDiscovery: null, afterDiscovery: false },
       );
     }),
@@ -334,11 +342,14 @@ describe("installRelayTelemetryEnabled", () => {
       const after = function* (...args: Parameters<typeof relayTelemetryEnabled>) {
         return (yield* relayTelemetryEnabled(...args)).afterDiscovery;
       };
-      assert.isFalse(yield* after({}, policy({ telemetry: false })));
-      assert.isTrue(yield* after({}, policy({ webhookTasks: false })));
+      assert.isFalse(yield* after({ ...optedIn }, policy({ telemetry: false })));
+      assert.isTrue(yield* after({ ...optedIn }, policy({ webhookTasks: false })));
       // A policy that cannot be read fails closed.
       assert.isFalse(
-        yield* after({}, new ManagedPolicyFileError({ path: "/test", reason: "bad JSON" })),
+        yield* after(
+          { ...optedIn },
+          new ManagedPolicyFileError({ path: "/test", reason: "bad JSON" }),
+        ),
       );
     }),
   );
