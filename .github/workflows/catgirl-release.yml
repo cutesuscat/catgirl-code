@@ -169,7 +169,9 @@ jobs:
               exit 1
             fi
           }
-          refuse "T3 Code" help.txt
+          # `t3 feedback` names T3 Code's team on purpose: it is one of the recipients a person can choose.
+          tr '\n' ' ' < help.txt | tr -s ' ' | sed -e 's/T3 Code team//g' -e 's/about T3 Code itself//g' > help-names.txt
+          refuse "T3 Code" help-names.txt
           refuse "pingdotgg/t3code/releases" apps/server/dist --include='*.mjs' --exclude-dir=client
 
       - uses: actions/upload-artifact@v4
