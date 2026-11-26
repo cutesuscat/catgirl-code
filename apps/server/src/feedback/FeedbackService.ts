@@ -1,6 +1,7 @@
 import * as NodeOS from "node:os";
 
 import type { ThreadId } from "@t3tools/contracts";
+import { feedbackModeFor } from "@t3tools/shared/agentFeedbackRecipient";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
@@ -13,8 +14,8 @@ import * as Projects from "../project/ProjectService.ts";
 import * as Providers from "../provider/ProviderRegistry.ts";
 import * as Settings from "../serverSettings.ts";
 import { providerDimensions } from "../telemetry/ProviderDimensions.ts";
+import { awaitingApprovalNote, cardTitle } from "./FeedbackRecipient.ts";
 import {
-  FEEDBACK_AWAITING_APPROVAL_NOTE,
   FEEDBACK_SUBJECT_MESSAGE,
   type FeedbackAwaitingApproval,
   type FeedbackInput,
@@ -99,7 +100,7 @@ const make = Effect.fn("FeedbackService.make")(function* (
   ) {
     const { agentFeedback } = yield* settings.getSettings.pipe(Effect.mapError(storageError));
     // Early, so a refused report shows no card; storing applies the rule again under the lock.
-    yield* Store.allowedBy(agentFeedback.mode, input.userRequested, caller.source);
+    yield* Store.allowedBy(feedbackModeFor(agentFeedback), input.userRequested, caller.source);
     const subject = resolveFeedbackSubject(input.subject, mcpToolNames());
     if (subject === undefined) return yield* new FeedbackSubjectError({});
     if (input.userRequested && caller.threadId === undefined) {
@@ -210,8 +211,12 @@ const make = Effect.fn("FeedbackService.make")(function* (
       nodeId: run.rootNodeId,
       preview: { ...fields, trace: traces.outline },
       conversationTrace: traces.conversation.textTurns > 0 ? traces.conversation : null,
+      title: cardTitle(agentFeedback.recipient),
     });
-    return { status: "awaiting_approval", note: FEEDBACK_AWAITING_APPROVAL_NOTE } as const;
+    return {
+      status: "awaiting_approval",
+      note: awaitingApprovalNote(agentFeedback.recipient),
+    } as const;
   });
 
   return FeedbackService.of({ submit });

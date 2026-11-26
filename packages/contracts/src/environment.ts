@@ -224,6 +224,8 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   linkedThreadRefreshes: Schema.optionalKey(Schema.Boolean),
   /** Honors the `agentFeedback` setting; older servers drop it, so hide its switch where absent. */
   agentFeedback: Schema.optionalKey(Schema.Boolean),
+  /** Catgirl Code: honors `agentFeedback.recipient`. Upstream's servers send only to T3 Code's team. */
+  agentFeedbackRecipient: Schema.optionalKey(Schema.Boolean),
   /** Answers `issues.linkedThreads`, the threads an issue is linked to. */
   issueLinkedThreads: Schema.optionalKey(Schema.Boolean),
   /** Keeps more than one account per standalone issue tracker; older servers keep one. */

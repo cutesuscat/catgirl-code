@@ -10,6 +10,7 @@ import { Command, Flag, GlobalFlag } from "effect/cli";
 
 import * as ServerConfig from "../config.ts";
 import { readFeedbackReports } from "../feedback/FeedbackList.ts";
+import { FEEDBACK_CLI_DESCRIPTION } from "../feedback/FeedbackRecipient.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as ServerSettings from "../serverSettings.ts";
 
@@ -133,9 +134,7 @@ export const feedbackCommand = Command.make("feedback", {
     Flag.withDefault(""),
   ),
 }).pipe(
-  Command.withDescription(
-    "Send feedback about T3 Code to the T3 team. Needs Agent feedback set to Automatic in Settings > Labs; to approve a report first, ask your agent in a thread.",
-  ),
+  Command.withDescription(FEEDBACK_CLI_DESCRIPTION),
   Command.withHandler(({ baseDir, kind, subject, expected, actual, workaround }) =>
     withThreadTools(
       { baseDir, json: true, clientLabel: FEEDBACK_CLI_CLIENT_LABEL },

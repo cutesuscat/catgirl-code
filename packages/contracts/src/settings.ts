@@ -22,6 +22,7 @@ import {
   TrimmedNonEmptyString,
   TrimmedString,
 } from "./baseSchemas.ts";
+import { AgentFeedbackRecipient } from "./agentFeedback.ts";
 import { UsageLimitSourceId } from "./usageLimitSourceId.ts";
 import { UsageModelFilter } from "./usage.ts";
 import { SecretProviderId, SecretProviderSlug } from "./secretReference.ts";
@@ -1438,7 +1439,15 @@ export const ServerSettings = Schema.Struct({
   ),
   agentFeedback: Schema.Struct({
     mode: AgentFeedbackMode.pipe(Schema.withDecodingDefaultKey(Effect.succeed("off" as const))),
-  }).pipe(Schema.withDecodingDefault(Effect.succeed({ mode: "off" as const }))),
+    // Catgirl Code: a choice made under upstream's "to the T3 team" keeps that recipient.
+    recipient: AgentFeedbackRecipient.pipe(
+      Schema.withDecodingDefaultKey(Effect.succeed("t3code" as const)),
+    ),
+  }).pipe(
+    Schema.withDecodingDefault(
+      Effect.succeed({ mode: "off" as const, recipient: "t3code" as const }),
+    ),
+  ),
   enableProviderUpdateChecks: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   continueThreadsAfterServerUpdate: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(true)),
@@ -1916,7 +1925,12 @@ export const ServerSettingsPatch = Schema.Struct({
   worktreesDirectory: Schema.optionalKey(TrimmedString),
   fastWorktreeCheckout: Schema.optionalKey(Schema.Boolean),
   responseStreamingMode: Schema.optionalKey(ResponseStreamingMode),
-  agentFeedback: Schema.optionalKey(Schema.Struct({ mode: AgentFeedbackMode })),
+  agentFeedback: Schema.optionalKey(
+    Schema.Struct({
+      mode: AgentFeedbackMode,
+      recipient: Schema.optionalKey(AgentFeedbackRecipient),
+    }),
+  ),
   enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),
   continueThreadsAfterServerUpdate: Schema.optionalKey(Schema.Boolean),
   keepAwakeWhileAgentsWork: Schema.optionalKey(Schema.Boolean),

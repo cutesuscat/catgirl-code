@@ -1,4 +1,5 @@
 import { AgentScope } from "@t3tools/shared/AgentScope";
+import { feedbackModeFor } from "@t3tools/shared/agentFeedbackRecipient";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
@@ -500,7 +501,7 @@ export const layerWithOptions = (
       const agentFeedbackMode = Option.isNone(serverSettings)
         ? Effect.succeed("off" as const)
         : serverSettings.value.getSettings.pipe(
-            Effect.map((settings) => settings.agentFeedback.mode),
+            Effect.map((settings) => feedbackModeFor(settings.agentFeedback)),
             Effect.orElseSucceed(() => "off" as const),
           );
       const agentAccessSettings = Effect.fn("ProviderSessionManagerV2.agentAccessSettings")(

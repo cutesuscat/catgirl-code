@@ -3,6 +3,7 @@
 import {
   type AgentFeedbackAnswerInput,
   type AgentFeedbackMode,
+  type AgentFeedbackRecipient,
   type AgentFeedbackPreview,
   type AgentFeedbackRequestStatus,
   AgentFeedbackRequestError,
@@ -13,6 +14,7 @@ import {
   type ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
+import { feedbackModeFor } from "@t3tools/shared/agentFeedbackRecipient";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -37,6 +39,7 @@ import {
   FeedbackTrace,
   type FeedbackSource,
 } from "./FeedbackReport.ts";
+import * as FeedbackRecipient from "./FeedbackRecipient.ts";
 
 const CARD_PREFIX = "turn-item:feedback-request:";
 
@@ -48,6 +51,8 @@ export interface FeedbackCard {
   readonly nodeId: NodeId;
   readonly preview: AgentFeedbackPreview;
   readonly conversationTrace: AgentFeedbackTrace | null;
+  /** Catgirl Code: names the card's recipient. */
+  readonly title?: string | undefined;
 }
 
 export interface UnpromptedReport {
@@ -126,6 +131,7 @@ const make = Effect.gen(function* () {
         preview: card.preview,
         ...(conversationTrace === undefined ? {} : { conversationTrace }),
         feedbackStatus,
+        ...(card.title === undefined ? {} : { title: card.title }),
       })
       .pipe(Effect.mapError(storageError));
 
@@ -152,6 +158,7 @@ const make = Effect.gen(function* () {
   const insert = Effect.fn("FeedbackStore.insert")(function* (
     report: Omit<FeedbackReport, "sent">,
     runId: RunId | null,
+    approved?: AgentFeedbackRecipient,
   ) {
     const traceJson = yield* encodeTrace(report.trace).pipe(Effect.mapError(storageError));
     const write = (mode: AgentFeedbackMode) =>
@@ -182,15 +189,25 @@ const make = Effect.gen(function* () {
           })}`;
         }),
       );
-    yield* settings
-      .withSettingsSnapshot(({ agentFeedback: { mode } }) =>
-        report.userRequested ? write(mode) : lock.withPermit(write(mode)),
+    return yield* settings
+      .withSettingsSnapshot(({ agentFeedback }) =>
+        Effect.gen(function* () {
+          const mode = feedbackModeFor(agentFeedback);
+          // Catgirl Code: an approved report goes only to the recipient its card named.
+          const refused = !FeedbackRecipient.approvedFor(approved, agentFeedback);
+          if (report.userRequested && mode !== "off" && refused) {
+            return yield* new FeedbackRecipient.FeedbackRecipientChangedError({});
+          }
+          yield* report.userRequested ? write(mode) : lock.withPermit(write(mode));
+          return agentFeedback.recipient;
+        }),
       )
       .pipe(
         Effect.mapError((error) =>
           error._tag === "FeedbackLimitError" ||
           error._tag === "FeedbackOffError" ||
-          error._tag === "FeedbackNotRequestedError"
+          error._tag === "FeedbackNotRequestedError" ||
+          error._tag === "FeedbackRecipientChangedError"
             ? error
             : storageError(error),
         ),
@@ -201,11 +218,12 @@ const make = Effect.gen(function* () {
   const deliver = Effect.fn("FeedbackStore.deliver")(function* (
     report: Omit<FeedbackReport, "sent">,
     dimensions: Partial<ProviderDimensions>,
+    recipient: AgentFeedbackRecipient,
   ) {
     const { kind, subject, expected, actual, workaround, trace, userRequested, source } = report;
     // A report links to no install. One that left without the user seeing it carries only its
     // categories; the agent's text stays in the local copy.
-    const sent = yield* analytics.record(
+    const sent = yield* FeedbackRecipient.sender(recipient, analytics).record(
       "agent.feedback",
       {
         kind,
@@ -243,8 +261,11 @@ const make = Effect.gen(function* () {
       threadId,
       createdAt: DateTime.formatIso(yield* DateTime.now),
     };
-    yield* insert(report, runId);
-    return { ...report, sent: yield* deliver(report, dimensions) };
+    // An unprompted report has no card whose recipient could have changed.
+    const recipient = yield* insert(report, runId).pipe(
+      Effect.catchTags({ FeedbackRecipientChangedError: Effect.die }),
+    );
+    return { ...report, sent: yield* deliver(report, dimensions, recipient) };
   });
 
   const showCard = Effect.fn("FeedbackStore.showCard")(function* (card: FeedbackCard) {
@@ -298,8 +319,11 @@ const make = Effect.gen(function* () {
       nodeId: item.nodeId,
     };
     // Settles the card with the trace it sent. Without one, it keeps only the outline.
-    const settle = (status: AgentFeedbackRequestStatus, trace = item.preview.trace) =>
-      record({ ...card, preview: { ...item.preview, trace } }, status);
+    const settle = (
+      status: AgentFeedbackRequestStatus,
+      trace = item.preview.trace,
+      title: string | undefined = item.title ?? undefined,
+    ) => record({ ...card, preview: { ...item.preview, trace }, title }, status);
     const { runs } = yield* threads
       .getThreadRecords(input.threadId, ["runs"], { runIds: [card.runId] })
       .pipe(
@@ -340,20 +364,25 @@ const make = Effect.gen(function* () {
             threadId: input.threadId,
             createdAt: DateTime.formatIso(yield* DateTime.now),
           };
-          const off = yield* insert(report, card.runId).pipe(
-            Effect.as(false),
-            Effect.catchTags({ FeedbackOffError: () => Effect.succeed(true) }),
+          const recipient = yield* insert(report, card.runId, input.recipient).pipe(
+            Effect.catchTags({
+              FeedbackOffError: () => Effect.undefined,
+              // Catgirl Code: the card stays open, to be read again and answered.
+              FeedbackRecipientChangedError: () => fail("recipient_changed"),
+            }),
           );
-          if (off) {
+          if (recipient === undefined) {
             yield* settle("cancelled");
             return yield* fail("feedback_off");
           }
           const sent = yield* deliver(
             report,
             run === undefined ? {} : providerDimensions(providerList, run.modelSelection),
+            recipient,
           );
           // Telemetry off keeps the report on this machine, so the card says not sent.
-          yield* sent ? settle("sent", trace) : settle("cancelled");
+          const title = FeedbackRecipient.cardTitle(recipient);
+          yield* sent ? settle("sent", trace, title) : settle("cancelled", undefined, title);
         }),
       )
       .pipe(

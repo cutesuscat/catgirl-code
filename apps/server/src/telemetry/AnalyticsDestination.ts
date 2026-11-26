@@ -2,6 +2,7 @@
 import type { ManagedPolicySummary, ServerObservability } from "@t3tools/contracts";
 import { isAnalyticsAllowed } from "@t3tools/shared/otelEnvironment";
 import * as Config from "effect/Config";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
@@ -99,3 +100,17 @@ export const resolved = Effect.gen(function* () {
   const { savedAnalytics } = yield* ServerConfig.ServerConfig;
   return resolveAnalyticsTarget(environment, savedAnalytics);
 }).pipe(Effect.orElseSucceed((): AnalyticsTarget => ({})));
+
+/**
+ * A fixed destination for one `AnalyticsService` built under it: agent feedback for T3 Code's team
+ * goes through its own instance so usage analytics keep having no built-in destination.
+ */
+export const FixedTarget = Context.Reference<AnalyticsTarget | undefined>(
+  "catgirl/telemetry/AnalyticsFixedTarget",
+  { defaultValue: () => undefined },
+);
+
+/** What an `AnalyticsService` sends to: its fixed destination, else the machine's own. */
+export const target = Effect.gen(function* () {
+  return (yield* FixedTarget) ?? (yield* resolved);
+});

@@ -136,7 +136,10 @@ const harness = Effect.gen(function* () {
     | undefined
   >(undefined);
   const readSettings = Ref.get(mode).pipe(
-    Effect.map((mode) => ({ ...DEFAULT_SERVER_SETTINGS, agentFeedback: { mode } })),
+    Effect.map((mode) => ({
+      ...DEFAULT_SERVER_SETTINGS,
+      agentFeedback: { ...DEFAULT_SERVER_SETTINGS.agentFeedback, mode },
+    })),
   );
   const unlockedRead = Effect.gen(function* () {
     const captured = yield* readSettings;

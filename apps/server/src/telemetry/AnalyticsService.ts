@@ -125,9 +125,7 @@ export const make = Effect.gen(function* () {
   const enabledByDefault = !isCiEnvironment(hostEnvironment);
   const enabledAtStartup = Option.getOrElse(telemetryConfig.enabled, () => enabledByDefault);
   // Catgirl Code builds in no destination: until the machine names one, nothing is queued or sent.
-  const destination = AnalyticsDestination.analyticsDestination(
-    yield* AnalyticsDestination.resolved,
-  );
+  const destination = AnalyticsDestination.analyticsDestination(yield* AnalyticsDestination.target);
   // A managed policy can switch analytics off over the environment, never on.
   const policyAllows =
     ManagedPolicy.deniedBy(yield* ManagedPolicy.ManagedPolicy, "telemetry") === undefined;

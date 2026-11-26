@@ -42,6 +42,10 @@ export const AgentFeedbackPreview = Schema.Struct({
 });
 export type AgentFeedbackPreview = typeof AgentFeedbackPreview.Type;
 
+/** Catgirl Code: who receives reports. Upstream has one recipient, T3 Code's team. */
+export const AgentFeedbackRecipient = Schema.Literals(["t3code", "catgirl-code"]);
+export type AgentFeedbackRecipient = typeof AgentFeedbackRecipient.Type;
+
 export const AgentFeedbackRequestStatus = Schema.Literals([
   "pending",
   "sent",
@@ -56,6 +60,8 @@ export const AgentFeedbackAnswerInput = Schema.Struct({
   answer: Schema.Literals(["send", "decline"]),
   /** Send the card's conversation trace instead of its outline. */
   includeConversation: Schema.optionalKey(Schema.Boolean),
+  /** The recipient the card named. Absent from clients that name only T3 Code's team. */
+  recipient: Schema.optionalKey(AgentFeedbackRecipient),
 });
 export type AgentFeedbackAnswerInput = typeof AgentFeedbackAnswerInput.Type;
 
@@ -64,6 +70,8 @@ const AGENT_FEEDBACK_REQUEST_FAILURE_MESSAGES = {
   not_found: "This feedback report no longer exists.",
   already_answered: "This feedback report was already answered.",
   feedback_off: "Agent feedback is off, so this report was not sent.",
+  recipient_changed:
+    "Agent feedback on this machine now goes somewhere other than this card said, so nothing was sent. Read the card again and answer it.",
   record_failed: "Could not record your answer.",
 } as const;
 

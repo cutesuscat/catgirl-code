@@ -100,7 +100,7 @@ it("keeps agent feedback out of the preferences agents read and write", () => {
   expect(
     EnvironmentHandlers.preferences({
       ...DEFAULT_SERVER_SETTINGS,
-      agentFeedback: { mode: "auto" },
+      agentFeedback: { mode: "auto", recipient: "t3code" },
     }),
   ).not.toHaveProperty("agentFeedback");
   expect(

@@ -138,6 +138,7 @@ import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as Workflows from "./workflows/Workflows.ts";
 import * as WorkflowRuntime from "./workflows/WorkflowRuntime.ts";
 import * as SecretRequests from "./secrets/SecretRequests.ts";
+import * as FeedbackRecipient from "./feedback/FeedbackRecipient.ts";
 import * as FeedbackStore from "./feedback/FeedbackStore.ts";
 import * as GuestShareService from "./guest/GuestShareService.ts";
 import {
@@ -1961,6 +1962,7 @@ export const layerWsRpc = (
               serverSettings.managedPolicy,
               analyticsTarget,
             ),
+            ...FeedbackRecipient.describeT3Delivery(hostEnvironment, serverSettings.managedPolicy),
           },
           settings,
           ...(serverSettings.managedPolicy === undefined

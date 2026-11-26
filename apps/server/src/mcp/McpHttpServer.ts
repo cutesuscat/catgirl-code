@@ -66,6 +66,7 @@ import * as PreviewControlsHandlers from "./toolkits/previewControls/handlers.ts
 import * as FeedbackHandlers from "./toolkits/feedback/handlers.ts";
 import { FeedbackToolkit } from "./toolkits/feedback/tools.ts";
 import * as Feedback from "../feedback/FeedbackService.ts";
+import * as FeedbackRecipient from "../feedback/FeedbackRecipient.ts";
 import { EnvironmentToolkit } from "./toolkits/environment/tools.ts";
 import * as EnvironmentHandlers from "./toolkits/environment/handlers.ts";
 import { ThemeToolkit } from "./toolkits/theme/tools.ts";
@@ -1514,7 +1515,7 @@ export const layerTools = Layer.mergeAll(
   layerWorkflowToolkit,
   layerAttachmentToolkit,
   layerProjectRegistration,
-  layerFeedbackToolkit,
+  FeedbackRecipient.withToolDescription(layerFeedbackToolkit),
   layerEnvironmentToolkit,
   layerThemeToolkit,
   layerPreviewControlsRegistration,
