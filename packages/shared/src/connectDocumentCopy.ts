@@ -49,6 +49,18 @@ export function connectRefreshProblemText(problem: ConnectRefreshProblem): strin
 
 const quoted = (value: string | undefined) => (value ? `"${value}"` : "none");
 
+/** A line about a new key, without its two fingerprints, for screens that show them as emoji. */
+export function connectKeyChangeText(change: ConnectServiceChange): string | null {
+  switch (change.kind) {
+    case "key-rotated":
+      return "Signing key rotated, endorsed by the old one.";
+    case "identity-trusted":
+      return "New identity trusted on this device.";
+    default:
+      return null;
+  }
+}
+
 /** One line of "Recent changes". */
 export function connectChangeText(change: ConnectServiceChange): string {
   const offer = change.diagnostics ? CONNECT_DIAGNOSTICS_LABELS[change.diagnostics].noun : "";

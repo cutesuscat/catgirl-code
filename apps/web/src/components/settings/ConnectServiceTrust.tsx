@@ -1,5 +1,5 @@
 /* oxlint-disable t3code/no-untranslated-copy -- Catgirl Connect version 2, English only: upstream's catalogs stay untouched */
-import type { ConnectServiceSettings } from "@t3tools/contracts";
+import type { ConnectServiceChange, ConnectServiceSettings } from "@t3tools/contracts";
 import {
   CONNECT_DIAGNOSTICS_KINDS,
   connectDiagnosticsOffers,
@@ -11,6 +11,7 @@ import {
 import {
   CONNECT_DIAGNOSTICS_LABELS,
   connectChangeText,
+  connectKeyChangeText,
   connectRefreshProblemText,
 } from "@t3tools/shared/connectDocumentCopy";
 import {
@@ -30,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { ConnectIdentity, ConnectIdentityInline } from "./ConnectIdentityEmoji";
 import { SettingsRow } from "./settingsLayout";
 
 type Signed = ConnectServiceSettings & {
@@ -43,14 +45,6 @@ const hostOf = (url: string) => {
     return url;
   }
 };
-
-function Fingerprint({ value }: { readonly value: string }) {
-  return (
-    <code data-testid="connect-fingerprint" className="font-mono text-foreground">
-      {value}
-    </code>
-  );
-}
 
 const fingerprintOf = (key: string) => connectKeyFingerprint(key) ?? "unknown";
 
@@ -77,8 +71,8 @@ export function ConnectFirstUseDetails({
       <dt className="text-muted-foreground">Address</dt>
       <dd>{hostOf(settings.relayUrl)}</dd>
       <dt className="text-muted-foreground">Identity</dt>
-      <dd>
-        <Fingerprint value={fingerprint} />
+      <dd className="min-w-0 pt-0.5">
+        <ConnectIdentity fingerprint={fingerprint} />
       </dd>
       <dd className="col-span-2 pt-1 text-xs text-muted-foreground">
         {linkFingerprint !== null && sameConnectFingerprint(linkFingerprint, fingerprint)
@@ -90,6 +84,25 @@ export function ConnectFirstUseDetails({
               .join(", ")}; nothing is sent unless you turn it on.`
           : null}
       </dd>
+    </dl>
+  );
+}
+
+/** The identity this device trusts above the one the service now presents, for comparing. */
+function IdentityPair({ before, after }: { readonly before: string; readonly after: string }) {
+  return (
+    <dl data-testid="connect-identity-pair" className="grid gap-3 py-2">
+      {[
+        { label: "Trusted until now", fingerprint: before },
+        { label: "New identity", fingerprint: after },
+      ].map(({ label, fingerprint }) => (
+        <div key={label} className="space-y-1">
+          <dt className="text-xs text-muted-foreground">{label}</dt>
+          <dd>
+            <ConnectIdentity fingerprint={fingerprint} />
+          </dd>
+        </div>
+      ))}
     </dl>
   );
 }
@@ -130,7 +143,7 @@ function IdentityChangedNotice({
         className="px-4 pb-3 text-xs text-muted-foreground"
       >
         Keeping the old settings. {name} now presents another identity (
-        <Fingerprint value={newFingerprint} />
+        <ConnectIdentityInline fingerprint={newFingerprint} />
         ).{" "}
         <button
           type="button"
@@ -154,11 +167,12 @@ function IdentityChangedNotice({
         <AlertTitle>This Connect service's identity changed</AlertTitle>
         <AlertDescription>
           <p>
-            {name} now presents the identity <Fingerprint value={newFingerprint} /> instead of{" "}
-            <Fingerprint value={oldFingerprint} />, and the old one did not endorse it. Nothing from
-            it is used: this device keeps the settings it last trusted until you decide. If you did
-            not expect this, keep the old settings and ask the service's operator.
+            {name} now presents a new identity, and the one this device trusts did not endorse it.
+            Nothing from it is used: this device keeps the settings it last trusted until you
+            decide. If you did not expect this, keep the old settings and ask the service's
+            operator.
           </p>
+          <IdentityPair before={oldFingerprint} after={newFingerprint} />
           <div className="flex flex-wrap gap-2 pt-2">
             <Button
               size="compact"
@@ -186,16 +200,9 @@ function IdentityChangedNotice({
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <dl className="mx-6 mb-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">Trusted until now</dt>
-            <dd>
-              <Fingerprint value={oldFingerprint} />
-            </dd>
-            <dt className="text-muted-foreground">New identity</dt>
-            <dd>
-              <Fingerprint value={newFingerprint} />
-            </dd>
-          </dl>
+          <div className="mx-6 mb-2">
+            <IdentityPair before={oldFingerprint} after={newFingerprint} />
+          </div>
           {failed || trusted === null ? (
             <p role="alert" className="px-6 pb-4 text-sm text-destructive">
               This identity's document can no longer be used (it may have expired). Nothing was
@@ -223,6 +230,30 @@ const offerWhere = {
 
 const RECENT_SHOWN = 3;
 
+/** A rotation or a trusted identity shows both identities; any other change is one sentence. */
+function KeyChangeOrText({ change }: { readonly change: ConnectServiceChange }) {
+  const text = connectKeyChangeText(change);
+  if (text === null || !change.from || !change.to) return <span>{connectChangeText(change)}</span>;
+  return (
+    <div data-testid="connect-key-change" className="min-w-0 flex-1 space-y-1">
+      <span>{text}</span>
+      <dl className="grid gap-2">
+        {[
+          { label: "From", fingerprint: change.from },
+          { label: "To", fingerprint: change.to },
+        ].map(({ label, fingerprint }) => (
+          <div key={label} className="space-y-0.5">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd>
+              <ConnectIdentity fingerprint={fingerprint} compact />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function RecentChanges({ current }: { readonly current: Signed }) {
   const [all, setAll] = useState(false);
   const changes = current.connect.recentChanges ?? [];
@@ -242,7 +273,7 @@ function RecentChanges({ current }: { readonly current: Signed }) {
             <span className="shrink-0 text-muted-foreground tabular-nums">
               {change.at.slice(0, 10)}
             </span>
-            <span>{connectChangeText(change)}</span>
+            <KeyChangeOrText change={change} />
           </li>
         ))}
       </ul>
@@ -285,7 +316,7 @@ export function ConnectServiceTrust({
         title={name}
         description={
           <>
-            {hostOf(current.relayUrl)} · signed by <Fingerprint value={fingerprintOf(key)} />
+            {hostOf(current.relayUrl)}
             {links.map((link) => (
               <span key={link.label}>
                 {" · "}
@@ -310,7 +341,12 @@ export function ConnectServiceTrust({
             `Checked ${current.connect.checkedAt.slice(0, 10)}.`
           )
         }
-      />
+      >
+        <div data-testid="connect-signed-by" className="space-y-1 pt-1 pb-2">
+          <p className="text-xs text-muted-foreground">Signed by</p>
+          <ConnectIdentity fingerprint={fingerprintOf(key)} />
+        </div>
+      </SettingsRow>
       <IdentityChangedNotice current={current} update={update} restartInto={restartInto} />
       {pendingSettings !== null ? (
         <SettingsRow

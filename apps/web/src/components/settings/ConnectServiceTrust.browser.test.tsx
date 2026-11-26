@@ -18,6 +18,9 @@ import { ConnectServiceForm, type ConnectServiceFormProps } from "./ConnectServi
 const RELAY = "https://relay.example.com";
 const OLD_FP = "3475 0f98 bd59 fcfc";
 const NEW_FP = "6a38 03d5 f059 902a";
+// The emoji of the two fingerprints, from the shared table (checked there against the vector).
+const OLD_EMOJI = "🐙Octopus🐰Rabbit🌙Moon🌷Flower⌛Hourglass🐢Turtle✈️Aeroplane🍓Strawberry";
+const NEW_EMOJI = "🌽Corn🎅Santa🎩Hat🐎Horse✈️Aeroplane🤖Robot🐶Dog🍓Strawberry";
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date("2026-12-02T00:00:00Z");
 const at = (days: number) => new Date(NOW.getTime() + days * DAY).toISOString();
@@ -120,7 +123,9 @@ it("first use shows the service, its host and its fingerprint before saving pins
   const details = page.getByTestId("connect-first-use");
   await expectText(details, /Example cats/);
   await expectText(details, /relay\.example\.com/);
-  await expectText(details, new RegExp(OLD_FP));
+  await expectText(details, new RegExp(`Identity${OLD_EMOJI}${OLD_FP}`));
+  const cells = details.getByRole("list", { name: "Identity" }).getByRole("listitem");
+  expect(cells.elements()).toHaveLength(8);
   await expectText(details, /Check this matches what the service's operator/);
   await expectText(details, /usage data, crash reports; nothing is sent/);
   expect(props.save).not.toHaveBeenCalled();
@@ -160,12 +165,21 @@ it("an identity change applies nothing: closing the question or keeping the old 
 
   const notice = screen.getByTestId("connect-identity-changed");
   await expectText(notice, /This Connect service's identity changed/);
-  await expectText(notice, new RegExp(`${NEW_FP}.*instead of.*${OLD_FP}`));
+  await expectText(notice, /now presents a new identity, and the one this device trusts did not/);
+  await expectText(
+    notice,
+    new RegExp(`Trusted until now${OLD_EMOJI}${OLD_FP}New identity${NEW_EMOJI}${NEW_FP}`),
+  );
 
   await screen.getByRole("button", { name: "Trust the new identity…" }).click();
-  await expect
-    .element(page.getByRole("alertdialog", { name: "Trust the new identity of Example cats?" }))
-    .toBeVisible();
+  const question = page.getByRole("alertdialog", {
+    name: "Trust the new identity of Example cats?",
+  });
+  await expect.element(question).toBeVisible();
+  await expectText(
+    question,
+    new RegExp(`Trusted until now${OLD_EMOJI}${OLD_FP}New identity${NEW_EMOJI}${NEW_FP}`),
+  );
   await userEvent.keyboard("{Escape}");
   await expect.element(page.getByRole("alertdialog")).not.toBeInTheDocument();
   await screen.getByRole("button", { name: "Trust the new identity…" }).click();
@@ -179,6 +193,28 @@ it("an identity change applies nothing: closing the question or keeping the old 
   expect(kept.connect?.document).toEqual(saved.connect?.document);
   expect(kept.connect?.identityChange?.declined).toBe(true);
   expect(props.save).not.toHaveBeenCalled();
+});
+
+it("the quiet line after keeping the old settings names the other identity", async () => {
+  using _clock = fixedClock();
+  const current = withIdentityChange();
+  const declined: SavedConnectService = {
+    ...current,
+    connect: {
+      ...current.connect!,
+      identityChange: { ...current.connect!.identityChange!, declined: true },
+    },
+  };
+  await using screen = await render(
+    <ConnectServiceForm {...setup({ _tag: "NotPublished" }, declined)} />,
+  );
+  const line = screen.getByTestId("connect-identity-declined");
+  await expectText(line, new RegExp(`another identity \\(🌽🎅🎩🐎✈️🤖🐶🍓 ${NEW_FP}\\)`));
+  await expect
+    .element(
+      line.getByRole("img", { name: "Corn, Santa, Hat, Horse, Aeroplane, Robot, Dog, Strawberry" }),
+    )
+    .toBeVisible();
 });
 
 it("trusting the new identity takes a second, explicit yes and starts the answers over", async () => {
@@ -238,7 +274,11 @@ it("shows what the service offers without switching anything on, and its recent 
 
   await expectText(
     screen.getByTestId("connect-service-identity"),
-    new RegExp(`relay\\.example\\.com · signed by ${OLD_FP}`),
+    new RegExp(`relay\\.example\\.com · Privacy policy · Contact the operator`),
+  );
+  await expectText(
+    screen.getByTestId("connect-signed-by"),
+    new RegExp(`Signed by${OLD_EMOJI}${OLD_FP}`),
   );
   await expectText(
     screen.getByTestId("connect-refresh-problem"),
@@ -256,6 +296,26 @@ it("shows what the service offers without switching anything on, and its recent 
   await expectText(
     screen.getByTestId("connect-recent-changes"),
     /Now offers to receive crash reports.*Off until you turn it on.*Name changed from "Cats" to "Example cats"/,
+  );
+});
+
+it("a rotation in recent changes shows the identity before and after", async () => {
+  using _clock = fixedClock();
+  const current: SavedConnectService = {
+    ...saved,
+    connect: {
+      ...saved.connect!,
+      recentChanges: [{ at: at(0), kind: "key-rotated", from: OLD_FP, to: NEW_FP }],
+    },
+  };
+  await using screen = await render(
+    <ConnectServiceForm {...setup({ _tag: "NotPublished" }, current)} />,
+  );
+  await expectText(
+    screen.getByTestId("connect-key-change"),
+    new RegExp(
+      `Signing key rotated, endorsed by the old one\\.From${OLD_EMOJI}${OLD_FP}To${NEW_EMOJI}${NEW_FP}`,
+    ),
   );
 });
 
