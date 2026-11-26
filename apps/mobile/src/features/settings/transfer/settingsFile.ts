@@ -57,6 +57,7 @@ export const PREFERENCE_LABELS = {
   projectGroupingMode: "Project grouping mode",
   toolCallVisibility: "Tool call visibility",
   workingShelfEnabled: "Working shelf",
+  catFleetEnabled: "Cat planets",
   workflowQuestionKind: null,
   useLastProjectForNewThreads: "Use the last project for new threads",
   lastThreadProject: null,
