@@ -1,0 +1,202 @@
+name: Catgirl Code Mac update test
+
+# Proves that an installed Mac app takes the next release as an update, end to end:
+# electron-updater finds it and downloads it, and macOS's updater (Squirrel) checks its
+# signature against the running app's and swaps the app. Run by hand with the id of a
+# "Catgirl Code release" run: it installs that run's app, makes a next release from it
+# signed with the same certificate, serves it on this machine, and has the app update
+# itself through the same calls its update button makes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Id of a "Catgirl Code release" run whose Mac app to test
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CATGIRL_MAC_SIGNING_IDENTITY: 36D36A618B3A343FE94F5A8F1738771E30A2042E
+  APP: /Applications/Catgirl Code.app
+
+jobs:
+  update:
+    name: Update an installed app
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-arm64
+          path: built
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install the app as a person would
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip="$(ls built/Catgirl-Code-*-arm64.zip)"
+          ditto -x -k "$zip" "$RUNNER_TEMP/installed"
+          rm -rf "$APP"
+          mv "$RUNNER_TEMP/installed/Catgirl Code.app" "$APP"
+          xattr -cr "$APP"
+          installed="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+          next="${installed%.*}.$(( ${installed##*.} + 1 ))"
+          echo "installed $installed, next $next"
+          echo "INSTALLED=$installed" >> "$GITHUB_ENV"
+          echo "NEXT=$next" >> "$GITHUB_ENV"
+          echo "ZIP=$zip" >> "$GITHUB_ENV"
+
+      # The same app with a new version and one new file, sealed again with the certificate.
+      - name: Make the next release, signed with the same certificate
+        shell: bash
+        env:
+          SIGNING_P12: ${{ secrets.CATGIRL_MAC_SIGNING_P12 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.CATGIRL_MAC_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/catgirl-signing.keychain-db"
+          password="$(openssl rand -hex 24)"
+          security create-keychain -p "$password" "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$SIGNING_P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+
+          ditto -x -k "$ZIP" "$RUNNER_TEMP/next"
+          next_app="$RUNNER_TEMP/next/Catgirl Code.app"
+          plutil -replace CFBundleShortVersionString -string "$NEXT" "$next_app/Contents/Info.plist"
+          plutil -replace CFBundleVersion -string "$NEXT" "$next_app/Contents/Info.plist"
+          echo "$NEXT" > "$next_app/Contents/Resources/catgirl-update-test.txt"
+          codesign --force --sign "$CATGIRL_MAC_SIGNING_IDENTITY" --keychain "$keychain" --timestamp=none \
+            --preserve-metadata=entitlements,requirements,flags "$next_app"
+          security delete-keychain "$keychain"
+
+          requirement="$(codesign --display --requirements - "$APP" 2>&1 | sed -n 's/^designated => //p')"
+          echo "installed app's designated requirement: $requirement"
+          codesign --verify --deep --strict -R "$requirement" "$next_app"
+
+          mkdir -p feed
+          name="Catgirl-Code-$NEXT-arm64.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$next_app" "feed/$name"
+          sha512="$(openssl dgst -sha512 -binary "feed/$name" | base64)"
+          size="$(stat -f%z "feed/$name")"
+          printf 'version: %s\nfiles:\n  - url: %s\n    sha512: %s\n    size: %s\npath: %s\nsha512: %s\nreleaseDate: %s\n' \
+            "$NEXT" "$name" "$sha512" "$size" "$name" "$sha512" "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'" > feed/latest-mac.yml
+          cat feed/latest-mac.yml
+
+      # T3CODE_DESKTOP_MOCK_UPDATES points the app's updater at http://localhost:<port>
+      # instead of the releases, which is the only difference from a real update.
+      - name: Start the installed app with the test feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd feed && nohup python3 -m http.server 4141 > "$RUNNER_TEMP/feed.log" 2>&1 &)
+          T3CODE_DESKTOP_MOCK_UPDATES=true T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT=4141 \
+            nohup "$APP/Contents/MacOS/Catgirl Code" --remote-debugging-port=9222 > "$RUNNER_TEMP/app.log" 2>&1 &
+          echo "started $!"
+
+      - name: Check, download and install through the app
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/drive.mjs" <<'EOF'
+          const next = process.env.NEXT;
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          let ws;
+          let id = 0;
+          const pending = new Map();
+          const evaluate = (expression, timeoutMs = 120_000) =>
+            new Promise((resolve, reject) => {
+              const n = ++id;
+              const timer = setTimeout(() => reject(new Error(`timed out: ${expression}`)), timeoutMs);
+              pending.set(n, (m) => {
+                clearTimeout(timer);
+                if (m.error || m.result?.exceptionDetails) reject(new Error(JSON.stringify(m.error ?? m.result.exceptionDetails)));
+                else resolve(m.result?.result?.value);
+              });
+              ws.send(JSON.stringify({ id: n, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } }));
+            });
+          async function connect() {
+            for (let i = 0; i < 180; i++) {
+              try {
+                const targets = await (await fetch("http://127.0.0.1:9222/json/list")).json();
+                for (const target of targets.filter((t) => t.type === "page")) {
+                  ws = new WebSocket(target.webSocketDebuggerUrl);
+                  await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+                  ws.onmessage = (event) => { const m = JSON.parse(event.data); pending.get(m.id)?.(m); pending.delete(m.id); };
+                  if ((await evaluate("typeof window.desktopBridge?.getUpdateState")) === "function") {
+                    console.log(`driving ${target.url}`);
+                    return;
+                  }
+                  ws.close();
+                }
+              } catch {}
+              await sleep(1000);
+            }
+            throw new Error("no app window with the desktop bridge");
+          }
+          const state = () => evaluate("window.desktopBridge.getUpdateState()");
+          async function waitFor(wanted, rounds) {
+            for (let i = 0; i < rounds; i++) {
+              const s = await state();
+              console.log(`${s.status} available=${s.availableVersion} downloaded=${s.downloadedVersion} ${s.message ?? ""}`);
+              if (s.status === wanted) return s;
+              if (s.status === "error" || s.status === "disabled") throw new Error(`updater: ${s.status} ${s.message}`);
+              await sleep(2000);
+            }
+            throw new Error(`never reached ${wanted}`);
+          }
+          await connect();
+          console.log("current", JSON.stringify((await state()).currentVersion));
+          console.log("check", JSON.stringify(await evaluate("window.desktopBridge.checkForUpdate()")));
+          await waitFor("available", 60);
+          console.log("download", JSON.stringify(await evaluate("window.desktopBridge.downloadUpdate()", 600_000)));
+          await waitFor("downloaded", 300);
+          // The app quits during this call, so its answer may never come.
+          await evaluate(`window.desktopBridge.installUpdate(${JSON.stringify(next)})`, 20_000).then(
+            (result) => console.log("install", JSON.stringify(result)),
+            (error) => console.log("install: no answer (the app is quitting):", error.message),
+          );
+          process.exit(0);
+          EOF
+          node "$RUNNER_TEMP/drive.mjs"
+
+      - name: The app is the next release and running again
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 90); do
+            version="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null || true)"
+            [[ "$version" == "$NEXT" ]] && break
+            sleep 2
+          done
+          echo "installed now: $version"
+          [[ "$version" == "$NEXT" ]]
+          [[ "$(cat "$APP/Contents/Resources/catgirl-update-test.txt")" == "$NEXT" ]]
+          codesign --verify --deep --strict "$APP"
+          for i in $(seq 1 30); do
+            pgrep -f "$APP/Contents/MacOS/Catgirl Code" > /dev/null && break
+            sleep 2
+          done
+          pgrep -fl "$APP/Contents/MacOS/Catgirl Code"
+          echo "updated $INSTALLED -> $NEXT and restarted"
+
+      - name: Logs
+        if: always()
+        shell: bash
+        run: |
+          tail -80 "$RUNNER_TEMP/app.log" || true
+          tail -20 "$RUNNER_TEMP/feed.log" || true
+          for f in ~/Library/Caches/com.t3tools.t3code.ShipIt/*.log; do echo "== $f"; tail -60 "$f"; done 2>/dev/null || true
+          ls ~/Library/Logs 2>/dev/null || true
