@@ -17,6 +17,8 @@ export const CATGIRL_LATEST_RELEASE_URL = `${CATGIRL_RELEASES_PAGE_URL}/latest`;
 export const CATGIRL_ISSUES_URL = `https://github.com/${CATGIRL_RELEASE_REPOSITORY}/issues`;
 /** What this fork is, for a person who meets its name somewhere. */
 export const CATGIRL_README_URL = `https://github.com/${CATGIRL_RELEASE_REPOSITORY}#readme`;
+/** What the apps and servers send, and to whom. Published outside the repository. */
+export const CATGIRL_PRIVACY_POLICY_URL = "https://slop.ie/catgirl-code/privacy/";
 /** Each release carries its own installer, so `latest` always installs the newest server. */
 export const CATGIRL_INSTALL_SCRIPT_URL = `${CATGIRL_RELEASES_PAGE_URL}/latest/download/install.sh`;
 export const CATGIRL_INSTALL_COMMAND = `curl -fsSL ${CATGIRL_INSTALL_SCRIPT_URL} | sh`;

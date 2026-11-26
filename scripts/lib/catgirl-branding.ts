@@ -10,6 +10,7 @@ import {
   CATGIRL_INSTALL_SCRIPT_URL,
   CATGIRL_ISSUES_URL,
   CATGIRL_LATEST_RELEASE_URL,
+  CATGIRL_PRIVACY_POLICY_URL,
   CATGIRL_README_URL,
   CATGIRL_RELEASE_REPOSITORY,
   CATGIRL_RELEASES_PAGE_URL,
@@ -87,6 +88,12 @@ export const REPLACED_TEXT: ReadonlyArray<readonly [file: string, from: string, 
   ["apps/web/src/branding.ts", '"https://t3.codes/download"', `"${CATGIRL_LATEST_RELEASE_URL}"`],
   // The code the welcome page shows a phone: the newest release carries the Android app.
   ["apps/web/src/branding.ts", '"https://t3.codes/mobile"', `"${CATGIRL_LATEST_RELEASE_URL}"`],
+  // T3 Code's policy describes T3 Code's servers and analytics, not what this build sends.
+  [
+    "apps/web/src/legalLinks.ts",
+    '"https://t3.codes/privacy-policy"',
+    `"${CATGIRL_PRIVACY_POLICY_URL}"`,
+  ],
   // The store pages are T3 Code's apps, so Settings does not offer them.
   ["apps/web/src/components/settings/SettingsPanels.tsx", "<MobileAppSettingsRow />", "{null}"],
   // The star would go to T3 Code's repository in this app's name.

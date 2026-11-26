@@ -1,3 +1,5 @@
+import { CATGIRL_PRIVACY_POLICY_URL } from "@t3tools/shared/catgirlRelease";
+
 const DEFAULT_MARKETING_SITE_URL = "https://t3.codes";
 
 function resolveMarketingSiteUrl(override: string | undefined): URL {
@@ -25,7 +27,8 @@ function marketingSiteDocumentUrl(path: string): string {
 const PRIVACY_POLICY_URL = marketingSiteDocumentUrl("privacy-policy");
 const SECURITY_POLICY_URL = marketingSiteDocumentUrl("security-policy");
 const TERMS_OF_SERVICE_URL = marketingSiteDocumentUrl("terms-of-service");
-export const LEGAL_URL = marketingSiteDocumentUrl("legal");
+// Catgirl Code: T3 Code's legal pages describe T3 Code's services, so the page is this fork's own.
+export const LEGAL_URL = CATGIRL_PRIVACY_POLICY_URL;
 
 const ALLOWED_LEGAL_DOCUMENT_URLS = [
   LEGAL_URL,
