@@ -68,7 +68,12 @@ export function connectTracesOffer() {
   if (!saved || !offer) return null;
   return {
     relayUrl: saved.relayUrl,
-    config: { tracesUrl: offer.url, tracesDataset: "connect", tracesToken: "connect" },
+    // An otlp-http offer is a base address, as OpenTelemetry endpoints are: traces go to <url>/v1/traces.
+    config: {
+      tracesUrl: `${offer.url.replace(/\/+$/u, "")}/v1/traces`,
+      tracesDataset: "connect",
+      tracesToken: "connect",
+    },
     isEnabled: () => connectDiagnosticsAllowed(currentConnectService()?.connect, "traces"),
   };
 }

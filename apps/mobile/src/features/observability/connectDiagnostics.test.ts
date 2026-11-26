@@ -44,7 +44,7 @@ describe("the service's connection-traces offer on this phone", () => {
     state.saved = service();
     state.current = service();
     const offer = connectTracesOffer();
-    expect(offer?.config.tracesUrl).toBe(`${RELAY}/v1/collect/otlp`);
+    expect(offer?.config.tracesUrl).toBe(`${RELAY}/v1/collect/otlp/v1/traces`);
     expect(offer?.isEnabled()).toBe(false);
     state.current = service({ traces: true });
     expect(offer?.isEnabled()).toBe(true);
