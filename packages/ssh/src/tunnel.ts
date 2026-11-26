@@ -212,6 +212,7 @@ export const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemo
       ...sshTargetLogFields(target),
       remotePort: parsed.remotePort,
       remoteServerKind: parsed.serverKind ?? null,
+      updateDeferred: parsed.updateDeferred ?? null,
       stateKey,
     });
     return {

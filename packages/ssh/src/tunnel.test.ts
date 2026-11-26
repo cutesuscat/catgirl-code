@@ -34,6 +34,7 @@ import { captureLauncher, captureLauncherFor, runLauncher } from "./launcherTest
 import * as SshAuth from "./auth.ts";
 import { remoteStateKey } from "./command.ts";
 import { SshCommandError, SshPasswordPromptError, SshReadinessError } from "./errors.ts";
+import { decodeRemoteLaunchOutput } from "./remoteScripts.ts";
 import * as SshTunnel from "./tunnel.ts";
 
 const isSshCommandError = Schema.is(SshCommandError);
@@ -1773,6 +1774,8 @@ const canBind = (port) =>
       const order = runtime.serverVersion.localeCompare(version, "en", { numeric: true });
       if (String(runtime.pid) === b && order >= 0) return;
     } catch {}
+  } else if (helper === "defer-update" && fs.existsSync(path.join(a, "busy"))) {
+    return console.log(fs.readFileSync(path.join(a, "busy"), "utf8").trim());
   }
   process.exitCode = 1;
 })();
@@ -1870,7 +1873,7 @@ const canBind = (port) =>
       const readServerTelemetry = fs
         .readFileString(`${home}/.t3/userdata/server-runtime.json`)
         .pipe(Effect.map((raw) => (JSON.parse(raw) as { telemetry?: string }).telemetry));
-      return { connect, readManagedPid, readServerVersion, readServerTelemetry };
+      return { connect, home, readManagedPid, readServerVersion, readServerTelemetry };
     });
 
   it.live.skipIf(windowsHost)("starts the server with telemetry off unless the host opted in", () =>
@@ -1924,6 +1927,48 @@ const canBind = (port) =>
       assert.notInclude(result.stderr, "File exists");
       assert.isTrue(yield* fs.exists(`${target}/ssh-launch/test-state`), result.stderr);
     }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.live.skipIf(windowsHost)(
+    "a newer client keeps an older managed server that has work running, until it is idle",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const { connect, home, readServerVersion } = yield* prepareLaunch(["0.1.5", "0.1.6"]);
+        const record = `${home}/.t3/ssh-launch/test-state/update-deferred`;
+        const olderPid = yield* connect("0.1.5");
+        yield* fs.writeFileString(`${home}/.t3/busy`, '{"reason":"busy","runningThreads":3}\n');
+
+        assert.equal(yield* connect("0.1.6"), olderPid);
+        assert.isTrue(isAlive(olderPid), "a busy 0.1.5 server was killed by a 0.1.6 client");
+        assert.equal(yield* readServerVersion, "0.1.5");
+        assert.include(yield* fs.readFileString(record), '"runningThreads":3');
+        // The runner on the host is the newer one by now; only the record makes this launch ask again.
+        assert.equal(yield* connect("0.1.6"), olderPid);
+
+        yield* fs.remove(`${home}/.t3/busy`);
+        const newerPid = yield* connect("0.1.6");
+        assert.notEqual(newerPid, olderPid);
+        assert.isFalse(isAlive(olderPid));
+        assert.equal(yield* readServerVersion, "0.1.6");
+        assert.isFalse(yield* fs.exists(record));
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("tells the client why an update was put off", () =>
+    Effect.gen(function* () {
+      const launch = yield* decodeRemoteLaunchOutput(
+        '{"remotePort":3773,"serverKind":"managed","updateDeferred":{"reason":"busy","runningThreads":3,"serverVersion":"0.1.12","wantedVersion":"1.12.1"}}\n',
+      );
+      assert.deepStrictEqual(launch.updateDeferred, {
+        reason: "busy",
+        runningThreads: 3,
+        serverVersion: "0.1.12",
+        wantedVersion: "1.12.1",
+      });
+      const plain = yield* decodeRemoteLaunchOutput('{"remotePort":3773}\n');
+      assert.isUndefined(plain.updateDeferred);
+    }),
   );
 
   it.live.skipIf(windowsHost)("a newer client still replaces an older managed server", () =>

@@ -14,6 +14,7 @@ import packageJson from "../../package.json" with { type: "json" };
 import { compareExactServiceVersions, isExactServiceVersion } from "../cloud/serviceProtocol.ts";
 import * as DesktopUpdateMarker from "../desktopUpdate/DesktopUpdateMarker.ts";
 import { serviceLauncherIsServing, stateDirOwned } from "../serviceLauncher.ts";
+import { deferUpdateCommand } from "./catgirlDeferUpdate.ts";
 
 const canBind = (port: number) =>
   new Promise<boolean>((resolve) => {
@@ -203,5 +204,6 @@ export const sshHelperCommand = Command.make("__ssh-helper").pipe(
     updateRemaining,
     homeOwned,
     keepServer,
+    deferUpdateCommand,
   ]),
 );

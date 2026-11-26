@@ -73,6 +73,15 @@ export function isNodeScriptRunner(runner: RemoteT3RunnerOptions | undefined): b
 const RemoteLaunchResult = Schema.Struct({
   remotePort: Schema.Number,
   serverKind: Schema.optional(Schema.Literals(["external", "managed"])),
+  // Catgirl Code: why the older server on the host was kept, when this launch would have replaced it.
+  updateDeferred: Schema.optional(
+    Schema.Struct({
+      reason: Schema.String,
+      runningThreads: Schema.optional(Schema.Number),
+      serverVersion: Schema.optional(Schema.String),
+      wantedVersion: Schema.optional(Schema.String),
+    }),
+  ),
 });
 
 const RemotePairingResult = Schema.Struct({
@@ -494,6 +503,7 @@ DEFAULT_RUNTIME_FILE="$DEFAULT_SERVER_HOME/userdata/server-runtime.json"
 PORT_FILE="$STATE_DIR/port"
 PID_FILE="$STATE_DIR/pid"
 MANAGED_FILE="$STATE_DIR/managed"
+UPDATE_DEFERRED_FILE="$STATE_DIR/update-deferred"
 LOG_FILE="$STATE_DIR/server.log"
 RUNNER_FILE="$STATE_DIR/run-t3.sh"
 RUNNER_NEXT="$STATE_DIR/run-t3.next.$$"
@@ -504,7 +514,7 @@ mkdir -p "$STATE_DIR"
 # The state directory and log are for their owner only. A umask set here would reach the server.
 chmod 700 "$STATE_DIR"
 cleanup_launch() {
-  rm -f "$RUNNER_NEXT"
+  rm -f "$RUNNER_NEXT" "$UPDATE_DEFERRED_FILE.next"
   for OWNED_LOCK in "$LAUNCH_LOCK" "$LAUNCH_BREAK_LOCK"; do
     if [ "$(cat "$OWNED_LOCK" 2>/dev/null || true)" = "$$" ]; then
       rm -f "$OWNED_LOCK"
@@ -574,7 +584,7 @@ while ! (set -C; printf '%s\\n' "$$" >"$LAUNCH_LOCK") 2>/dev/null; do
   LAUNCH_LOCK_WAITED=$((LAUNCH_LOCK_WAITED + 1))
 done
 RUNNER_CHANGED=0
-if [ ! -f "$RUNNER_FILE" ] || ! cmp -s "$RUNNER_NEXT" "$RUNNER_FILE"; then
+if [ ! -f "$RUNNER_FILE" ] || ! cmp -s "$RUNNER_NEXT" "$RUNNER_FILE" || [ -f "$UPDATE_DEFERRED_FILE" ]; then
   RUNNER_CHANGED=1
 fi
 mv "$RUNNER_NEXT" "$RUNNER_FILE"
@@ -623,9 +633,20 @@ server_running() {
   esac
 }
 # An older client replacing a same-or-newer server would run below the database's migrations.
+# Catgirl Code: a server with work running is kept too, and the record makes every later launch
+# ask again, so the update lands once the host is idle. T3 Code's t3 has no defer-update: it replaces.
 keeps_running_server() {
-  [ "$T3_ARCHIVE_MODE" = "1" ] &&
-    "$RUNNER_FILE" __ssh-helper keep-server "$DEFAULT_RUNTIME_FILE" "$REMOTE_PID" >/dev/null 2>&1
+  [ "$T3_ARCHIVE_MODE" = "1" ] || return 1
+  if "$RUNNER_FILE" __ssh-helper keep-server "$DEFAULT_RUNTIME_FILE" "$REMOTE_PID" >/dev/null 2>&1; then
+    rm -f "$UPDATE_DEFERRED_FILE"
+    return 0
+  fi
+  if "$RUNNER_FILE" __ssh-helper defer-update "$DEFAULT_SERVER_HOME" "$REMOTE_PID" >"$UPDATE_DEFERRED_FILE.next" 2>/dev/null && [ -s "$UPDATE_DEFERRED_FILE.next" ]; then
+    mv "$UPDATE_DEFERRED_FILE.next" "$UPDATE_DEFERRED_FILE"
+    return 0
+  fi
+  rm -f "$UPDATE_DEFERRED_FILE" "$UPDATE_DEFERRED_FILE.next"
+  return 1
 }
 @@T3_MANAGED_SERVER_RUNNING_SCRIPT@@
 # The server publishes its runtime record only after it answers, so one that
@@ -790,6 +811,7 @@ if adopt_default_server && [ -n "$ADOPTED_PID" ] && [ -n "$LAUNCHER_ID" ]; then
   done
 fi
 if [ "$REMOTE_MANAGED" = "external" ]; then
+  rm -f "$UPDATE_DEFERRED_FILE"
   # A server adopted above has just answered. While it is still alive, probing
   # it again could catch a momentary stall and launch a second server beside it.
   if server_running "$ADOPTED_PID"; then
@@ -902,7 +924,7 @@ if [ -z "$REMOTE_PORT" ]; then
   fi
   # Start this launch's log empty. Unlink rather than truncate: a process from an
   # earlier launch can still hold the old log open and keep writing to it.
-  rm -f "$LOG_FILE"
+  rm -f "$LOG_FILE" "$UPDATE_DEFERRED_FILE"
   (umask 077 && : >"$LOG_FILE")
   # The runner may fetch upstream's own build, which reports usage unless told not to.
   nohup env T3CODE_NO_BROWSER=1 T3CODE_TELEMETRY_ENABLED="\${T3CODE_TELEMETRY_ENABLED:-false}" "$RUNNER_FILE" serve --host 127.0.0.1 --port "$REMOTE_PORT" --base-dir "$DEFAULT_SERVER_HOME" >>"$LOG_FILE" 2>&1 < /dev/null &
@@ -950,7 +972,12 @@ if [ -z "$REMOTE_PORT" ]; then
     sleep 0.1
   done
 fi
-printf '{"remotePort":%s,"serverKind":"%s"}\\n' "$REMOTE_PORT" "\${REMOTE_MANAGED:-managed}"
+UPDATE_DEFERRED="$(cat "$UPDATE_DEFERRED_FILE" 2>/dev/null || true)"
+case "$UPDATE_DEFERRED" in
+  "{"*"}") UPDATE_DEFERRED=",\\"updateDeferred\\":$UPDATE_DEFERRED" ;;
+  *) UPDATE_DEFERRED="" ;;
+esac
+printf '{"remotePort":%s,"serverKind":"%s"%s}\\n' "$REMOTE_PORT" "\${REMOTE_MANAGED:-managed}" "$UPDATE_DEFERRED"
 `;
 
 const REMOTE_PAIRING_SCRIPT = `set -eu
