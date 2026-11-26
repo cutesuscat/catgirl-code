@@ -111,7 +111,14 @@ describe("t3 connect --relay", () => {
       _tag: "Continue",
       argv: [...T3, "connect"],
     });
-    expect(run.printed.join("\n")).toContain(`Identity: ${OLD_FP}`);
+    // The emoji line, each name under its emoji, then the hex the setup link carries.
+    expect(run.printed).toEqual(
+      expect.arrayContaining([
+        "  Identity: 🐙       🐰      🌙    🌷      ⌛         🐢      ✈️         🍓",
+        "            Octopus  Rabbit  Moon  Flower  Hourglass  Turtle  Aeroplane  Strawberry",
+        `            ${OLD_FP}`,
+      ]),
+    );
     expect(run.printed.join("\n")).toContain("Matches the setup link.");
     expect(run.printed.join("\n")).toContain(
       "Offers to receive usage data: off unless you turn it on.",
@@ -179,7 +186,16 @@ describe("t3 connect --relay", () => {
       interactive: true,
     });
     expect(await prepareConnectService(no.io)).toEqual({ _tag: "Exit", code: 1 });
-    expect(no.printed.join("\n")).toContain(`Trusted until now: ${OLD_FP}`);
+    expect(no.printed.join("\n")).toContain(
+      [
+        "  Trusted until now: 🐙       🐰      🌙    🌷      ⌛         🐢      ✈️         🍓",
+        "                     Octopus  Rabbit  Moon  Flower  Hourglass  Turtle  Aeroplane  Strawberry",
+        `                     ${OLD_FP}`,
+        "  New identity:      🌽    🎅     🎩   🐎     ✈️         🤖     🐶   🍓",
+        "                     Corn  Santa  Hat  Horse  Aeroplane  Robot  Dog  Strawberry",
+        `                     ${NEW_FP}`,
+      ].join("\n"),
+    );
     expect(no.asked).toEqual([`Trust ${NEW_FP}? [y/N] `]);
     expect(no.saved()?.connect?.identityChange?.declined).toBe(true);
 
@@ -242,7 +258,9 @@ describe("a machine with a saved service", () => {
       _tag: "Continue",
       argv: [...T3, "serve"],
     });
-    expect(run.printed.join("\n")).toContain(`changed its identity to ${NEW_FP}`);
+    expect(run.printed.join("\n")).toContain(
+      `changed its identity to 🌽 🎅 🎩 🐎 ✈️ 🤖 🐶 🍓  ${NEW_FP}.`,
+    );
     expect(run.saved()?.connect?.identityChange).toBeDefined();
     expect(run.io.env.T3CODE_RELAY_URL).toBe(RELAY);
     expect(run.io.env.T3CODE_CLERK_JWT_TEMPLATE).toBe("t3-relay");

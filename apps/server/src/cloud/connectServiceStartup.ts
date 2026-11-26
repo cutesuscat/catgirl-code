@@ -12,6 +12,10 @@ import {
 } from "@t3tools/shared/connectDocument";
 import { CONNECT_DIAGNOSTICS_LABELS } from "@t3tools/shared/connectDocumentCopy";
 import {
+  connectFingerprintEmoji,
+  connectFingerprintEmojiLines,
+} from "@t3tools/shared/connectFingerprintEmoji";
+import {
   type ConnectServiceFetch,
   checkConnectService,
   connectServiceAfterRestart,
@@ -66,6 +70,20 @@ export function connectServiceFilePath(
   return `${base.replace(/\/+$/u, "")}/userdata/${CONNECT_SERVICE_FILE}`;
 }
 
+/** The emoji, each name under its emoji, then the hex, all lined up after `label`. */
+function identityLines(label: string, fingerprint: string): ReadonlyArray<string> {
+  const lines = connectFingerprintEmojiLines(fingerprint);
+  if (lines === null) return [`${label}${fingerprint}`];
+  const indent = " ".repeat(label.length);
+  return [`${label}${lines.emoji}`, `${indent}${lines.names}`, `${indent}${fingerprint}`];
+}
+
+/** For a one-line warning: the emoji, then the hex. */
+function identityInline(fingerprint: string): string {
+  const row = connectFingerprintEmoji(fingerprint);
+  return row === null ? fingerprint : `${row.map(({ emoji }) => emoji).join(" ")}  ${fingerprint}`;
+}
+
 const describe = (settings: ConnectServiceSettings, linkFingerprint: string | null) => {
   if (!settings.connect) {
     return [
@@ -79,7 +97,7 @@ const describe = (settings: ConnectServiceSettings, linkFingerprint: string | nu
   return [
     `Catgirl Connect service: ${name}`,
     `  Address:  ${settings.relayUrl}`,
-    `  Identity: ${fingerprint}`,
+    ...identityLines("  Identity: ", fingerprint),
     linkFingerprint !== null && sameConnectFingerprint(linkFingerprint, fingerprint)
       ? "  Matches the setup link."
       : "  Check this matches what the service's operator gave you.",
@@ -119,8 +137,8 @@ async function setUpRelay(
     io.warn(
       [
         "This Connect service's identity changed.",
-        `  Trusted until now: ${fingerprintOf(check.settings.connect?.key ?? "")}`,
-        `  New identity:      ${fingerprintOf(change?.envelope.key ?? "")}`,
+        ...identityLines("  Trusted until now: ", fingerprintOf(check.settings.connect?.key ?? "")),
+        ...identityLines("  New identity:      ", fingerprintOf(change?.envelope.key ?? "")),
         "  Nothing from it is used. Only trust it if the service's operator told you it changed.",
       ].join("\n"),
     );
@@ -185,7 +203,7 @@ async function refreshAtServerStart(
   }
   if (refreshed.outcome === "identity-changed" && !next.connect?.identityChange?.declined) {
     io.warn(
-      `Catgirl Connect: the service at ${saved.relayUrl} changed its identity to ${fingerprintOf(next.connect?.identityChange?.envelope.key ?? "")}. Keeping the settings it last trusted. To review, run: t3 connect --relay ${saved.relayUrl}`,
+      `Catgirl Connect: the service at ${saved.relayUrl} changed its identity to ${identityInline(fingerprintOf(next.connect?.identityChange?.envelope.key ?? ""))}. Keeping the settings it last trusted. To review, run: t3 connect --relay ${saved.relayUrl}`,
     );
   }
   io.writeFile(path, JSON.stringify(next));
