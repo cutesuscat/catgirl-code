@@ -3,7 +3,7 @@
 Catgirl Code is an unofficial fork of T3 Code. It is not affiliated with T3 Tools, Inc.
 
 Report a vulnerability in Catgirl Code privately with **Report a vulnerability** on this repository's
-[Security tab](https://github.com/nickypro/catgirl-code/security/advisories/new). Please do not open a public
+[Security tab](https://github.com/cutesuscat/catgirl-code/security/advisories/new). Please do not open a public
 issue for it, and give the maintainer a reasonable time to fix it before you publish anything.
 
 A report helps most when it names the version (Settings › About, such as 0.1.12a) and the steps that show the

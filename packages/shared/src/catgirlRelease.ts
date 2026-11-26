@@ -3,7 +3,7 @@
 // releases or its npm package. Plain TypeScript with no imports: build scripts load it directly.
 
 /** The GitHub repository whose releases hold this fork's builds. Rename it here and nowhere else. */
-export const CATGIRL_RELEASE_REPOSITORY = "nickypro/catgirl-code";
+export const CATGIRL_RELEASE_REPOSITORY = "cutesuscat/catgirl-code";
 
 /** The T3 Code release this source is based on. Move it when the fork moves to a newer one. */
 export const CATGIRL_UPSTREAM_VERSION = "0.1.12";

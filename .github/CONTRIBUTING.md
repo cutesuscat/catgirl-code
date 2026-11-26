@@ -3,7 +3,7 @@
 Catgirl Code is a personal, unofficial fork of T3 Code. It is not affiliated with T3 Tools, Inc., and
 T3 Code's maintainers do not review or support it.
 
-- **A problem or an idea:** open an [issue](https://github.com/nickypro/catgirl-code/issues). Say which
+- **A problem or an idea:** open an [issue](https://github.com/cutesuscat/catgirl-code/issues). Say which
   version you run (Settings › About, such as 0.1.12a).
 - **A change:** open an issue first and say what you want to change. The fork stays close to T3 Code so it can
   move to each new T3 Code release, so a change that touches little of T3 Code's own code is much easier to take.

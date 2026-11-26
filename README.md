@@ -55,7 +55,7 @@ You usually do not need to. Add the machine in the Mac or Android app with **Con
 To install it by hand, or to use the web app without a desktop app:
 
 ```bash
-curl -fsSL https://github.com/nickypro/catgirl-code/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/cutesuscat/catgirl-code/releases/latest/download/install.sh | sh
 ```
 
 This installs the `t3` command under `~/.t3` and `~/.local/bin`. Run `t3` to start the server and open the web app. Later, `t3 update` moves the machine to the newest release. The installer needs only `sh`, `tar`, and `curl` or `wget`. Every release has a Linux x64 archive; Linux arm64 and Apple Silicon archives are attached when their builds pass.
@@ -65,7 +65,7 @@ This installs the `t3` command under `~/.t3` and `~/.local/bin`. Run `t3` to sta
 A machine that runs T3 Code's own `t3` keeps looking at T3 Code's releases. One command moves it:
 
 ```bash
-T3CODE_RELEASE_BASE_URL=https://github.com/nickypro/catgirl-code/releases/download t3 update <version>
+T3CODE_RELEASE_BASE_URL=https://github.com/cutesuscat/catgirl-code/releases/download t3 update <version>
 ```
 
 `<version>` is a release's plain version, such as `1.12.1` for 0.1.12a: T3 Code's own `t3` knows only plain numbers. Stop the server and start it again afterwards; that ends the threads running on it, so pick a quiet moment.
