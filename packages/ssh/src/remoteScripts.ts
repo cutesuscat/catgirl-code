@@ -7,6 +7,7 @@ import {
   DESKTOP_UPDATE_IN_PROGRESS_TTL_MS,
   type DesktopSshEnvironmentTarget,
 } from "@t3tools/contracts";
+import { CATGIRL_INSTALL_SCRIPT_URL } from "@t3tools/shared/catgirlRelease";
 import { cliReleaseDownloadBaseUrl } from "@t3tools/shared/cliRelease";
 import { extractJsonObject, fromLenientJson } from "@t3tools/shared/schemaJson";
 import { satisfiesSemverRange } from "@t3tools/shared/semver";
@@ -434,7 +435,7 @@ if ! t3_runtime_ready; then
     elif command -v wget >/dev/null 2>&1; then wget -q --timeout=30 --tries=1 "$1" -O "$2"
     else printf 'Remote host needs curl or wget to download %s.\\n' "$T3_ARCHIVE" >&2; exit 1
     fi || {
-      printf 'Could not download t3 %s from %s. If this host cannot reach it, install t3 %s on it with https://t3.codes/install.sh (T3CODE_VERSION=%s; T3CODE_RELEASE_BASE_URL selects a mirror).\\n' "$T3_ARCHIVE_VERSION" "$1" "$T3_ARCHIVE_VERSION" "$T3_ARCHIVE_VERSION" >&2
+      printf 'Could not download t3 %s from %s. If this host cannot reach it, install t3 %s on it with @@T3_INSTALL_SCRIPT_URL@@ (T3CODE_VERSION=%s; T3CODE_RELEASE_BASE_URL selects a mirror).\\n' "$T3_ARCHIVE_VERSION" "$1" "$T3_ARCHIVE_VERSION" "$T3_ARCHIVE_VERSION" >&2
       exit 1
     }
   }
@@ -1075,6 +1076,7 @@ export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string
       T3_NODE_SCRIPT_PATH: shellSingleQuote(nodeScriptPath),
       T3_ARCHIVE_VERSION: shellSingleQuote(archiveVersion),
       T3_RELEASE_BASE_URL: shellSingleQuote(releaseBaseUrl),
+      T3_INSTALL_SCRIPT_URL: CATGIRL_INSTALL_SCRIPT_URL,
       T3_ARCHIVE_LOCK_WAIT_SECONDS: String(REMOTE_ARCHIVE_LOCK_WAIT_SECONDS),
       T3_ARCHIVE_DOWNLOAD_SECONDS: String(REMOTE_ARCHIVE_DOWNLOAD_SECONDS),
       T3_ARCHIVE_CHECKSUMS_SECONDS: String(REMOTE_ARCHIVE_CHECKSUMS_SECONDS),

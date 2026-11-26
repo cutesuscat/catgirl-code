@@ -12,7 +12,7 @@ export const CATGIRL_BUILD = 1;
 
 export const CATGIRL_RELEASES_PAGE_URL = `https://github.com/${CATGIRL_RELEASE_REPOSITORY}/releases`;
 /** Each release carries its own installer, so `latest` always installs the newest server. */
-const CATGIRL_INSTALL_SCRIPT_URL = `${CATGIRL_RELEASES_PAGE_URL}/latest/download/install.sh`;
+export const CATGIRL_INSTALL_SCRIPT_URL = `${CATGIRL_RELEASES_PAGE_URL}/latest/download/install.sh`;
 export const CATGIRL_INSTALL_COMMAND = `curl -fsSL ${CATGIRL_INSTALL_SCRIPT_URL} | sh`;
 
 const UPSTREAM_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;

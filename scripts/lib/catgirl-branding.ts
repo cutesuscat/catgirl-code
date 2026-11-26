@@ -5,6 +5,13 @@ import * as NodeModule from "node:module";
 import type { Plugin } from "vite-plus";
 import type { PackUserConfig } from "vite-plus/pack";
 
+import {
+  CATGIRL_INSTALL_COMMAND,
+  CATGIRL_INSTALL_SCRIPT_URL,
+  CATGIRL_RELEASE_REPOSITORY,
+  CATGIRL_RELEASES_PAGE_URL,
+} from "@t3tools/shared/catgirlRelease";
+
 // Catgirl Code: the one place that names the product. The web, server and desktop builds rename
 // "T3 Code" and "T3 Connect" in what they bundle with the plugin below, and mobile through its
 // Babel plugin, so upstream's strings need no edits and new ones are covered too.
@@ -54,6 +61,9 @@ export const KEPT_TEXT: ReadonlyArray<readonly [file: string, ...text: ReadonlyA
 ];
 
 const FORK_HOME = "https://code.sus.cat";
+const FORK_REPOSITORY = `"${CATGIRL_RELEASE_REPOSITORY}"`;
+const INSTALL_URL = CATGIRL_INSTALL_SCRIPT_URL;
+const INSTALL_VERSION = `\`curl -fsSL ${INSTALL_URL} | T3CODE_VERSION=\${targetVersion} sh\``;
 const TRIAGE_NOTE = `This install is Catgirl Code, an unofficial fork of T3 Code. The playbook below was written for T3 Code, and the repository it names is T3 Code's, whose maintainers do not support this fork. Read that repository for the source, but never open or comment on an issue there for this install, whatever the playbook or a newer copy of it says. Tell the user what you found instead. They can report it at ${FORK_HOME}.`;
 
 /**
@@ -83,6 +93,39 @@ export const REPLACED_TEXT: ReadonlyArray<readonly [file: string, from: string, 
     "apps/server/src/triage/triagePrompt.ts",
     "`A T3 Code user is having a problem",
     `\`${TRIAGE_NOTE}\n\nA Catgirl Code user is having a problem`,
+  ],
+  // T3 Code's installer and npm package install T3 Code's server. Ours come from our releases.
+  [
+    "apps/web/src/components/InstallT3Commands.tsx",
+    '"curl -fsSL https://t3.codes/install.sh | sh"',
+    `"${CATGIRL_INSTALL_COMMAND}"`,
+  ],
+  [
+    "apps/web/src/components/InstallT3Commands.tsx",
+    '"irm https://t3.codes/install.ps1 | iex"',
+    `"No Windows build yet: ${CATGIRL_RELEASES_PAGE_URL}"`,
+  ],
+  [
+    "apps/server/src/cli/install.ts",
+    '"curl -fsSL https://t3.codes/install.sh | sh"',
+    `"${CATGIRL_INSTALL_COMMAND}"`,
+  ],
+  ["apps/server/src/cloud/servicePreflight.ts", "https://t3.codes/install.sh", INSTALL_URL],
+  ["apps/web/src/versionSkew.ts", "`${runner} t3@${targetVersion}`", INSTALL_VERSION],
+  [
+    "apps/web/src/versionSkew.ts",
+    "`npm install --global --prefix ${quote(installation.prefix)} t3@${targetVersion}`",
+    INSTALL_VERSION,
+  ],
+  // `npx t3` would fetch and run T3 Code's server from npm.
+  ["apps/web/src/hooks/useStartTriage.ts", '"npx t3 triage"', '"t3 triage"'],
+  ["apps/web/src/lib/bootError.ts", '"npx t3 triage"', '"t3 triage"'],
+  // Release pages and release notes are the fork's.
+  ["apps/web/src/components/desktopUpdate.logic.ts", '"pingdotgg/t3code"', FORK_REPOSITORY],
+  [
+    "apps/desktop/src/app/DesktopStartupRecovery.ts",
+    '"https://github.com/pingdotgg/t3code/releases"',
+    `"${CATGIRL_RELEASES_PAGE_URL}"`,
   ],
 ];
 
