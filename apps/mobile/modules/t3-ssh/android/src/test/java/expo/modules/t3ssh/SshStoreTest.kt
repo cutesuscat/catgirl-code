@@ -9,6 +9,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.security.KeyPairGenerator
+import java.security.PublicKey
+import java.security.spec.ECGenParameterSpec
 
 class SshStoreTest {
   @get:Rule val tmp = TemporaryFolder()
@@ -250,6 +253,100 @@ class SshStoreTest {
 
     assertEquals(line, other.publicKeyLine())
     assertEquals(line, other.key()?.publicKeyLine("t3code-android"))
+  }
+
+  private fun keychainKey(alias: String = "my-phone"): Pair<KeychainKey, PublicKey> {
+    val public = KeyPairGenerator.getInstance("EC").run {
+      initialize(ECGenParameterSpec("secp256r1"))
+      generateKeyPair().public
+    }
+    return KeychainKey(alias, sshPublicKeyLine(public, "t3code-android")) to public
+  }
+
+  @Test
+  fun aKeychainKeyTakesThePlaceOfTheAppsOwnKeyAndBack() {
+    store.createKey("t3")
+    val (keychain) = keychainKey()
+
+    store.useKeychainKey(keychain)
+
+    assertEquals(keychain, store.keychainKey())
+    assertEquals(keychain.publicKeyLine, store.publicKeyLine())
+    assertNull(store.key())
+    assertEquals(0x11.toByte(), sealer.mask)
+
+    val line = store.createKey("t3")
+    assertNull(store.keychainKey())
+    assertEquals(line, store.publicKeyLine())
+
+    store.useKeychainKey(keychain)
+    store.deleteKey()
+    assertNull(store.publicKeyLine())
+  }
+
+  @Test
+  fun aKeychainKeyTravelsAsItsNameAndIsTakenOnlyWhenThisAppMayUseIt() {
+    val (keychain, public) = keychainKey()
+    store.useKeychainKey(keychain)
+    val sections = store.exportSections()
+    assertEquals(setOf(SshSections.KEYCHAIN), sections.keys)
+    assertEquals(keychain, SshArchive.read(sections).keychainKey)
+
+    val notAllowed = otherStore()
+    val asked = notAllowed.importSections(sections, SshImport.ADD, SshImport.ADD, SshImport.ADD)
+    assertEquals(SshImportResult(false, false, 0, 0, "my-phone"), asked)
+    assertNull(notAllowed.publicKeyLine())
+
+    val allowed = otherStore()
+    val taken = allowed.importSections(sections, SshImport.ADD, SshImport.ADD, SshImport.ADD) {
+      public.takeIf { _ -> it == "my-phone" }
+    }
+    assertEquals(SshImportResult(true, false, 0, 0), taken)
+    assertEquals(keychain, allowed.keychainKey())
+
+    // Another key under the same name is not the key the file meant.
+    val impostor = otherStore()
+    val refused = impostor.importSections(sections, SshImport.ADD, SshImport.ADD, SshImport.ADD) {
+      keychainKey().second
+    }
+    assertEquals("my-phone", refused.keychainToChoose)
+    assertNull(impostor.keychainKey())
+  }
+
+  @Test
+  fun addNeverReplacesAKeyOfEitherKind() {
+    val (keychain, public) = keychainKey()
+    val withKeychain = otherStore().apply { useKeychainKey(keychain) }
+    store.createKey("app key")
+
+    val kept = withKeychain.importSections(
+      store.exportSections(),
+      SshImport.ADD,
+      SshImport.SKIP,
+      SshImport.SKIP,
+    )
+    assertEquals(SshImportResult(false, false, 0, 0), kept)
+    assertEquals(keychain, withKeychain.keychainKey())
+
+    val mine = store.publicKeyLine()
+    val alsoKept = store.importSections(
+      withKeychain.exportSections(),
+      SshImport.ADD,
+      SshImport.SKIP,
+      SshImport.SKIP,
+    ) { public }
+    assertEquals(SshImportResult(false, false, 0, 0), alsoKept)
+    assertEquals(mine, store.publicKeyLine())
+
+    val replaced = withKeychain.importSections(
+      store.exportSections(),
+      SshImport.REPLACE,
+      SshImport.SKIP,
+      SshImport.SKIP,
+    )
+    assertEquals(SshImportResult(true, false, 0, 0), replaced)
+    assertNull(withKeychain.keychainKey())
+    assertEquals(mine, withKeychain.publicKeyLine())
   }
 
   private fun keyBase64() = Ed25519Key.generate().publicKeyLine("").split(" ")[1]

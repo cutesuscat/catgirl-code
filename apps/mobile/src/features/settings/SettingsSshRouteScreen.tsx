@@ -86,6 +86,12 @@ function SshSettings({ native }: { readonly native: SshNative }) {
       setKey(await native.createKey(KEY_COMMENT));
     });
 
+  const pickKeychainKey = () =>
+    void run("key", async () => {
+      // Picking nothing in Android's picker leaves the key as it was.
+      setKey((await native.chooseKeychainKey(KEY_COMMENT)) ?? key);
+    });
+
   const copyKey = (line: string) =>
     void run(null, async () => {
       await Clipboard.setStringAsync(line);
@@ -124,12 +130,23 @@ function SshSettings({ native }: { readonly native: SshNative }) {
         }
       >
         {key === null ? (
-          <ListActionRow
-            icon="plus"
-            label={gt("Create SSH key")}
-            loading={busy === "key"}
-            onPress={createKey}
-          />
+          <>
+            <ListActionRow
+              icon="plus"
+              label={gt("Create SSH key")}
+              loading={busy === "key"}
+              onPress={createKey}
+            />
+            <ListActionRow
+              icon={{ ios: "lock", android: "lock" }}
+              label={gt("Use a key from this phone's keychain")}
+              description={gt(
+                "An RSA or EC key you installed in Android, which survives reinstalling the app.",
+              )}
+              disabled={busy === "key"}
+              onPress={pickKeychainKey}
+            />
+          </>
         ) : (
           <>
             <View collapsable={false} className="gap-1 px-4 py-3">
@@ -137,6 +154,14 @@ function SshSettings({ native }: { readonly native: SshNative }) {
                 {key.line}
               </Text>
               <Text className="text-xs text-foreground-muted">{key.fingerprint}</Text>
+              {key.keychainAlias ? (
+                <Text className="text-xs text-foreground-muted">
+                  {gt(
+                    "Kept in this phone's keychain as {alias}. Android signs with it; the app never holds the key.",
+                    { alias: key.keychainAlias },
+                  )}
+                </Text>
+              ) : null}
             </View>
             <View className="ml-4 border-t border-border-subtle" />
             <ListActionRow
@@ -163,6 +188,23 @@ function SshSettings({ native }: { readonly native: SshNative }) {
                   confirmText: gt("Replace"),
                   destructive: true,
                   onConfirm: createKey,
+                })
+              }
+            />
+            <ListActionRow
+              icon={{ ios: "lock", android: "lock" }}
+              label={gt("Use a key from this phone's keychain")}
+              tone="danger"
+              disabled={busy === "key"}
+              onPress={() =>
+                Dialog.confirm({
+                  title: gt("Replace this device's SSH key?"),
+                  message: gt(
+                    "Hosts stop accepting this device until you add the new key to them.",
+                  ),
+                  confirmText: gt("Choose a key"),
+                  destructive: true,
+                  onConfirm: pickKeychainKey,
                 })
               }
             />

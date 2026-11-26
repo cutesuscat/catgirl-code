@@ -4,6 +4,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.io.File
 import java.security.KeyStore
+import java.security.PublicKey
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -28,6 +29,9 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
   private val knownHostsFile = File(dir, "known_hosts")
   private val publicKeyFile = File(dir, "id_ed25519.pub")
   private val sealedSeedFile = File(dir, "id_ed25519.sealed")
+
+  // A key kept in the system KeyChain instead: its alias, then its public line.
+  private val keychainFile = File(dir, "keychain_key")
 
   @Synchronized
   fun readConfig(): String = configFile.readOrEmpty()
@@ -58,7 +62,26 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
   }
 
   @Synchronized
-  fun publicKeyLine(): String? = publicKeyFile.takeIf { it.exists() }?.readText()?.trim()
+  fun publicKeyLine(): String? =
+    keychainKey()?.publicKeyLine ?: publicKeyFile.takeIf { it.exists() }?.readText()?.trim()
+
+  /** The KeyChain entry this device signs in with, when it uses one instead of its own key. */
+  @Synchronized
+  fun keychainKey(): KeychainKey? {
+    val lines = keychainFile.readOrEmpty().lines()
+    if (lines.size < 2 || lines[0].isBlank() || lines[1].isBlank()) return null
+    return KeychainKey(lines[0], lines[1].trim())
+  }
+
+  /** Signs in with a KeyChain entry from now on, in place of any key made in the app. */
+  @Synchronized
+  fun useKeychainKey(key: KeychainKey) {
+    require('\n' !in key.alias && '\n' !in key.publicKeyLine) { "Not a KeyChain key." }
+    writeAtomically(keychainFile, "${key.alias}\n${key.publicKeyLine}\n")
+    sealedSeedFile.delete()
+    publicKeyFile.delete()
+    sealer.forget()
+  }
 
   /** The key, or null when none was created or this device can no longer open it. */
   @Synchronized
@@ -78,6 +101,7 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
     val line = key.publicKeyLine(comment)
     writeAtomically(sealedSeedFile, sealer.seal(key.seedCopy()))
     writeAtomically(publicKeyFile, line + "\n")
+    keychainFile.delete()
     return line
   }
 
@@ -85,6 +109,7 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
   fun deleteKey() {
     sealedSeedFile.delete()
     publicKeyFile.delete()
+    keychainFile.delete()
     sealer.forget()
   }
 
@@ -92,9 +117,15 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
   @Synchronized
   fun exportSections(): Map<String, ByteArray> {
     val sections = LinkedHashMap<String, ByteArray>()
-    key()?.let { key ->
-      sections[SshSections.SEED] = key.seedCopy()
-      sections[SshSections.PUBLIC] = (publicKeyLine() ?: key.publicKeyLine("")).toByteArray()
+    val keychain = keychainKey()
+    if (keychain != null) {
+      // Only the name travels: the key itself cannot leave the KeyChain, and need not.
+      sections[SshSections.KEYCHAIN] = "${keychain.alias}\n${keychain.publicKeyLine}".toByteArray()
+    } else {
+      key()?.let { key ->
+        sections[SshSections.SEED] = key.seedCopy()
+        sections[SshSections.PUBLIC] = (publicKeyLine() ?: key.publicKeyLine("")).toByteArray()
+      }
     }
     readConfig().takeIf { it.isNotBlank() }?.let { sections[SshSections.CONFIG] = it.toByteArray() }
     knownHosts().takeIf { it.isNotEmpty() }?.let { hosts ->
@@ -106,22 +137,34 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
   /**
    * Takes what the caller asked for from a settings file. ADD never changes what this device
    * already has, so only REPLACE can overwrite a key or a config. The key is sealed again here.
+   * A file whose key lives in the KeyChain names it; `keychainPublicKey` says whether this app
+   * may use that entry, and when it may not the result asks for it to be chosen.
    */
   @Synchronized
   fun importSections(
     sections: Map<String, ByteArray>,
     key: SshImport,
     config: SshImport,
-    knownHosts: SshImport
+    knownHosts: SshImport,
+    keychainPublicKey: (alias: String) -> PublicKey? = { null }
   ): SshImportResult {
     val archive = SshArchive.read(sections)
-    val current = key()
-    val keyTaken = archive.key != null && key != SshImport.SKIP &&
-      (key == SshImport.REPLACE || current == null) &&
-      !archive.key.publicKey.contentEquals(current?.publicKey)
-    if (keyTaken) {
-      writeAtomically(sealedSeedFile, sealer.seal(archive.key!!.seedCopy()))
+    val current = publicKeyLine()?.let(::keyOf)
+    val incoming = (archive.publicKeyLine ?: archive.keychainKey?.publicKeyLine)?.let(::keyOf)
+    val wanted = incoming != null && incoming != current && key != SshImport.SKIP &&
+      (key == SshImport.REPLACE || current == null)
+    var keyTaken = false
+    var keychainToChoose: String? = null
+    if (wanted && archive.key != null) {
+      writeAtomically(sealedSeedFile, sealer.seal(archive.key.seedCopy()))
       writeAtomically(publicKeyFile, archive.publicKeyLine + "\n")
+      keychainFile.delete()
+      keyTaken = true
+    } else if (wanted && archive.keychainKey != null) {
+      val usable = keychainPublicKey(archive.keychainKey.alias)
+        ?.let { keyOf(sshPublicKeyLine(it, "")) } == incoming
+      if (usable) useKeychainKey(archive.keychainKey) else keychainToChoose = archive.keychainKey.alias
+      keyTaken = usable
     }
     val configTaken = archive.config != null && config != SshImport.SKIP &&
       (config == SshImport.REPLACE || readConfig().isBlank()) && archive.config != readConfig()
@@ -142,8 +185,11 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
       }
       if (hostsAdded > 0) saveKnownHosts(merged)
     }
-    return SshImportResult(keyTaken, configTaken, hostsAdded, hostsKept)
+    return SshImportResult(keyTaken, configTaken, hostsAdded, hostsKept, keychainToChoose)
   }
+
+  // A public line without its comment: the same key reads the same whoever named it.
+  private fun keyOf(line: String): List<String> = line.trim().split(Regex("\\s+")).take(2)
 
   private fun saveKnownHosts(entries: List<KnownHost>) =
     writeAtomically(knownHostsFile, entries.joinToString("") { "${it.line}\n" })
@@ -166,7 +212,13 @@ object SshSections {
   const val PUBLIC = "ssh/public"
   const val CONFIG = "ssh/config"
   const val KNOWN_HOSTS = "ssh/known_hosts"
+
+  /** In place of the seed when the key lives in the system KeyChain: alias, then public line. */
+  const val KEYCHAIN = "ssh/keychain"
 }
+
+/** A key in the system KeyChain, by the name Android shows for it. */
+data class KeychainKey(val alias: String, val publicKeyLine: String)
 
 enum class SshImport { SKIP, ADD, REPLACE }
 
@@ -174,13 +226,16 @@ data class SshImportResult(
   val keyImported: Boolean,
   val configImported: Boolean,
   val knownHostsAdded: Int,
-  val knownHostsKept: Int
+  val knownHostsKept: Int,
+  /** The file's key is this KeyChain entry, which this app has to be allowed to use first. */
+  val keychainToChoose: String? = null
 )
 
 /** The SSH part of an opened settings file, checked before anything is shown or stored. */
 class SshArchive private constructor(
   val key: Ed25519Key?,
   val publicKeyLine: String?,
+  val keychainKey: KeychainKey?,
   val config: String?,
   val knownHosts: List<KnownHost>
 ) {
@@ -192,9 +247,13 @@ class SshArchive private constructor(
         Ed25519Key(it)
       }
       val line = key?.let { publicLine(it, sections[SshSections.PUBLIC]) }
+      val keychain = sections[SshSections.KEYCHAIN]?.toString(Charsets.UTF_8)?.lines()
+        ?.takeIf { it.size >= 2 && it[0].isNotBlank() && it[1].isNotBlank() }
+        ?.let { KeychainKey(it[0], it[1].trim()) }
       return SshArchive(
         key = key,
         publicKeyLine = line,
+        keychainKey = keychain.takeIf { key == null },
         config = sections[SshSections.CONFIG]?.toString(Charsets.UTF_8)?.takeIf { it.isNotBlank() },
         knownHosts = KnownHosts.parse(
           sections[SshSections.KNOWN_HOSTS]?.toString(Charsets.UTF_8).orEmpty()

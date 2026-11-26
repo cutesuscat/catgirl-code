@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import android.security.KeyChain
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.functions.Coroutine
@@ -17,6 +18,7 @@ import expo.modules.kotlin.records.Record
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SSHRuntimeException
 import net.schmizz.sshj.userauth.UserAuthException
 import java.io.ByteArrayOutputStream
@@ -27,6 +29,7 @@ import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.security.GeneralSecurityException
+import java.security.KeyPair
 import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -109,7 +112,8 @@ class T3SshModule : Module() {
         mapOf(
           "status" to "saved",
           "name" to (displayName(uri) ?: name),
-          "sshKey" to sections.containsKey(SshSections.SEED),
+          "sshKey" to
+            (SshSections.SEED in sections || SshSections.KEYCHAIN in sections),
         )
       }
     }
@@ -138,7 +142,10 @@ class T3SshModule : Module() {
         val ssh = SshArchive.read(sections)
         file.sections = sections
         mapOf(
-          "key" to ssh.publicKeyLine?.let(::publicKeyInfo),
+          "key" to (
+            ssh.publicKeyLine?.let { publicKeyInfo(it, null) }
+              ?: ssh.keychainKey?.let { publicKeyInfo(it.publicKeyLine, it.alias) }
+            ),
           "config" to ssh.config,
           "knownHosts" to ssh.knownHosts.map(::knownHostInfo),
           "app" to sections[APP_SECTION]?.toString(Charsets.UTF_8),
@@ -160,12 +167,13 @@ class T3SshModule : Module() {
           SshImport.valueOf(key.uppercase()),
           SshImport.valueOf(config.uppercase()),
           SshImport.valueOf(hosts.uppercase()),
-        )
+        ) { alias -> runCatching { keychainKeyPair(alias).public }.getOrNull() }
         mapOf(
           "keyImported" to result.keyImported,
           "configImported" to result.configImported,
           "knownHostsAdded" to result.knownHostsAdded,
           "knownHostsKept" to result.knownHostsKept,
+          "keychainToChoose" to result.keychainToChoose,
         )
       }
     }
@@ -175,11 +183,26 @@ class T3SshModule : Module() {
     }
 
     AsyncFunction("getPublicKey") Coroutine { ->
-      io { store.publicKeyLine()?.let(::publicKeyInfo) }
+      io { store.publicKeyLine()?.let { publicKeyInfo(it, store.keychainKey()?.alias) } }
     }
 
     AsyncFunction("createKey") Coroutine { comment: String ->
-      io { publicKeyInfo(store.createKey(comment)) }
+      io { publicKeyInfo(store.createKey(comment), null) }
+    }
+
+    // Lets the person pick a key from the system KeyChain to sign in with, in place of a key
+    // made here. Its private half stays in the KeyChain; null when they pick nothing.
+    AsyncFunction("chooseKeychainKey") Coroutine { comment: String ->
+      val alias = chooseKeychainAlias(store.keychainKey()?.alias)
+      if (alias == null) {
+        null
+      } else {
+        io {
+          val line = sshPublicKeyLine(keychainKeyPair(alias).public, comment)
+          store.useKeychainKey(KeychainKey(alias, line))
+          publicKeyInfo(line, alias)
+        }
+      }
     }
 
     AsyncFunction("deleteKey") Coroutine { ->
@@ -229,8 +252,9 @@ class T3SshModule : Module() {
   }
 
   private fun connect(hops: List<SshHopRecord>): Map<String, Any?> {
-    val key =
-      store.key() ?: throw CodedException("ERR_SSH_NO_KEY", "Create an SSH key first.", null)
+    val keychain = store.keychainKey()
+    val key = keychain?.let { keychainKeyPair(it.alias) } ?: store.key()?.toKeyPair()
+      ?: throw CodedException("ERR_SSH_NO_KEY", "Create an SSH key first.", null)
     sessions.entries.removeIf { (_, session) ->
       val dead = !session.isOpen
       if (dead) session.close()
@@ -238,7 +262,7 @@ class T3SshModule : Module() {
     }
     val result = SshSession.connect(
       hops.map { SshHop(it.host, it.port, it.user, it.hostKeyAlias) },
-      key.toKeyPair(),
+      key,
       store.knownHosts(),
     )
     return when (result) {
@@ -330,9 +354,55 @@ class T3SshModule : Module() {
     "fingerprint" to sshFingerprint(Base64.getDecoder().decode(entry.keyBase64)),
   )
 
-  private fun publicKeyInfo(line: String): Map<String, String> {
+  /** `keychainAlias` names the KeyChain entry when the key is kept there, not in the app. */
+  private fun publicKeyInfo(line: String, keychainAlias: String?): Map<String, String?> {
     val blob = Base64.getDecoder().decode(line.split(Regex("\\s+"))[1])
-    return mapOf("line" to line, "fingerprint" to sshFingerprint(blob))
+    return mapOf(
+      "line" to line,
+      "fingerprint" to sshFingerprint(blob),
+      "keychainAlias" to keychainAlias,
+    )
+  }
+
+  /** Shows Android's own picker of KeyChain entries; null when nothing was picked. */
+  private suspend fun chooseKeychainAlias(current: String?): String? {
+    val activity = appContext.currentActivity
+      ?: throw CodedException("ERR_SSH_KEYCHAIN", "Open this screen in the foreground.", null)
+    val picked = CompletableDeferred<String?>()
+    withContext(Dispatchers.Main) {
+      KeyChain.choosePrivateKeyAlias(
+        activity,
+        { alias -> picked.complete(alias) },
+        KEYCHAIN_KEY_TYPES,
+        null,
+        null,
+        -1,
+        current,
+      )
+    }
+    return picked.await()
+  }
+
+  // The private key is a handle: every signature is made inside the KeyChain, for this app
+  // only after the person picked the entry for it. Not for the main thread.
+  private fun keychainKeyPair(alias: String): KeyPair {
+    val unavailable = CodedException(
+      "ERR_SSH_KEYCHAIN",
+      "Android no longer lets this app use the key \"$alias\". Choose it again in Settings > SSH.",
+      null,
+    )
+    val key = runCatching { KeyChain.getPrivateKey(context, alias) }.getOrNull() ?: throw unavailable
+    val certificate = runCatching { KeyChain.getCertificateChain(context, alias) }.getOrNull()
+      ?.firstOrNull() ?: throw unavailable
+    val public = certificate.publicKey
+    if (KeyType.fromKey(public) !in KEYCHAIN_SSH_TYPES) {
+      throw CodedException(
+        "ERR_SSH_KEYCHAIN",
+        "SSH cannot use the key \"$alias\". It needs an RSA key or an EC key on P-256, P-384 or P-521.",
+        null,
+      )
+    }
+    return KeyPair(public, key)
   }
 
   private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) {
@@ -366,6 +436,8 @@ class T3SshModule : Module() {
   private companion object {
     const val APP_SECTION = "app"
     const val PICK_REQUEST = 4721
+    val KEYCHAIN_KEY_TYPES = arrayOf("EC", "RSA")
+    val KEYCHAIN_SSH_TYPES = setOf(KeyType.RSA, KeyType.ECDSA256, KeyType.ECDSA384, KeyType.ECDSA521)
   }
 
   private fun unreachable(error: Exception) =

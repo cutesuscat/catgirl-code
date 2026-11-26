@@ -6,6 +6,8 @@ import { m } from "../../i18n/messages";
 export interface SshPublicKey {
   readonly line: string;
   readonly fingerprint: string;
+  /** Set when the key is an entry of the system KeyChain instead of a key made in the app. */
+  readonly keychainAlias?: string | null;
 }
 
 export interface SshKnownHost {
@@ -65,6 +67,8 @@ export interface OpenedSettingsFile {
 export interface SshNative {
   getPublicKey(): Promise<SshPublicKey | null>;
   createKey(comment: string): Promise<SshPublicKey>;
+  /** Opens Android's picker of KeyChain keys and signs in with the one picked; null if none was. */
+  chooseKeychainKey(comment: string): Promise<SshPublicKey | null>;
   deleteKey(): Promise<void>;
   readConfig(): Promise<string>;
   writeConfig(text: string): Promise<void>;
@@ -97,6 +101,8 @@ export interface SshNative {
     readonly configImported: boolean;
     readonly knownHostsAdded: number;
     readonly knownHostsKept: number;
+    /** The file's key is this KeyChain entry, which Android has not let this app use yet. */
+    readonly keychainToChoose: string | null;
   }>;
   closeSettingsFile(id: string): Promise<void>;
 }

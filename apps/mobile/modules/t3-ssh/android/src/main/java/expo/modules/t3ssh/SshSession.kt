@@ -217,7 +217,9 @@ class SshSession private constructor(private val clients: List<SSHClient>) : Clo
         setKeyExchangeFactories(getKeyExchangeFactories().filter { isAllowedAlgorithm(it.name) })
         setCipherFactories(getCipherFactories().filter { isAllowedAlgorithm(it.name) })
         setMACFactories(getMACFactories().filter { isAllowedAlgorithm(it.name) })
-        setKeyAlgorithms(getKeyAlgorithms().filter { isAllowedAlgorithm(it.name) })
+        setKeyAlgorithms(
+          KeystoreSigning.wrap(getKeyAlgorithms().filter { isAllowedAlgorithm(it.name) }),
+        )
       }
       return SSHClient(config).apply {
         addHostKeyVerifier(verifier)

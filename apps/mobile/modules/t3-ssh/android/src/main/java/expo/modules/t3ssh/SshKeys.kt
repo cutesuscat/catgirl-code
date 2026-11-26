@@ -1,5 +1,7 @@
 package expo.modules.t3ssh
 
+import net.schmizz.sshj.common.Buffer
+import net.schmizz.sshj.common.KeyType
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.io.ByteArrayOutputStream
@@ -7,6 +9,7 @@ import java.io.DataOutputStream
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.MessageDigest
+import java.security.PublicKey
 import java.security.SecureRandom
 import java.security.Security
 import java.security.spec.PKCS8EncodedKeySpec
@@ -74,6 +77,14 @@ class Ed25519Key(seed: ByteArray) {
     private val PKCS8_PREFIX = hex("302e020100300506032b657004220420")
     private val X509_PREFIX = hex("302a300506032b6570032100")
   }
+}
+
+/** The `authorized_keys` line of any public key the SSH library can encode. */
+fun sshPublicKeyLine(key: PublicKey, comment: String): String {
+  val blob = Buffer.PlainBuffer().putPublicKey(key).compactData
+  val base = "${KeyType.fromKey(key)} ${Base64.getEncoder().encodeToString(blob)}"
+  val trimmed = comment.trim()
+  return if (trimmed.isEmpty()) base else "$base $trimmed"
 }
 
 /** OpenSSH's `SHA256:` fingerprint of a public key blob. */
