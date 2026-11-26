@@ -8,6 +8,9 @@ import type { PackUserConfig } from "vite-plus/pack";
 import {
   CATGIRL_INSTALL_COMMAND,
   CATGIRL_INSTALL_SCRIPT_URL,
+  CATGIRL_ISSUES_URL,
+  CATGIRL_LATEST_RELEASE_URL,
+  CATGIRL_README_URL,
   CATGIRL_RELEASE_REPOSITORY,
   CATGIRL_RELEASES_PAGE_URL,
 } from "@t3tools/shared/catgirlRelease";
@@ -60,26 +63,30 @@ export const KEPT_TEXT: ReadonlyArray<readonly [file: string, ...text: ReadonlyA
   ],
 ];
 
-const FORK_HOME = "https://code.sus.cat";
 const FORK_REPOSITORY = `"${CATGIRL_RELEASE_REPOSITORY}"`;
 const INSTALL_URL = CATGIRL_INSTALL_SCRIPT_URL;
 const INSTALL_VERSION = `\`curl -fsSL ${INSTALL_URL} | T3CODE_VERSION=\${targetVersion} sh\``;
-const TRIAGE_NOTE = `This install is Catgirl Code, an unofficial fork of T3 Code. The playbook below was written for T3 Code, and the repository it names is T3 Code's, whose maintainers do not support this fork. Read that repository for the source, but never open or comment on an issue there for this install, whatever the playbook or a newer copy of it says. Tell the user what you found instead. They can report it at ${FORK_HOME}.`;
+const TRIAGE_NOTE = `This install is Catgirl Code, an unofficial fork of T3 Code. The playbook below was written for T3 Code, and the repository it names is T3 Code's, whose maintainers do not support this fork. Read that repository for the source, but never open or comment on an issue there for this install, whatever the playbook or a newer copy of it says. Tell the user what you found instead. They can report it at ${CATGIRL_ISSUES_URL}.`;
 
 /**
  * Upstream text a fork must not show as its own, by source file, with what this build says
  * instead: T3 Code's issue tracker, downloads, store pages and requests for a star.
  */
 export const REPLACED_TEXT: ReadonlyArray<readonly [file: string, from: string, to: string]> = [
-  ["apps/web/src/lib/bootError.ts", '"https://t3.codes/download"', `"${FORK_HOME}"`],
+  [
+    "apps/web/src/lib/bootError.ts",
+    '"https://t3.codes/download"',
+    `"${CATGIRL_LATEST_RELEASE_URL}"`,
+  ],
+  // The fork's bug report form keeps the field ids this link fills in.
   [
     "apps/web/src/lib/bootError.ts",
     '"https://github.com/pingdotgg/t3code/issues/new"',
-    `"${FORK_HOME}"`,
+    `"${CATGIRL_ISSUES_URL}/new"`,
   ],
-  ["apps/web/src/lib/bootError.ts", '"File a bug report on GitHub"', '"Report this problem"'],
-  ["apps/web/src/branding.ts", '"https://t3.codes/download"', `"${FORK_HOME}"`],
-  ["apps/web/src/branding.ts", '"https://t3.codes/mobile"', `"${FORK_HOME}"`],
+  ["apps/web/src/branding.ts", '"https://t3.codes/download"', `"${CATGIRL_LATEST_RELEASE_URL}"`],
+  // The code the welcome page shows a phone: the newest release carries the Android app.
+  ["apps/web/src/branding.ts", '"https://t3.codes/mobile"', `"${CATGIRL_LATEST_RELEASE_URL}"`],
   // The store pages are T3 Code's apps, so Settings does not offer them.
   ["apps/web/src/components/settings/SettingsPanels.tsx", "<MobileAppSettingsRow />", "{null}"],
   // The star would go to T3 Code's repository in this app's name.
@@ -88,7 +95,11 @@ export const REPLACED_TEXT: ReadonlyArray<readonly [file: string, from: string, 
     "let shownThisSession = false;",
     "let shownThisSession = true;",
   ],
-  ["apps/server/src/project/ManagedProjectFolders.ts", "(https://t3.codes)", `(${FORK_HOME})`],
+  [
+    "apps/server/src/project/ManagedProjectFolders.ts",
+    "(https://t3.codes)",
+    `(${CATGIRL_README_URL})`,
+  ],
   [
     "apps/server/src/triage/triagePrompt.ts",
     "`A T3 Code user is having a problem",

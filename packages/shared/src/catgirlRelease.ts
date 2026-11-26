@@ -11,6 +11,12 @@ export const CATGIRL_UPSTREAM_VERSION = "0.1.12";
 export const CATGIRL_BUILD = 1;
 
 export const CATGIRL_RELEASES_PAGE_URL = `https://github.com/${CATGIRL_RELEASE_REPOSITORY}/releases`;
+/** The newest release: the Mac app, the Android app and the server's installer. */
+export const CATGIRL_LATEST_RELEASE_URL = `${CATGIRL_RELEASES_PAGE_URL}/latest`;
+/** Where a person reports a problem with this fork. */
+export const CATGIRL_ISSUES_URL = `https://github.com/${CATGIRL_RELEASE_REPOSITORY}/issues`;
+/** What this fork is, for a person who meets its name somewhere. */
+export const CATGIRL_README_URL = `https://github.com/${CATGIRL_RELEASE_REPOSITORY}#readme`;
 /** Each release carries its own installer, so `latest` always installs the newest server. */
 export const CATGIRL_INSTALL_SCRIPT_URL = `${CATGIRL_RELEASES_PAGE_URL}/latest/download/install.sh`;
 export const CATGIRL_INSTALL_COMMAND = `curl -fsSL ${CATGIRL_INSTALL_SCRIPT_URL} | sh`;
