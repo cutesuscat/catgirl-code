@@ -89,6 +89,8 @@ jobs:
           set -euo pipefail
           npm install -g "$(node -p "require('./package.json').packageManager")"
           pnpm install --frozen-lockfile
+          # The build scripts start `vp` by name; upstream installs it globally with its own setup action.
+          echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
 
       # The tag must be the version in the source: apps ask for exactly that release.
       - id: version
@@ -204,6 +206,8 @@ jobs:
           set -euo pipefail
           npm install -g "$(node -p "require('./package.json').packageManager")"
           pnpm install --frozen-lockfile
+          # The build scripts start `vp` by name; upstream installs it globally with its own setup action.
+          echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
 
       - id: version
         name: Resolve the version
