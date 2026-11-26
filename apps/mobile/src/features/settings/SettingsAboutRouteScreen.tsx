@@ -4,6 +4,7 @@ import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScroll
 import * as Application from "expo-application";
 import Constants from "expo-constants";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
+import { CATGIRL_LETTER_VERSION } from "@t3tools/shared/catgirlRelease";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,10 +55,12 @@ function AppSettingsSection() {
   const updateInFlight = useRef(false);
   const hiddenUpdateTapCount = useRef(0);
 
-  const version = Constants.expoConfig?.version ?? "0.0.0";
+  // Catgirl Code: the version people see (0.1.12a), as the desktop's About shows it.
+  const version = CATGIRL_LETTER_VERSION;
   // Match app.config.ts's production fallback to avoid mislabeling builds as development.
   const variant = (Constants.expoConfig?.extra?.appVariant as string | undefined) ?? "production";
-  const variantLabel = variant === "production" ? "" : capitalize(variant);
+  // Every Catgirl phone build is the "preview" variant, to keep the package id it updates in place.
+  const variantLabel = variant === "production" || variant === "preview" ? "" : capitalize(variant);
   // EAS assigns build numbers remotely; only the installed binary knows its own.
   const build = Application.nativeBuildVersion;
   const versionWithBuild = build ? `${version} (${build})` : version;
