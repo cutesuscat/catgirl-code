@@ -88,7 +88,10 @@ export class ServerConfig extends Context.Service<
     readonly otelEnvironment: OtelEnvironment.OtelEnvironment;
     /** The usage analytics destination that was saved in settings when the server started. */
     readonly savedAnalytics?:
-      | Pick<PersistedServerObservabilitySettings, "analyticsUrl" | "analyticsKey">
+      | Pick<
+          PersistedServerObservabilitySettings,
+          "analyticsUrl" | "analyticsKey" | "connectAnalytics"
+        >
       | undefined;
     readonly mode: RuntimeMode;
     readonly port: number;

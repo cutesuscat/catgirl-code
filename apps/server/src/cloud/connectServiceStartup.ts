@@ -222,6 +222,15 @@ export async function prepareConnectService(
   for (const [name, value] of Object.entries(connectServiceEnvironment(saved))) {
     if (!io.env[name]?.trim()) io.env[name] = value;
   }
+  // Only an offer: the server sends to it after this machine's own yes in its settings.
+  const analytics = connectDiagnosticsOffers(saved.connect?.document).analytics;
+  if (analytics && !io.env.T3CODE_CONNECT_ANALYTICS_URL?.trim()) {
+    io.env.T3CODE_CONNECT_ANALYTICS_URL = analytics.url;
+    io.env.T3CODE_CONNECT_SERVICE_NAME = connectServiceName(
+      saved.connect?.document,
+      saved.relayUrl,
+    );
+  }
   const hostedAppUrl = connectHostedAppUrl(saved.connect?.document);
   if (hostedAppUrl !== null && !io.env.T3CODE_HOSTED_APP_URL?.trim()) {
     io.env.T3CODE_HOSTED_APP_URL = hostedAppUrl;

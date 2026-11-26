@@ -10,6 +10,7 @@ import { ConnectionStatusDot } from "../ConnectionStatusDot";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
 import { SettingsSection } from "./settingsLayout";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { SettingsScopeNotice } from "./SettingsScopeNotice";
@@ -49,6 +50,8 @@ function runningStatus(running: ServerObservability | undefined) {
 }
 
 const withoutTrailingSlashes = (url: string) => url.replace(/\/+$/, "");
+
+const hostOf = (url: string) => (URL.canParse(url) ? new URL(url).host : url);
 
 /** Where usage analytics go, beside the OpenTelemetry export fields and saved the same way. */
 export function UsageAnalyticsSettings() {
@@ -200,6 +203,40 @@ function UsageAnalyticsForm() {
             <code className="font-mono">T3CODE_TELEMETRY_ENABLED=false</code>,{" "}
             <code className="font-mono">DO_NOT_TRACK</code>, a managed policy, or a CI runner.
           </p>
+        )}
+        {!unsupported && running?.connectAnalyticsOffer && (
+          <div
+            data-testid="connect-analytics-offer"
+            className="flex items-start justify-between gap-3 rounded-md border border-border/70 px-3 py-2"
+          >
+            <div className="grid gap-0.5">
+              <Label htmlFor="connect-analytics">
+                Send usage data to {running.connectAnalyticsOffer.serviceName}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                This machine's Catgirl Connect service offers to receive its usage data at{" "}
+                {hostOf(running.connectAnalyticsOffer.url)}, with a token from Connect sign-in. Off
+                until you turn it on here. The fields above and environment variables win over it.
+                Restart the server to apply.
+              </p>
+            </div>
+            <Switch
+              id="connect-analytics"
+              checked={saved.connectAnalytics}
+              disabled={saving || !canEdit}
+              onCheckedChange={async (connectAnalytics) => {
+                if (!environment) return;
+                setSaving(true);
+                setMessage(null);
+                const result = await updateSettings({
+                  environmentId: environment.environmentId,
+                  input: { patch: { observability: { connectAnalytics } } },
+                });
+                setSaving(false);
+                if (result._tag === "Success") setMessage("Saved. Restart the server to apply.");
+              }}
+            />
+          </div>
         )}
         {!unsupported && (
           <div className="flex items-center justify-between gap-3">

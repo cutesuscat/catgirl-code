@@ -511,12 +511,14 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     ...(logs?.variable !== undefined ? { otlpLogsVariable: logs.variable } : {}),
     otelEnvironment: otel,
     ...(persistedObservabilitySettings.analyticsUrl === undefined &&
-    persistedObservabilitySettings.analyticsKey === undefined
+    persistedObservabilitySettings.analyticsKey === undefined &&
+    persistedObservabilitySettings.connectAnalytics === undefined
       ? {}
       : {
           savedAnalytics: {
             analyticsUrl: persistedObservabilitySettings.analyticsUrl,
             analyticsKey: persistedObservabilitySettings.analyticsKey,
+            connectAnalytics: persistedObservabilitySettings.connectAnalytics,
           },
         }),
     mode,

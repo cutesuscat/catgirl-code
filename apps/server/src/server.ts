@@ -734,6 +734,12 @@ const layerServerRestart = Layer.effect(
   }),
 );
 
+// One reference, so the analytics layer below shares this instance rather than building another.
+const layerCloudCliTokenManager = CloudCliTokenManager.layer.pipe(
+  Layer.provide(ServerSecretStore.layer),
+  Layer.provide(ExternalLauncher.layer),
+);
+
 const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   AgentAwarenessRelay.layer,
   ProviderHostPathWatcher.layer.pipe(Layer.provide(layerDesktopTelemetryReceiver)),
@@ -857,15 +863,7 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
     Layer.mergeAll(AssetSigner.layer, EnvironmentKeys.layer, WorkspacePreviewRevisions.layer),
   ),
   Layer.provideMerge(ServerSecretStore.layer),
-  Layer.provideMerge(
-    Layer.mergeAll(
-      CloudCliTokenManager.layer.pipe(
-        Layer.provide(ServerSecretStore.layer),
-        Layer.provide(ExternalLauncher.layer),
-      ),
-      layerCloudManagedEndpointRuntime,
-    ),
-  ),
+  Layer.provideMerge(Layer.mergeAll(layerCloudCliTokenManager, layerCloudManagedEndpointRuntime)),
 );
 
 const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
@@ -877,7 +875,13 @@ const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
   Layer.provideMerge(TraceDiagnostics.layer),
   Layer.provideMerge(TriageService.layer.pipe(Layer.provide(GitVcsDriver.layer))),
   // Layers memoize by reference, so this is the same policy the settings layer reads.
-  Layer.provideMerge(AnalyticsService.layer.pipe(Layer.provide(ManagedPolicy.layer))),
+  // Catgirl Connect: the same token manager (one instance) for a usage-data offer's collect token.
+  Layer.provideMerge(
+    AnalyticsService.layer.pipe(
+      Layer.provide(ManagedPolicy.layer),
+      Layer.provide(layerCloudCliTokenManager),
+    ),
+  ),
   Layer.provideMerge(ExternalLauncher.layer),
   Layer.provideMerge(RemoteOpenTargets.layer),
   Layer.provideMerge(DirectEndpoints.layer.pipe(Layer.provide(layerServerEnvironment))),

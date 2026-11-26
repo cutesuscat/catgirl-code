@@ -180,6 +180,7 @@ export interface PersistedServerObservabilitySettings {
   readonly otlpLogsUrl: string | undefined;
   readonly analyticsUrl?: string | undefined;
   readonly analyticsKey?: string | undefined;
+  readonly connectAnalytics?: boolean | undefined;
 }
 
 function normalizePersistedServerSettingString(
@@ -196,6 +197,7 @@ function extractPersistedServerObservabilitySettings(input: {
     readonly otlpLogsUrl?: string;
     readonly analyticsUrl?: string;
     readonly analyticsKey?: string;
+    readonly connectAnalytics?: boolean;
   };
 }): PersistedServerObservabilitySettings {
   return {
@@ -204,6 +206,7 @@ function extractPersistedServerObservabilitySettings(input: {
     otlpLogsUrl: normalizePersistedServerSettingString(input.observability?.otlpLogsUrl),
     analyticsUrl: normalizePersistedServerSettingString(input.observability?.analyticsUrl),
     analyticsKey: normalizePersistedServerSettingString(input.observability?.analyticsKey),
+    ...(input.observability?.connectAnalytics === true ? { connectAnalytics: true } : {}),
   };
 }
 

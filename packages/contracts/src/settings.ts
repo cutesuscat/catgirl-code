@@ -1082,6 +1082,8 @@ export const ObservabilitySettings = Schema.Struct({
   // Where product usage analytics go. Empty by default: with either one empty, nothing is sent.
   analyticsUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   analyticsKey: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  // This machine's own yes to its Catgirl Connect service's usage-data offer. Off by default.
+  connectAnalytics: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
 });
 export type ObservabilitySettings = typeof ObservabilitySettings.Type;
 
@@ -2045,6 +2047,7 @@ export const ServerSettingsPatch = Schema.Struct({
       otlpLogsUrl: Schema.optionalKey(TrimmedString),
       analyticsUrl: Schema.optionalKey(TrimmedString),
       analyticsKey: Schema.optionalKey(TrimmedString),
+      connectAnalytics: Schema.optionalKey(Schema.Boolean),
     }),
   ),
   /** Merges per host, replacing patched fields whole; redaction markers retain secrets, empty secrets remove them. A non-empty token map keeps the saved tokens of hosts it omits; an empty map clears them all. */

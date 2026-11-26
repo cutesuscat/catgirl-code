@@ -91,6 +91,38 @@ describe("UsageAnalyticsSettings", () => {
       .toBeInTheDocument();
   });
 
+  it("shows a Connect service's offer off, and saves only the machine's own yes", async () => {
+    setup({
+      ...RUNNING,
+      connectAnalyticsOffer: {
+        serviceName: "Example cats",
+        url: "https://relay.example.com/v1/collect/analytics",
+      },
+    });
+    await using screen = await render(<UsageAnalyticsSettings />);
+
+    const label = screen.getByText("Send usage data to Example cats", { exact: true });
+    await expect.element(label).toBeVisible();
+    expect(document.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("false");
+    await expect
+      .element(screen.getByText(/offers to receive its usage data at relay\.example\.com/))
+      .toBeInTheDocument();
+    expect(updateSettings).not.toHaveBeenCalled();
+
+    await userEvent.click(label);
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({
+      environmentId: "env",
+      input: { patch: { observability: { connectAnalytics: true } } },
+    });
+  });
+
+  it("shows no offer from a server that reports none", async () => {
+    setup();
+    await using screen = await render(<UsageAnalyticsSettings />);
+    await expect.element(screen.getByText("Address", { exact: true })).toBeVisible();
+    expect(document.querySelector('[role="switch"]')).toBeNull();
+  });
+
   it("says where the running address comes from when the environment sets it", async () => {
     setup({
       ...RUNNING,

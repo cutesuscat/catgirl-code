@@ -126,6 +126,7 @@ export const make = Effect.gen(function* () {
   const enabledAtStartup = Option.getOrElse(telemetryConfig.enabled, () => enabledByDefault);
   // Catgirl Code builds in no destination: until the machine names one, nothing is queued or sent.
   const destination = AnalyticsDestination.analyticsDestination(yield* AnalyticsDestination.target);
+  const authorize = yield* AnalyticsDestination.collectAuthorization(destination);
   // A managed policy can switch analytics off over the environment, never on.
   const policyAllows =
     ManagedPolicy.deniedBy(yield* ManagedPolicy.ManagedPolicy, "telemetry") === undefined;
@@ -241,8 +242,9 @@ export const make = Effect.gen(function* () {
       })),
     };
 
-    yield* HttpClientRequest.post(`${destination.url}/batch/`).pipe(
+    yield* HttpClientRequest.post(AnalyticsDestination.endpointOf(destination)).pipe(
       HttpClientRequest.bodyJson(payload),
+      Effect.flatMap(authorize),
       Effect.flatMap(httpClient.execute),
       Effect.flatMap(HttpClientResponse.filterStatusOk),
       Effect.timeout(SEND_TIMEOUT),

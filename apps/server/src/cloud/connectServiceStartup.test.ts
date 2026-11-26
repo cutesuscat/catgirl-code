@@ -126,6 +126,8 @@ describe("t3 connect --relay", () => {
       T3CODE_CLERK_JWT_TEMPLATE: "t3-relay",
       T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: "example-client",
       T3CODE_HOSTED_APP_URL: "https://app.example.com",
+      T3CODE_CONNECT_ANALYTICS_URL: `${RELAY}/v1/collect/analytics`,
+      T3CODE_CONNECT_SERVICE_NAME: "Example cats",
     });
   });
 

@@ -391,6 +391,10 @@ export const ServerObservability = Schema.Struct({
   analyticsKeySource: Schema.optional(OtlpEndpointSource),
   /** Whether usage analytics are being sent. Absent from servers that predate the setting. */
   analyticsEnabled: Schema.optionalKey(Schema.Boolean),
+  /** Catgirl Connect: the machine's service offers to receive usage data. An offer, never a yes. */
+  connectAnalyticsOffer: Schema.optionalKey(
+    Schema.Struct({ serviceName: Schema.String, url: Schema.String }),
+  ),
   /** Catgirl Code: whether agent feedback for T3 Code's team would leave this machine. */
   agentFeedbackT3Sends: Schema.optionalKey(Schema.Boolean),
 });
