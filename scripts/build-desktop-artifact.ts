@@ -15,6 +15,7 @@ import {
   type DirectoryRecord,
 } from "@electron/asar";
 
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { fromYaml } from "@t3tools/shared/schemaYaml";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
@@ -2945,7 +2946,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "mac" && target === "dmg") {
     buildConfig.dmg = {
       // Finder caches DMG backgrounds by volume name; give each installer its own.
-      title: `${resolveDesktopProductName(version)} ${version} Installer`,
+      // Catgirl Code: the letter version people see (0.1.12b); machines keep the plain one.
+      title: `${resolveDesktopProductName(version)} ${displayVersion(version)}`,
       background: `dmg/dmg-background-${updateChannel}.png`,
       window: {
         width: 640,

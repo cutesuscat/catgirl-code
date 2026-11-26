@@ -554,6 +554,37 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
+  it.effect("titles the Mac disk image with the version people see", () =>
+    Effect.gen(function* () {
+      const catgirl = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.12.2",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+      const upstream = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "0.0.33",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+      assert.strictEqual((catgirl.dmg as { title: string }).title, "Catgirl Code 0.1.12b");
+      assert.strictEqual((upstream.dmg as { title: string }).title, "Catgirl Code 0.0.33");
+    }).pipe(
+      Effect.provide(
+        ConfigProvider.layer(
+          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "cutesuscat/catgirl-code" } }),
+        ),
+      ),
+    ),
+  );
+
   it.effect("names the Electron window class in the Linux desktop entry", () =>
     Effect.gen(function* () {
       const linux = yield* createBuildConfig(
