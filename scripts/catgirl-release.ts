@@ -10,6 +10,8 @@ import * as NodeURL from "node:url";
 import { CATGIRL_HOME_SHELL_FUNCTION } from "@t3tools/shared/catgirlHomeScript";
 import {
   CATGIRL_COMMAND,
+  CATGIRL_COMMAND_ALIASES,
+  CATGIRL_COMMAND_ALIASES_ENV,
   CATGIRL_HOME_DIR,
   CATGIRL_INSTALL_SCRIPT_URL,
   CATGIRL_LETTER_VERSION,
@@ -51,6 +53,35 @@ const INSTALL_SCRIPT_EDITS: ReadonlyArray<readonly [from: string, to: string]> =
 // that contain the word (`t3_home`), or T3 Code's site. `%s` or `\n` stands before it in printf.
 const COMMAND_WORD = /(?<=^|[^\w$.]|%s|\\n)t3(?!\w|\.codes)/gm;
 
+// The aliases are links to the launcher beside them. A file in their place that is another link
+// or no link at all is someone else's, so it stays and the install goes on.
+const LAUNCHER_STEP_END = `grep -qxF "$launcher" "$launchers" 2>/dev/null || printf '%s\\n' "$launcher" >> "$launchers"\n`;
+const BIN_DIR_DOC =
+  "#   T3CODE_INSTALL_BIN_DIR   where the `catcode` command goes (default: ~/.local/bin)\n";
+const ALIASES_STEP = `if [ "\${${CATGIRL_COMMAND_ALIASES_ENV}:-1}" != 0 ]; then
+  for cg_alias in ${CATGIRL_COMMAND_ALIASES.join(" ")}; do
+    if [ -L "\${bin_dir}/\${cg_alias}" ] && [ "$(readlink "\${bin_dir}/\${cg_alias}")" = ${CATGIRL_COMMAND} ]; then continue; fi
+    if [ -e "\${bin_dir}/\${cg_alias}" ] || [ -L "\${bin_dir}/\${cg_alias}" ]; then
+      printf '  Left %s, which is not ours.\\n' "\${bin_dir}/\${cg_alias}" >&2
+    else
+      ln -s ${CATGIRL_COMMAND} "\${bin_dir}/\${cg_alias}" || printf '  Could not link %s.\\n' "\${bin_dir}/\${cg_alias}" >&2
+    fi
+  done
+fi
+`;
+
+function withCommandAliases(script: string): string {
+  for (const text of [LAUNCHER_STEP_END, BIN_DIR_DOC]) {
+    if (script.split(text).length !== 2) {
+      throw new RangeError(`scripts/install.sh no longer contains exactly one: ${text}`);
+    }
+  }
+  const doc = `${BIN_DIR_DOC}#   ${CATGIRL_COMMAND_ALIASES_ENV}   0 makes no ${CATGIRL_COMMAND_ALIASES.join(" or ")} beside it (default: 1)\n`;
+  return script
+    .replace(LAUNCHER_STEP_END, () => LAUNCHER_STEP_END + ALIASES_STEP)
+    .replace(BIN_DIR_DOC, () => doc);
+}
+
 const INSTALL_SCRIPT_NOTE = `# Catgirl Code's installer: an unofficial fork of T3 Code, not affiliated with T3 Tools, Inc.
 # Generated from T3 Code's scripts/install.sh (MIT) by scripts/catgirl-release.ts.
 `;
@@ -64,7 +95,7 @@ export function catgirlInstallScript(upstreamScript: string): string {
     }
     script = script.replace(from, () => to);
   }
-  script = script.replace(COMMAND_WORD, CATGIRL_COMMAND);
+  script = withCommandAliases(script.replace(COMMAND_WORD, CATGIRL_COMMAND));
   const [shebang = "", ...rest] = renameProduct(script).split("\n");
   return [shebang, INSTALL_SCRIPT_NOTE.trimEnd(), ...rest].join("\n");
 }

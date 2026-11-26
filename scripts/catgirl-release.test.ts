@@ -169,6 +169,15 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")(
             encoding: "utf8",
           }),
         ).toBe("catcode v1.2.3\n");
+        // The aliases are links to catcode beside it.
+        for (const alias of ["catgirlcode", "catgirl-code"]) {
+          expect(NodeFS.readlinkSync(NodePath.join(home, ".local/bin", alias))).toBe("catcode");
+          expect(
+            NodeChildProcess.execFileSync(NodePath.join(home, ".local/bin", alias), ["--version"], {
+              encoding: "utf8",
+            }),
+          ).toBe("catcode v1.2.3\n");
+        }
         expect(result.output).toContain("catcode");
       } finally {
         NodeFS.rmSync(home, { recursive: true, force: true });
@@ -191,6 +200,30 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")(
         } finally {
           NodeFS.rmSync(home, { recursive: true, force: true });
         }
+      }
+    });
+
+    it("makes an alias only where nothing else is, and none when told not to", async () => {
+      const { home, run } = installInOldHome();
+      try {
+        const bin = NodePath.join(home, ".local/bin");
+        NodeFS.writeFileSync(NodePath.join(bin, "catgirl-code"), "#!/bin/sh\necho mine\n");
+        const result = await run();
+        expect(result.code, result.output).toBe(0);
+        expect(result.output).toContain(
+          `Left ${NodePath.join(bin, "catgirl-code")}, which is not ours.`,
+        );
+        expect(NodeFS.readFileSync(NodePath.join(bin, "catgirl-code"), "utf8")).toBe(
+          "#!/bin/sh\necho mine\n",
+        );
+        expect(NodeFS.readlinkSync(NodePath.join(bin, "catgirlcode"))).toBe("catcode");
+
+        const bare = NodePath.join(home, "bin-without-aliases");
+        const skipped = await run(bare, { T3CODE_INSTALL_ALIASES: "0" });
+        expect(skipped.code, skipped.output).toBe(0);
+        expect(NodeFS.readdirSync(bare)).toEqual(["catcode"]);
+      } finally {
+        NodeFS.rmSync(home, { recursive: true, force: true });
       }
     });
   },

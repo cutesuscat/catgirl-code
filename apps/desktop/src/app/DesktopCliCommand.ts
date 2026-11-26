@@ -2,7 +2,7 @@
 import * as NodeFSP from "node:fs/promises";
 
 import type { DesktopCliCommandState } from "@t3tools/contracts";
-import { CATGIRL_COMMAND } from "@t3tools/shared/catgirlRelease";
+import { CATGIRL_COMMAND, CATGIRL_COMMAND_ALIASES } from "@t3tools/shared/catgirlRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -186,6 +186,25 @@ export const make = Effect.gen(function* () {
     return first;
   });
 
+  // Catgirl Code: the aliases are links to the command beside them, made and removed with it.
+  // Anything else in their place is someone else's.
+  const aliasesIn = (directory: string) =>
+    CATGIRL_COMMAND_ALIASES.map((name) => path.join(directory, name));
+  const linkAliases = (directory: string) =>
+    Effect.forEach(aliasesIn(directory), (alias) => fs.symlink(CATGIRL_COMMAND, alias), {
+      discard: true,
+    }).pipe(Effect.ignore);
+  const unlinkAliases = (directory: string) =>
+    Effect.forEach(
+      aliasesIn(directory),
+      (alias) =>
+        fs.readLink(alias).pipe(
+          Effect.flatMap((target) => (target === CATGIRL_COMMAND ? fs.remove(alias) : Effect.void)),
+          Effect.ignore,
+        ),
+      { discard: true },
+    );
+
   /** A link to this home's launcher; another home's link is marked too. */
   const leadsHere = (link: string) =>
     fs.readLink(link).pipe(
@@ -316,7 +335,10 @@ export const make = Effect.gen(function* () {
     const replaced = Option.getOrUndefined(yield* installedAt);
     if (replaced !== undefined) {
       const target = yield* fs.readLink(replaced).pipe(Effect.option);
-      if (Option.getOrUndefined(target) === launcher) return yield* state;
+      if (Option.getOrUndefined(target) === launcher) {
+        yield* linkAliases(path.dirname(replaced));
+        return yield* state;
+      }
     }
     const shadowedBy = yield* foreignFirstOnPath;
     // Our own link into another T3 home runs first too; it is the one this install updates.
@@ -360,8 +382,10 @@ export const make = Effect.gen(function* () {
         Effect.orElseSucceed(() => false),
       );
       if (!linked) continue;
+      yield* linkAliases(directory);
       if (replaced !== undefined && replaced !== link) {
         yield* fs.remove(replaced).pipe(Effect.ignore);
+        yield* unlinkAliases(path.dirname(replaced));
       }
       return yield* state;
     }
@@ -386,6 +410,7 @@ export const make = Effect.gen(function* () {
       const link = path.join(directory, CATGIRL_COMMAND);
       if (yield* isOurLink(link)) {
         yield* fs.remove(link).pipe(Effect.mapError(() => fail(`Could not remove ${link}.`)));
+        yield* unlinkAliases(directory);
       }
     }
     return yield* state;

@@ -59,6 +59,10 @@ it.layer(NodeServices.layer)("t3 install", (it) => {
       yield* fs.symlink(older, link);
       const installed = yield* provide(installCli());
       assert.equal(yield* fs.readFileString(link), posixLauncherScript(executable));
+      // The aliases are links to it, so they follow it.
+      for (const alias of ["catgirlcode", "catgirl-code"]) {
+        assert.equal(yield* fs.readLink(path.join(path.dirname(link), alias)), "catcode");
+      }
       assert.isFalse(installed.onPath);
       assert.include(installed.pathCommand, "$HOME/bin");
 
@@ -323,5 +327,31 @@ it.layer(NodeServices.layer)("t3 install", (it) => {
       assert.isFalse(isForegroundPs("   -1  4242\n"));
       assert.isFalse(isForegroundPs(""));
     }),
+  );
+});
+
+it.layer(NodeServices.layer)("catcode install aliases", (it) => {
+  it.effect("links catgirlcode and catgirl-code to catcode, and never over someone's file", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const { link, provide } = yield* setup;
+      const bin = path.dirname(link);
+      yield* fs.makeDirectory(bin, { recursive: true });
+      yield* fs.writeFileString(path.join(bin, "catgirl-code"), "#!/bin/sh\necho mine\n");
+      yield* provide(installCli());
+      assert.equal(yield* fs.readLink(path.join(bin, "catgirlcode")), "catcode");
+      assert.equal(
+        yield* fs.readFileString(path.join(bin, "catgirl-code")),
+        "#!/bin/sh\necho mine\n",
+      );
+
+      // Installing again keeps our link; the switch makes none.
+      yield* provide(installCli());
+      assert.equal(yield* fs.readLink(path.join(bin, "catgirlcode")), "catcode");
+      yield* fs.remove(path.join(bin, "catgirlcode"));
+      yield* provide(installCli(), { T3CODE_INSTALL_ALIASES: "0" });
+      assert.isFalse(yield* fs.exists(path.join(bin, "catgirlcode")));
+    }).pipe(Effect.scoped),
   );
 });

@@ -163,6 +163,40 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
     }),
   );
 
+  it.effect("links the aliases beside the command and removes them with it", () =>
+    Effect.gen(function* () {
+      const env: NodeJS.ProcessEnv = { PATH: "", SHELL: "/bin/zsh" };
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const home = yield* fs.makeTempDirectoryScoped();
+      const bin = path.join(home, ".local", "bin");
+      yield* fs.makeDirectory(bin, { recursive: true });
+      // Someone else's file under an alias name stays.
+      yield* fs.writeFileString(path.join(bin, "catgirl-code"), "#!/bin/sh\necho mine\n");
+      const command = yield* commandIn({ home, env });
+      yield* command.install;
+      expect(yield* fs.readLink(path.join(bin, "catgirlcode"))).toBe("catcode");
+      expect(yield* fs.readFileString(path.join(bin, "catgirlcode"))).toContain(
+        DesktopCliShim.MARKER,
+      );
+      expect(yield* fs.readFileString(path.join(bin, "catgirl-code"))).toBe(
+        "#!/bin/sh\necho mine\n",
+      );
+      // Install again restores a removed alias.
+      yield* fs.remove(path.join(bin, "catgirlcode"));
+      yield* command.install;
+      expect(yield* fs.readLink(path.join(bin, "catgirlcode"))).toBe("catcode");
+
+      yield* command.uninstall;
+      expect(yield* fs.readLink(path.join(bin, "catgirlcode")).pipe(Effect.option)).toEqual(
+        Option.none(),
+      );
+      expect(yield* fs.readFileString(path.join(bin, "catgirl-code"))).toBe(
+        "#!/bin/sh\necho mine\n",
+      );
+    }),
+  );
+
   it.effect("never replaces or removes a t3 it did not create", () =>
     Effect.gen(function* () {
       const env: NodeJS.ProcessEnv = { PATH: "", SHELL: "/bin/zsh" };

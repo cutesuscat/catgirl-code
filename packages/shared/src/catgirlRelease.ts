@@ -7,6 +7,10 @@ export const CATGIRL_RELEASE_REPOSITORY = "cutesuscat/catgirl-code";
 
 /** The server's command, its executable and the start of its release archives' names. */
 export const CATGIRL_COMMAND = "catcode";
+/** Links to `catcode` beside it, the way `python` points at `python3`. Text never uses them. */
+export const CATGIRL_COMMAND_ALIASES = ["catgirlcode", "catgirl-code"] as const;
+/** Set to 0 for the installer, `catcode install` or `catcode update` to make no aliases. */
+export const CATGIRL_COMMAND_ALIASES_ENV = "T3CODE_INSTALL_ALIASES";
 /** T3 Code's command. Its launchers are left alone; only programs that run it still look for it. */
 export const LEGACY_COMMAND = "t3";
 /** The folder in a person's home that holds the server's state, unless T3CODE_HOME names another. */

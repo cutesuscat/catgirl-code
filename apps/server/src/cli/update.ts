@@ -49,6 +49,7 @@ import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import { managedUpdateMirror, managedUpdateRefusal } from "../policy/managedUpdates.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
+import { writeCommandAliases } from "./catgirlCommandAlias.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import { createUpdateProgress } from "./updateProgress.ts";
 import * as CliService from "./service.ts";
@@ -560,6 +561,7 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     baseDir: input.baseDir,
     targetEntryPath: runtime.entryPath,
   });
+  if (Option.isSome(repointed)) yield* writeCommandAliases(repointed.value);
 
   // Use today's service manager for the target version. Inside the service it hands off to
   // the target CLI, so stopping this process cannot interrupt the switch.

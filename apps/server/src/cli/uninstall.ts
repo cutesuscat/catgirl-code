@@ -22,6 +22,7 @@ import {
   readPosixLauncherTarget,
   resolveLauncherPath,
 } from "../cloud/pinnedRuntime.ts";
+import { ownedCommandAliases } from "./catgirlCommandAlias.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import * as CliService from "./service.ts";
 import { awaitDetachedSpawn } from "../process/windowsVerbatimSpawn.ts";
@@ -239,7 +240,12 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
 
   yield* Console.log("This will remove:");
   if (plan.service) yield* Console.log("  the background service (stopping it first)");
-  for (const launcher of plan.launchers) yield* Console.log(`  the launcher at ${launcher}`);
+  for (const launcher of plan.launchers) {
+    yield* Console.log(`  the launcher at ${launcher}`);
+    for (const alias of yield* ownedCommandAliases(launcher)) {
+      yield* Console.log(`  its alias at ${alias}`);
+    }
+  }
   if (plan.runtimeDir !== undefined) {
     yield* Console.log(`  every downloaded version under ${plan.runtimeDir}`);
   }
@@ -274,6 +280,10 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
     if (!(yield* ownsLauncher(launcher, plan.versionsDir))) {
       yield* Console.log(`Left ${launcher}: it no longer runs this t3.`);
       continue;
+    }
+    for (const alias of yield* ownedCommandAliases(launcher)) {
+      yield* fs.remove(alias).pipe(Effect.ignore);
+      yield* Console.log(`Removed ${alias}.`);
     }
     yield* fs
       .remove(launcher, { force: true })

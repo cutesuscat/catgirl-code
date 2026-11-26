@@ -20,6 +20,7 @@ import {
   recordPinnedRuntimeLauncher,
   writePosixLauncher,
 } from "../cloud/pinnedRuntime.ts";
+import { writeCommandAliases } from "./catgirlCommandAlias.ts";
 import { detectCliRunner, resolveCliCommand, resolveEntryPath } from "./invocation.ts";
 
 export class CliInstallError extends Schema.TaggedError<CliInstallError>()("CliInstallError", {
@@ -142,6 +143,7 @@ export const installCli = Effect.fn("cli.install.install")(function* () {
       ),
     ),
   );
+  yield* writeCommandAliases(link);
 
   // resolve() drops trailing separators, so `~/.local/bin/` on PATH still matches.
   const normalize = (value: string) =>
