@@ -307,6 +307,14 @@ the key and add its public line to `~/.ssh/authorized_keys` on each host, then
 describe your hosts in the SSH config there as you would in `~/.ssh/config`.
 `Host`, `HostName`, `User`, `Port`, `ProxyJump` and `HostKeyAlias` are used.
 
+Instead of a key made in the app, **Use a key from this phone's keychain** signs
+in with a key you installed in Android (**Settings → Security → Encryption &
+credentials → Install a certificate**, from a `.p12` file holding an RSA key or an
+EC key on P-256, P-384 or P-521). Such a key stays in Android's keychain: no app
+can read it, it survives reinstalling the app, and another install of the app can
+use it once you pick it there. Android does not accept ed25519 keys this way, so
+this is a different key from one made in the app, with its own public line.
+
 Choose the host under **Add environment → Or connect over SSH**. The first
 connection to each host, jump hosts included, shows its key fingerprint: check it
 against `ssh-keygen -lf` on the host before trusting it. A host whose key changes
@@ -321,6 +329,27 @@ restrict,port-forwarding,permitopen="127.0.0.1:2222",command="/bin/false" ssh-ed
 
 Removing the environment closes the app's connection and leaves the server
 running.
+
+### Move the Android app's settings
+
+**Settings → Export settings** saves one file, encrypted with a passphrase you
+choose, holding the SSH key, SSH config and trusted host keys, the machines you
+paired with a link or reach over SSH, your client certificate choices, a Connect
+service you saved and your preferences. **Settings → Import settings** in another
+install of the app, or on another phone, shows what the file holds beside what
+that device already has and brings in what you leave switched on. Anything that
+would replace something on the device starts switched off, and nothing is removed.
+
+Not in the file: your T3 Connect sign-in and the machines you reach through it
+(sign in again and they return), and client certificates and keychain SSH keys
+themselves, which stay in Android's keychain. After importing, pick each of those
+once so Android lets the new install use it; on another phone, install the `.p12`
+there first.
+
+The file holds a private key and the sign-ins for your machines. Delete it once
+it is imported. A machine paired with a link then works from both installs until
+you remove the old one or revoke its session
+(see [Manage or revoke access](#manage-or-revoke-access)).
 
 For Antigravity's Google callback on a remote host, see
 [remote sign-in](./providers-antigravity.md#sign-in-from-a-remote-device).
