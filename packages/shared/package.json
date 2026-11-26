@@ -259,6 +259,10 @@
       "types": "./src/connectDocument.ts",
       "import": "./src/connectDocument.ts"
     },
+    "./connectDocumentTesting": {
+      "types": "./src/connectDocumentTesting.ts",
+      "import": "./src/connectDocumentTesting.ts"
+    },
     "./connectDocumentCopy": {
       "types": "./src/connectDocumentCopy.ts",
       "import": "./src/connectDocumentCopy.ts"

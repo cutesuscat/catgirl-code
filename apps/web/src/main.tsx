@@ -5,6 +5,7 @@ import "@fontsource-variable/inter";
 import "./index.css";
 
 import { trackKeyboardLayout } from "./keyboardLayout";
+import { refreshConnectServiceIfDue } from "./cloud/connectService";
 import { hasCloudPublicConfig, resolveCloudPublicConfig } from "./cloud/publicConfig";
 import { isElectron } from "./env";
 import { startAppServices } from "./appInit";
@@ -16,6 +17,7 @@ const stopTrackingKeyboardLayout = trackKeyboardLayout();
 import.meta.hot?.dispose(stopTrackingKeyboardLayout);
 
 const router = startAppServices();
+void refreshConnectServiceIfDue();
 
 const clerkPublishableKey = resolveCloudPublicConfig().clerkPublishableKey;
 

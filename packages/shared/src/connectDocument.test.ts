@@ -8,6 +8,11 @@ import { describe, expect, it } from "vite-plus/test";
 
 import vector from "./catgirlConnectDocument.vector.json" with { type: "json" };
 import {
+  endorseConnectKeyForTests,
+  signConnectDocumentForTests,
+  TEST_CONNECT_SEEDS,
+} from "./connectDocumentTesting.ts";
+import {
   connectDiagnosticsAllowed,
   connectDiagnosticsOffers,
   connectDocumentChanges,
@@ -97,6 +102,23 @@ describe("the coordinator's test vector", () => {
       now: NOW,
     });
     expect(check).toEqual({ _tag: "Rejected", problem: "bad-signature" });
+  });
+
+  it("a rotation a relay signs today, endorsed by the pinned key, applies", () => {
+    const newKey = Result.getOrThrow(Base64Url.decode(NEW.publicKey));
+    const rotated = signConnectDocumentForTests(
+      {
+        ...VALID_PAYLOAD,
+        keyRotation: {
+          previousKey: OLD.publicKey,
+          endorsement: endorseConnectKeyForTests(newKey, TEST_CONNECT_SEEDS.old),
+        },
+      },
+      TEST_CONNECT_SEEDS.new,
+    );
+    expect(
+      verifyConnectDocument(rotated, { relayUrl: RELAY, pinnedKey: OLD.publicKey, now: NOW }),
+    ).toMatchObject({ _tag: "Apply", key: NEW.publicKey, rotatedFrom: OLD.publicKey });
   });
 
   it("an endorsement that does not verify is an identity change, not a rotation", () => {

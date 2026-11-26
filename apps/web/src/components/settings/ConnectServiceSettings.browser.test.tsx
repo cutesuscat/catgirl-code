@@ -33,6 +33,8 @@ function setup(check: ConnectServiceCheck, overrides: Partial<ConnectServiceForm
     check: vi.fn(async () => check),
     save: vi.fn(async () => void calls.push("save")),
     leave: vi.fn(async () => void calls.push("leave")),
+    current: null,
+    update: vi.fn(async () => true),
     ...overrides,
   };
   return { props, calls };

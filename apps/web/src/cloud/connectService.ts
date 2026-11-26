@@ -1,10 +1,13 @@
 import type { ConnectServiceSettings } from "@t3tools/contracts";
+import { connectRefreshDue } from "@t3tools/shared/connectDocument";
 import {
   type BuiltInConnectService,
   type ConnectServiceDraft,
   checkConnectService,
+  connectServiceNeedsRestart,
   parseConnectServiceSettings,
   readConnectServiceSettings,
+  refreshConnectService,
   resolveConnectService,
   type ResolvedConnectService,
 } from "@t3tools/shared/connectService";
@@ -58,9 +61,62 @@ export function appliedConnectService(): ResolvedConnectService {
   return resolveConnectService(savedConnectService(), builtInConnectService());
 }
 
+const fetchWithoutCredentials: Parameters<typeof checkConnectService>[1]["fetch"] = (url, init) =>
+  globalThis.fetch(url, { ...init, credentials: "omit" });
+
+let liveConnectService: ConnectServiceSettings | null | undefined;
+const liveListeners = new Set<() => void>();
+
+/** The saved record as it is now: what started this app, plus later checks of its document. */
+export function currentConnectService(): ConnectServiceSettings | null {
+  if (liveConnectService === undefined) liveConnectService = savedConnectService();
+  return liveConnectService;
+}
+
+export function subscribeConnectService(listener: () => void): () => void {
+  liveListeners.add(listener);
+  return () => liveListeners.delete(listener);
+}
+
+/**
+ * Saves a later check of the service this app started with. Sign-in values never change here:
+ * a record that would change them is refused, and those go through `saveConnectService`.
+ */
+export async function updateConnectService(settings: ConnectServiceSettings): Promise<boolean> {
+  if (connectServiceNeedsRestart(savedConnectService(), settings)) return false;
+  if (window.desktopBridge?.updateConnectService) {
+    await window.desktopBridge.updateConnectService(settings);
+  } else if (!window.desktopBridge) {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } else {
+    return false;
+  }
+  liveConnectService = settings;
+  for (const listener of liveListeners) listener();
+  return true;
+}
+
+let refreshing: Promise<void> | null = null;
+
+/** At start, at most once a day: re-check a signed service's document against its pinned key. */
+export function refreshConnectServiceIfDue(now = new Date()): Promise<void> {
+  const saved = currentConnectService();
+  if (!saved?.connect || !connectRefreshDue(saved.connect, now)) return Promise.resolve();
+  refreshing ??= refreshConnectService(saved, { fetch: fetchWithoutCredentials, now })
+    .then(async (refreshed) => {
+      if (refreshed !== null) await updateConnectService(refreshed.settings);
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
 export function checkConnectServiceDraft(draft: ConnectServiceDraft) {
   return checkConnectService(draft, {
-    fetch: (url, init) => globalThis.fetch(url, { ...init, credentials: "omit" }),
+    fetch: fetchWithoutCredentials,
+    saved: currentConnectService(),
   });
 }
 
@@ -77,4 +133,5 @@ export async function saveConnectService(settings: ConnectServiceSettings | null
 
 export function __resetSavedConnectServiceForTests(): void {
   savedAtStartup = undefined;
+  liveConnectService = undefined;
 }

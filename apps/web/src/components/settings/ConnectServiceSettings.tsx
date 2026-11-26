@@ -10,14 +10,18 @@ import {
   connectServiceCheckProblem,
   connectServiceSourceLabel,
 } from "@t3tools/shared/connectServiceCopy";
+import { parseConnectSetupLink } from "@t3tools/shared/connectDocument";
 import { T, useGT, useMessages } from "gt-react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import {
   appliedConnectService,
   builtInConnectService,
   checkConnectServiceDraft,
+  currentConnectService,
   saveConnectService,
+  subscribeConnectService,
+  updateConnectService,
 } from "~/cloud/connectService";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { environmentCatalog } from "~/connection/catalog";
@@ -37,6 +41,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Spinner } from "../ui/spinner";
 import { AdvancedSettings } from "./AdvancedSettings";
+import { ConnectFirstUseDetails, ConnectServiceTrust } from "./ConnectServiceTrust";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
 
@@ -53,6 +58,10 @@ export interface ConnectServiceFormProps {
   readonly save: (settings: SavedConnectService | null) => Promise<void>;
   /** Signs out of the service in use and forgets the machines reached through it. */
   readonly leave: () => Promise<void>;
+  /** The saved record as it is now, with later checks of a signed service's document. */
+  readonly current: SavedConnectService | null;
+  /** Saves a later check of the same service in place; refused if sign-in values would change. */
+  readonly update: (settings: SavedConnectService) => Promise<boolean>;
 }
 
 const sameService = (settings: SavedConnectService, applied: ResolvedConnectService) =>
@@ -72,6 +81,8 @@ export function ConnectServiceForm({
   check,
   save,
   leave,
+  current,
+  update,
 }: ConnectServiceFormProps) {
   const gt = useGT();
   const messages = useMessages();
@@ -108,8 +119,13 @@ export function ConnectServiceForm({
     );
     setChecking(false);
     if (result._tag !== "Success") return setProblem("check-failed");
+    // The notice below the address explains it and offers the two choices.
+    if (result.value._tag === "IdentityChanged") return void (await update(result.value.settings));
     if (result.value._tag !== "Ready") return setProblem(result.value);
-    if (sameService(result.value.settings, applied)) return setProblem("unchanged");
+    if (sameService(result.value.settings, applied)) {
+      if (result.value.settings.connect) await update(result.value.settings);
+      return setProblem("unchanged");
+    }
     setPending(result.value.settings);
   };
 
@@ -228,6 +244,13 @@ export function ConnectServiceForm({
           </p>
         ) : null}
       </SettingsRow>
+      {current?.connect && current.relayUrl === applied.relayUrl ? (
+        <ConnectServiceTrust
+          current={{ ...current, connect: current.connect }}
+          update={update}
+          restartInto={setPending}
+        />
+      ) : null}
       <AdvancedSettings targetIds={[]} openRequested={signInValuesNeeded}>
         <SettingsRow
           title={gt("Sign-in key")}
@@ -314,6 +337,12 @@ export function ConnectServiceForm({
                   )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {pending?.connect && pending.connect.key !== current?.connect?.key ? (
+            <ConnectFirstUseDetails
+              settings={pending}
+              linkFingerprint={parseConnectSetupLink(relayUrl).fingerprint}
+            />
+          ) : null}
           {applyFailed ? (
             <p role="alert" className="px-6 pb-4 text-sm text-destructive">
               <T>Could not save the service. Nothing was changed.</T>
@@ -349,9 +378,12 @@ async function forgetRelayEnvironments(): Promise<void> {
   });
 }
 
-function connectServiceFormProps(): Omit<ConnectServiceFormProps, "leave"> {
+function useConnectServiceFormProps(): Omit<ConnectServiceFormProps, "leave"> {
   const builtIn = builtInConnectService();
+  const current = useSyncExternalStore(subscribeConnectService, currentConnectService);
   return {
+    current,
+    update: updateConnectService,
     applied: appliedConnectService(),
     hasBuiltIn: Boolean(builtIn.relayUrl && builtIn.clerkPublishableKey),
     desktop: isElectron,
@@ -365,7 +397,7 @@ function SignedInConnectServiceSettings() {
   const clerk = useClerk();
   return (
     <ConnectServiceForm
-      {...connectServiceFormProps()}
+      {...useConnectServiceFormProps()}
       leave={async () => {
         await forgetRelayEnvironments();
         // Stay on this page: the default sign-out redirect would race the save that follows.
@@ -375,12 +407,16 @@ function SignedInConnectServiceSettings() {
   );
 }
 
+function SignedOutConnectServiceSettings() {
+  return <ConnectServiceForm {...useConnectServiceFormProps()} leave={forgetRelayEnvironments} />;
+}
+
 /** Where this device points T3 Connect: the service its build ships with, or one saved here. */
 export function ConnectServiceSettings() {
   // Clerk's hooks exist only under the auth shell, which mounts when a service is configured.
   return hasCloudPublicConfig() ? (
     <SignedInConnectServiceSettings />
   ) : (
-    <ConnectServiceForm {...connectServiceFormProps()} leave={forgetRelayEnvironments} />
+    <SignedOutConnectServiceSettings />
   );
 }
