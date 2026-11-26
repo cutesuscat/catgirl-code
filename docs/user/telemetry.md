@@ -3,7 +3,9 @@
 > **Catgirl Code** is a fork of T3 Code and sends none of what this page describes unless you turn
 > it on. Product usage events have no built-in destination and never go to `ingest.t3.codes`: they
 > go only to an address you enter, see
-> [Usage analytics in Catgirl Code](#usage-analytics-in-catgirl-code). Relay connection traces stay
+> [Usage analytics in Catgirl Code](#usage-analytics-in-catgirl-code). The one thing that can reach
+> `ingest.t3.codes` is an [agent feedback](#agent-feedback) report you choose to send to the T3 Code
+> team. Relay connection traces stay
 > off until you set `T3CODE_TELEMETRY_ENABLED=true` in the server's environment. The mobile app's
 > crash reports and connection traces stay off until you turn them on in
 > **Settings > About > Diagnostics**. The rest of this page describes what each one sends once it
@@ -24,6 +26,17 @@ raw provider events, child-agent output, or identifiers from your provider accou
 which is off unless you turn it on.
 
 ## Agent feedback
+
+> **Catgirl Code:** in **Settings > Labs > Agent feedback** you choose who gets reports: **Off**
+> (the default), the **T3 Code team**, or **Catgirl Code**. Reports for the T3 Code team are sent
+> exactly as this section describes, to `ingest.t3.codes`. T3 Code's makers did not make Catgirl
+> Code, so keep those reports to T3 Code itself. This server never sends a report for Catgirl Code:
+> when you approve one, the card opens a new issue on
+> [Catgirl Code's GitHub](https://github.com/nickypro/catgirl-code/issues) with the report filled
+> in, and nothing leaves your machine until you submit it there. Such issues are public and show
+> your GitHub name. Catgirl Code takes only reports you ask for, so **Automatic** and
+> `t3 feedback` work only with the T3 Code team. An open card always names who would get the
+> report, and **Send** goes only there.
 
 Agent feedback lets agents tell the T3 team about T3 Code: a T3 tool or `t3` command that did not
 do what they expected, a confusing instruction, or a missing capability. Choose a mode in
