@@ -1,6 +1,7 @@
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
 
+import { connectDocumentProblemText } from "./connectDocumentCopy.ts";
 import type {
   ConnectServiceCheck,
   ConnectServiceField,
@@ -44,6 +45,10 @@ export function connectServiceCheckProblem(
           "This app cannot read the sign-in values this service publishes. Enter them under Advanced.",
         ),
       );
+    case "DocumentRejected":
+      return connectDocumentProblemText(check.problem);
+    case "IdentityChanged":
+      return connectDocumentProblemText("fingerprint-mismatch");
   }
 }
 

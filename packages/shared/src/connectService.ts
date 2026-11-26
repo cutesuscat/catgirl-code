@@ -1,13 +1,26 @@
-// @effect-diagnostics globalTimers:off - Settings screens call these relay requests outside an Effect runtime; each clears its own deadline.
+// @effect-diagnostics globalTimers:off globalDate:off - Settings screens call these relay requests outside an Effect runtime; each clears its own deadline and reads the clock for document dates.
 import {
+  CATGIRL_CONNECT_DOCUMENT_PATH,
   CONNECT_SERVICE_DISCOVERY_PATH,
   CONNECT_SERVICE_DISCOVERY_VERSION,
+  type ConnectDocumentPayload,
   ConnectServiceDiscoveryDocument,
   ConnectServiceSettings,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
+import {
+  applyPendingConnectDocument,
+  type ConnectDocumentProblem,
+  type ConnectRefreshOutcome,
+  parseConnectSetupLink,
+  pinConnectService,
+  refreshConnectTrust,
+  trustedIdentityChange,
+  trustNewConnectIdentity,
+  verifyConnectDocument,
+} from "./connectDocument.ts";
 import { clerkFrontendApiHostnameFromPublishableKey } from "./relayAuth.ts";
 import { normalizeSecureRelayUrl } from "./relayUrl.ts";
 
@@ -83,7 +96,9 @@ export function readConnectServiceSettings(stored: unknown): ConnectServiceSetti
   const decoded = decodeSettings(stored);
   if (Option.isNone(decoded)) return null;
   const validated = validateConnectServiceValues(decoded.value);
-  return validated.ok ? { ...validated.values, source: decoded.value.source } : null;
+  if (!validated.ok) return null;
+  const { connect } = decoded.value;
+  return { ...validated.values, source: decoded.value.source, ...(connect ? { connect } : {}) };
 }
 
 export function parseConnectServiceSettings(json: string | null | undefined): unknown {
@@ -235,27 +250,126 @@ async function discoverConnectService(
     : { _tag: "UnreadableDocument" };
 }
 
+type FetchedConnectDocument =
+  | { readonly _tag: "Envelope"; readonly envelope: unknown }
+  | { readonly _tag: "NotPublished" }
+  | { readonly _tag: "Unreachable" };
+
+async function fetchConnectDocument(
+  relayUrl: string,
+  options: ConnectServiceRequestOptions,
+): Promise<FetchedConnectDocument> {
+  const response = await getJson(`${relayUrl}${CATGIRL_CONNECT_DOCUMENT_PATH}`, options);
+  if (response._tag === "Json") return { _tag: "Envelope", envelope: response.body };
+  return response._tag === "Status" && response.status === 404
+    ? { _tag: "NotPublished" }
+    : { _tag: "Unreachable" };
+}
+
+/** The four values a signed document names, if this app can use them. */
+function connectDocumentValues(
+  relayUrl: string,
+  document: ConnectDocumentPayload,
+): ConnectServiceValues | null {
+  if (document.signIn.provider !== "clerk") return null;
+  const validated = validateConnectServiceValues({
+    relayUrl,
+    clerkPublishableKey: document.signIn.publishableKey,
+    clerkJwtTemplate: document.signIn.jwtTemplate,
+    clerkCliOAuthClientId: document.signIn.cliOAuthClientId ?? null,
+  });
+  return validated.ok ? validated.values : null;
+}
+
 export type ConnectServiceCheck =
   | { readonly _tag: "Ready"; readonly settings: ConnectServiceSettings }
   | { readonly _tag: "InvalidFields"; readonly fields: ReadonlyArray<ConnectServiceField> }
   | Exclude<ConnectRelayProbe, { readonly _tag: "Relay" }>
-  | Exclude<ConnectServiceDiscovery, { readonly _tag: "Discovered" | "Unreachable" }>;
+  | Exclude<ConnectServiceDiscovery, { readonly _tag: "Discovered" | "Unreachable" }>
+  | { readonly _tag: "DocumentRejected"; readonly problem: ConnectDocumentProblem | "missing" }
+  | { readonly _tag: "IdentityChanged"; readonly settings: ConnectServiceSettings };
+
+export interface ConnectServiceCheckOptions extends ConnectServiceRequestOptions {
+  /** What this device has saved now: a pinned key for the same address is checked against. */
+  readonly saved?: ConnectServiceSettings | null;
+  readonly now?: Date;
+}
+
+async function checkSignedConnectService(
+  relayUrl: string,
+  fingerprint: string | null,
+  options: ConnectServiceCheckOptions,
+): Promise<ConnectServiceCheck | null> {
+  const now = options.now ?? new Date();
+  const saved = options.saved?.relayUrl === relayUrl ? options.saved : null;
+  const pinned = saved?.connect;
+  const fetched = await fetchConnectDocument(relayUrl, options);
+  if (pinned !== undefined && saved !== null) {
+    if (fetched._tag !== "Envelope") {
+      return fetched._tag === "NotPublished"
+        ? { _tag: "DocumentRejected", problem: "missing" }
+        : { _tag: "Unreachable" };
+    }
+    const refreshed = refreshConnectTrust(pinned, fetched, { relayUrl, now });
+    if (refreshed.outcome === "identity-changed") {
+      return { _tag: "IdentityChanged", settings: { ...saved, connect: refreshed.trust } };
+    }
+    if (refreshed.outcome === "problem") {
+      const check = verifyConnectDocument(fetched.envelope, {
+        relayUrl,
+        pinnedKey: pinned.key,
+        now,
+      });
+      return {
+        _tag: "DocumentRejected",
+        problem: check._tag === "Rejected" ? check.problem : "malformed",
+      };
+    }
+    return readyFromTrust(relayUrl, applyPendingConnectDocument(refreshed.trust, now));
+  }
+  if (fetched._tag !== "Envelope") return null;
+  const check = verifyConnectDocument(fetched.envelope, {
+    relayUrl,
+    pinnedKey: null,
+    expectedFingerprint: fingerprint,
+    now,
+  });
+  if (check._tag === "Rejected") {
+    // Another version is for other apps: this one falls back to version 1, then to typing.
+    return check.problem === "unsupported-version"
+      ? null
+      : { _tag: "DocumentRejected", problem: check.problem };
+  }
+  if (check._tag === "IdentityChanged") return { _tag: "DocumentRejected", problem: "malformed" };
+  return readyFromTrust(relayUrl, pinConnectService(check, now));
+}
+
+function readyFromTrust(
+  relayUrl: string,
+  trust: NonNullable<ConnectServiceSettings["connect"]>,
+): ConnectServiceCheck {
+  const values = connectDocumentValues(relayUrl, trust.document);
+  return values === null
+    ? { _tag: "UnreadableDocument" }
+    : { _tag: "Ready", settings: { ...values, source: "discovered", connect: trust } };
+}
 
 /**
  * Turns what a person typed into settings that are safe to save: the address must be a relay
- * that answers, and the sign-in values come from the relay unless any were typed in.
+ * that answers. A signed document wins, then the version 1 values, unless any were typed in.
  */
 export async function checkConnectService(
   draft: ConnectServiceDraft,
-  options: ConnectServiceRequestOptions,
+  options: ConnectServiceCheckOptions,
 ): Promise<ConnectServiceCheck> {
-  const relayUrl = normalizeSecureRelayUrl(draft.relayUrl);
+  const link = parseConnectSetupLink(draft.relayUrl);
+  const relayUrl = normalizeSecureRelayUrl(link.address);
   if (relayUrl === null) return { _tag: "InvalidFields", fields: ["relayUrl"] };
   const manual =
     `${draft.clerkPublishableKey}${draft.clerkJwtTemplate}${draft.clerkCliOAuthClientId}`.trim()
       .length > 0;
   if (manual) {
-    const validated = validateConnectServiceValues(draft);
+    const validated = validateConnectServiceValues({ ...draft, relayUrl });
     if (!validated.ok) return { _tag: "InvalidFields", fields: validated.fields };
     const probe = await probeConnectRelay(relayUrl, options);
     return probe._tag === "Relay"
@@ -264,8 +378,64 @@ export async function checkConnectService(
   }
   const probe = await probeConnectRelay(relayUrl, options);
   if (probe._tag !== "Relay") return probe;
+  const signed = await checkSignedConnectService(relayUrl, link.fingerprint, options);
+  if (signed !== null) return signed;
+  // A setup link names a key; an unsigned service cannot show one, so it cannot match.
+  if (link.fingerprint !== null)
+    return { _tag: "DocumentRejected", problem: "fingerprint-mismatch" };
   const discovery = await discoverConnectService(relayUrl, options);
   return discovery._tag === "Discovered"
     ? { _tag: "Ready", settings: { ...discovery.values, source: "discovered" } }
     : discovery;
+}
+
+/** The daily check of a saved signed service. `null` when there is nothing signed to check. */
+export async function refreshConnectService(
+  saved: ConnectServiceSettings,
+  options: ConnectServiceRequestOptions & { readonly now?: Date },
+): Promise<{
+  readonly settings: ConnectServiceSettings;
+  readonly outcome: ConnectRefreshOutcome;
+} | null> {
+  if (!saved.connect) return null;
+  const fetched = await fetchConnectDocument(saved.relayUrl, options);
+  const refreshed = refreshConnectTrust(
+    saved.connect,
+    fetched._tag === "Envelope" ? fetched : { _tag: "Unreachable" },
+    { relayUrl: saved.relayUrl, now: options.now ?? new Date() },
+  );
+  return { settings: { ...saved, connect: refreshed.trust }, outcome: refreshed.outcome };
+}
+
+/** The settings a restart applies: a waiting sign-in change, or the identity a person trusted. */
+export function connectServiceAfterRestart(
+  saved: ConnectServiceSettings,
+  change: "pending" | "trust-new-identity",
+  now = new Date(),
+): ConnectServiceSettings | null {
+  const trust = saved.connect;
+  if (!trust) return null;
+  if (change === "pending") {
+    if (!trust.pending) return null;
+    const ready = readyFromTrust(saved.relayUrl, applyPendingConnectDocument(trust, now));
+    return ready._tag === "Ready" ? ready.settings : null;
+  }
+  const check = trustNewConnectIdentity(trust, { relayUrl: saved.relayUrl, now });
+  if (check === null) return null;
+  const ready = readyFromTrust(saved.relayUrl, trustedIdentityChange(trust, check, now));
+  return ready._tag === "Ready" ? ready.settings : null;
+}
+
+/** Whether moving from one saved record to another changes what the sign-in library starts with. */
+export function connectServiceNeedsRestart(
+  before: ConnectServiceSettings | null,
+  after: ConnectServiceSettings | null,
+): boolean {
+  if (before === null || after === null) return before !== after;
+  return (
+    before.relayUrl !== after.relayUrl ||
+    before.clerkPublishableKey !== after.clerkPublishableKey ||
+    before.clerkJwtTemplate !== after.clerkJwtTemplate ||
+    before.clerkCliOAuthClientId !== after.clerkCliOAuthClientId
+  );
 }

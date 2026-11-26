@@ -255,6 +255,14 @@
       "types": "./src/connectService.ts",
       "import": "./src/connectService.ts"
     },
+    "./connectDocument": {
+      "types": "./src/connectDocument.ts",
+      "import": "./src/connectDocument.ts"
+    },
+    "./connectDocumentCopy": {
+      "types": "./src/connectDocumentCopy.ts",
+      "import": "./src/connectDocumentCopy.ts"
+    },
     "./connectServiceCopy": {
       "types": "./src/connectServiceCopy.ts",
       "import": "./src/connectServiceCopy.ts"

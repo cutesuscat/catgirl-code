@@ -123,6 +123,7 @@ describe("checkConnectService", () => {
     ).toEqual({ _tag: "Ready", settings: { ...VALUES, source: "discovered" } });
     expect(requested).toEqual([
       `${RELAY}/.well-known/oauth-authorization-server`,
+      `${RELAY}/.well-known/catgirl-connect.json`,
       `${RELAY}/.well-known/t3-connect.json`,
     ]);
   });
