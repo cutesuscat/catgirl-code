@@ -8,7 +8,7 @@ export const CATGIRL_RELEASE_REPOSITORY = "cutesuscat/catgirl-code";
 /** The T3 Code release this source is based on. Move it when the fork moves to a newer one. */
 export const CATGIRL_UPSTREAM_VERSION = "0.1.12";
 /** Which Catgirl Code build of that release this is. Starts at 1; raise it for every release. */
-export const CATGIRL_BUILD = 1;
+export const CATGIRL_BUILD = 2;
 
 export const CATGIRL_RELEASES_PAGE_URL = `https://github.com/${CATGIRL_RELEASE_REPOSITORY}/releases`;
 /** The newest release: the Mac app, the Android app and the server's installer. */
