@@ -2,6 +2,11 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import type { ManagedPolicyDocument } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { verifyCatgirlReleaseSignature } from "@t3tools/shared/catgirlReleaseSignature";
+import {
+  signReleaseForTest,
+  TEST_RELEASE_SIGNING_KEY,
+} from "@t3tools/shared/catgirlReleaseSignatureTesting";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -21,6 +26,7 @@ import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as ServiceLauncherClient from "./serviceLauncherClient.ts";
 import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
+import * as PinnedRuntime from "./pinnedRuntime.ts";
 import * as ServerSelfUpdate from "./selfUpdate.ts";
 
 interface HarnessOptions {
@@ -42,14 +48,16 @@ const releaseHttpClient = (order: string[], urls: string[], beforeDownload?: Eff
   HttpClient.make((request) =>
     Effect.gen(function* () {
       urls.push(request.url);
-      if (request.url.endsWith("/SHA256SUMS")) {
+      const isSignature = request.url.endsWith("/SHA256SUMS.sig");
+      if (request.url.endsWith("/SHA256SUMS") || isSignature) {
         const digest = yield* Effect.promise(() => crypto.subtle.digest("SHA-256", archiveBytes));
         const hex = Array.from(new Uint8Array(digest), (byte) =>
           byte.toString(16).padStart(2, "0"),
         ).join("");
+        const checksums = `${hex}  catcode-1.1.0-linux-x64.tar.gz\n`;
         return HttpClientResponse.fromWeb(
           request,
-          new Response(`${hex}  catcode-1.1.0-linux-x64.tar.gz\n`),
+          new Response(isSignature ? signReleaseForTest(checksums) : checksums),
         );
       }
       if (beforeDownload) yield* beforeDownload;
@@ -178,7 +186,12 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
   return { selfUpdate, order, urls, baseDir, preflightProtocols };
 });
 
-it.layer(NodeServices.layer)("server self update", (it) => {
+// Releases in these tests are signed with the test key, and checked against it.
+const testKeyCheck = Layer.succeed(PinnedRuntime.ReleaseSignatureCheck, (checksums, signature) =>
+  verifyCatgirlReleaseSignature(checksums, signature, TEST_RELEASE_SIGNING_KEY),
+);
+
+it.layer(Layer.merge(NodeServices.layer, testKeyCheck))("server self update", (it) => {
   it.effect.each([
     { asset: "checksums", status: 504 },
     { asset: "archive", status: 503 },
@@ -190,8 +203,8 @@ it.layer(NodeServices.layer)("server self update", (it) => {
       const { selfUpdate, order, baseDir } = yield* makeHarness({
         httpClient: releaseHttpClient([], []).pipe(
           HttpClient.transform((response, request) => {
-            if (!failDownload || request.url.endsWith("/SHA256SUMS") !== (asset === "checksums"))
-              return response;
+            const isChecksums = /\/SHA256SUMS(\.sig)?$/.test(request.url);
+            if (!failDownload || isChecksums !== (asset === "checksums")) return response;
             Deferred.doneUnsafe(downloadFailed, Effect.void);
             return Effect.succeed(
               HttpClientResponse.fromWeb(

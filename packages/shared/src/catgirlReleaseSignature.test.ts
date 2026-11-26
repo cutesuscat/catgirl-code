@@ -14,6 +14,7 @@ import {
   catgirlReleaseSignatureShellFunction,
   verifyCatgirlReleaseSignature,
 } from "./catgirlReleaseSignature.ts";
+import { signReleaseForTest, TEST_RELEASE_SIGNING_KEY } from "./catgirlReleaseSignatureTesting.ts";
 
 // Made with `ssh-keygen -Y sign` and throwaway keys whose private halves were deleted.
 const TEST_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAADmK10U8P43RxFFr3RwvA4YlK1oXGniphqsXCr46PB";
@@ -73,6 +74,21 @@ describe("verifyCatgirlReleaseSignature", () => {
   });
 });
 
+describe("signReleaseForTest", () => {
+  it("makes signatures the check accepts for the test key only", () => {
+    const signature = signReleaseForTest(MESSAGE);
+    expect(verifyCatgirlReleaseSignature(MESSAGE, signature, TEST_RELEASE_SIGNING_KEY)).toBe(true);
+    expect(verifyCatgirlReleaseSignature(MESSAGE, signature)).toBe(false);
+    expect(
+      verifyCatgirlReleaseSignature(
+        MESSAGE,
+        signReleaseForTest(MESSAGE, "file"),
+        TEST_RELEASE_SIGNING_KEY,
+      ),
+    ).toBe(false);
+  });
+});
+
 describe("the release key", () => {
   it("is the key whose fingerprint people are given", () => {
     const blob = Uint8Array.from(atob(CATGIRL_RELEASE_SIGNING_KEY.split(" ")[1] ?? ""), (c) =>
@@ -108,6 +124,17 @@ catgirl_release_signature "$1/SHA256SUMS" "$1/SHA256SUMS.sig" "$1/allowed_signer
     expect(run(SIGNATURES.otherNamespace)).toBe(1);
     expect(run(SIGNATURES.good, new TextEncoder().encode("changed\n"))).toBe(1);
     expect(run("")).toBe(1);
+  });
+
+  it("accepts what signReleaseForTest makes, so its format is ssh-keygen's", () => {
+    const script = (
+      dir: string,
+    ) => `${catgirlReleaseSignatureShellFunction(TEST_RELEASE_SIGNING_KEY)}
+catgirl_release_signature "${dir}/SHA256SUMS" "${dir}/SHA256SUMS.sig" "${dir}/allowed_signers"`;
+    const dir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "catgirl-signature-"));
+    NodeFS.writeFileSync(NodePath.join(dir, "SHA256SUMS"), MESSAGE);
+    NodeFS.writeFileSync(NodePath.join(dir, "SHA256SUMS.sig"), signReleaseForTest(MESSAGE));
+    expect(NodeChildProcess.spawnSync("sh", ["-c", script(dir)]).status).toBe(0);
   });
 
   it("says it cannot check when ssh-keygen is missing", () => {

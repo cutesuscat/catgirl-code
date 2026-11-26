@@ -8,6 +8,10 @@ import {
   type DesktopSshEnvironmentTarget,
 } from "@t3tools/contracts";
 import { CATGIRL_HOME_SHELL_FUNCTION } from "@t3tools/shared/catgirlHomeScript";
+import {
+  CATGIRL_RELEASE_SIGNATURE_FILE,
+  catgirlReleaseSignatureShellFunction,
+} from "@t3tools/shared/catgirlReleaseSignature";
 import { CATGIRL_COMMAND, CATGIRL_INSTALL_SCRIPT_URL } from "@t3tools/shared/catgirlRelease";
 import { cliReleaseDownloadBaseUrl } from "@t3tools/shared/cliRelease";
 import { extractJsonObject, fromLenientJson } from "@t3tools/shared/schemaJson";
@@ -66,6 +70,8 @@ export interface RemoteT3RunnerOptions {
   readonly nodeEngineRange?: string | null;
   readonly archiveVersion?: string | null;
   readonly releaseBaseUrl?: string | null;
+  /** The release key the runner trusts. Only tests set it; builds trust Catgirl Code's. */
+  readonly releaseSigningKey?: string | null;
 }
 
 export function isNodeScriptRunner(runner: RemoteT3RunnerOptions | undefined): boolean {
@@ -443,6 +449,15 @@ if ! t3_runtime_ready; then
     }
   }
   t3_fetch "$T3_RELEASE_BASE_URL/v$T3_ARCHIVE_VERSION/SHA256SUMS" "$T3_STAGING/SHA256SUMS" @@T3_ARCHIVE_CHECKSUMS_SECONDS@@
+  # Catgirl Code: the checksums count only when the release key signed them. A host without
+  # OpenSSH 8.1 cannot check (status 2) and goes on with the checksum alone.
+  t3_fetch "$T3_RELEASE_BASE_URL/v$T3_ARCHIVE_VERSION/${CATGIRL_RELEASE_SIGNATURE_FILE}" "$T3_STAGING/${CATGIRL_RELEASE_SIGNATURE_FILE}" @@T3_ARCHIVE_CHECKSUMS_SECONDS@@
+@@T3_SIGNATURE_FUNCTION@@
+  T3_SIGNATURE=0
+  catgirl_release_signature "$T3_STAGING/SHA256SUMS" "$T3_STAGING/${CATGIRL_RELEASE_SIGNATURE_FILE}" "$T3_STAGING/allowed_signers" || T3_SIGNATURE=$?
+  if [ "$T3_SIGNATURE" = 1 ]; then
+    printf '${CATGIRL_COMMAND} %s is not signed by the Catgirl Code release key, so it was not installed.\\n' "$T3_ARCHIVE_VERSION" >&2; exit 1
+  fi
   t3_fetch "$T3_RELEASE_BASE_URL/v$T3_ARCHIVE_VERSION/$T3_ARCHIVE" "$T3_STAGING/$T3_ARCHIVE" @@T3_ARCHIVE_DOWNLOAD_SECONDS@@
   T3_EXPECTED="$(grep " \\*\\{0,1\\}$T3_ARCHIVE$" "$T3_STAGING/SHA256SUMS" | cut -d' ' -f1)"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -460,7 +475,7 @@ if ! t3_runtime_ready; then
     fi
     exit 1
   fi
-  rm -f "$T3_STAGING/$T3_ARCHIVE" "$T3_STAGING/SHA256SUMS"
+  rm -f "$T3_STAGING/$T3_ARCHIVE" "$T3_STAGING/SHA256SUMS" "$T3_STAGING/${CATGIRL_RELEASE_SIGNATURE_FILE}" "$T3_STAGING/allowed_signers"
   # Prove the binary runs here (libc, arch) before marking it ready, or every
   # later launch would exec a broken install instead of retrying.
   if ! "$T3_STAGING/${CATGIRL_COMMAND}" --version >/dev/null 2>&1; then
@@ -1086,6 +1101,9 @@ export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string
       T3_ARCHIVE_DOWNLOAD_SECONDS: String(REMOTE_ARCHIVE_DOWNLOAD_SECONDS),
       T3_ARCHIVE_CHECKSUMS_SECONDS: String(REMOTE_ARCHIVE_CHECKSUMS_SECONDS),
       T3_HOME_FUNCTION: CATGIRL_HOME_SHELL_FUNCTION,
+      T3_SIGNATURE_FUNCTION: catgirlReleaseSignatureShellFunction(
+        input?.releaseSigningKey ?? undefined,
+      ),
       T3_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
     }),
   );

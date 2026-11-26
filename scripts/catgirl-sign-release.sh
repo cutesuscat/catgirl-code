@@ -27,7 +27,7 @@ repo=$(sed -n 's/^export const CATGIRL_RELEASE_REPOSITORY = "\(.*\)";$/\1/p' "$r
 signature_module="$root/packages/shared/src/catgirlReleaseSignature.ts"
 expected=$(grep -o 'ssh-ed25519 AAAA[A-Za-z0-9+/=]*' "$signature_module" | head -n 1)
 namespace=$(sed -n 's/^export const CATGIRL_RELEASE_SIGNATURE_NAMESPACE = "\(.*\)";$/\1/p' "$signature_module")
-signer=$(sed -n 's/^export const CATGIRL_RELEASE_SIGNER = "\(.*\)";$/\1/p' "$signature_module")
+signer=$(sed -n 's/^const CATGIRL_RELEASE_SIGNER = "\(.*\)";$/\1/p' "$signature_module")
 [[ -n "$repo" && -n "$expected" && -n "$namespace" && -n "$signer" ]] || die "could not read the release constants"
 [[ "$(ssh-keygen -y -f "$key" | cut -d' ' -f1,2)" == "$expected" ]] ||
   die "$key is not the release key the code embeds"

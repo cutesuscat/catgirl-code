@@ -9,6 +9,10 @@ import { assert, describe, it } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { CATGIRL_RELEASE_REPOSITORY } from "@t3tools/shared/catgirlRelease";
+import {
+  signReleaseForTest,
+  TEST_RELEASE_SIGNING_KEY,
+} from "@t3tools/shared/catgirlReleaseSignatureTesting";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as NetService from "@t3tools/shared/Net";
 import * as Clock from "effect/Clock";
@@ -422,6 +426,10 @@ describe("ssh tunnel scripts", () => {
       NodeChildProcess.execFileSync("sh", ["-c", `sha256sum ${archive} > SHA256SUMS`], {
         cwd: release,
       });
+      NodeFS.writeFileSync(
+        NodePath.join(release, "SHA256SUMS.sig"),
+        signReleaseForTest(NodeFS.readFileSync(NodePath.join(release, "SHA256SUMS"))),
+      );
       for (const tool of [
         "sh",
         "mkdir",
@@ -460,6 +468,104 @@ describe("ssh tunnel scripts", () => {
       assert.notEqual(result.status, 0);
       assert.match(result.stderr, /(missing|needs) gzip/);
       assert.notInclude(result.stderr, "Cannot exec");
+    } finally {
+      NodeFS.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  const sshKeygen = NodeChildProcess.spawnSync("sh", ["-c", "command -v ssh-keygen"], {
+    encoding: "utf8",
+  }).stdout.trim();
+  it.skipIf(sshKeygen === "").each([
+    {
+      case: "the release key's",
+      result: "installs",
+      sign: (sums: Buffer) => signReleaseForTest(sums),
+      refused: false,
+    },
+    {
+      case: "other checksums'",
+      result: "refuses",
+      sign: () => signReleaseForTest("other\n"),
+      refused: true,
+    },
+    {
+      case: "another purpose's",
+      result: "refuses",
+      sign: (sums: Buffer) => signReleaseForTest(sums, "file"),
+      refused: true,
+    },
+  ])("$result a release with $case signature", ({ sign, refused }) => {
+    const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-ssh-signature-"));
+    try {
+      const bin = NodePath.join(root, "bin");
+      const release = NodePath.join(root, "release");
+      const home = NodePath.join(root, "home");
+      const archive = `catcode-${ARCHIVE.archiveVersion}-linux-x64.tar.gz`;
+      NodeFS.mkdirSync(bin);
+      NodeFS.mkdirSync(home);
+      NodeFS.mkdirSync(NodePath.join(release, "t3"), { recursive: true });
+      NodeFS.writeFileSync(NodePath.join(release, "t3", "catcode"), "#!/bin/sh\necho ok\n", {
+        mode: 0o755,
+      });
+      NodeChildProcess.execFileSync("tar", ["-czf", archive, "t3"], { cwd: release });
+      NodeChildProcess.execFileSync("sh", ["-c", `sha256sum ${archive} > SHA256SUMS`], {
+        cwd: release,
+      });
+      const sums = NodeFS.readFileSync(NodePath.join(release, "SHA256SUMS"));
+      NodeFS.writeFileSync(NodePath.join(release, "SHA256SUMS.sig"), sign(sums));
+      for (const tool of [
+        "sh",
+        "mkdir",
+        "mktemp",
+        "cat",
+        "rm",
+        "grep",
+        "cut",
+        "sha256sum",
+        "tar",
+        "gzip",
+        "mv",
+        "printf",
+      ]) {
+        const found = NodeChildProcess.spawnSync("sh", ["-c", `command -v ${tool}`], {
+          encoding: "utf8",
+        }).stdout.trim();
+        if (found.startsWith("/")) NodeFS.symlinkSync(found, NodePath.join(bin, tool));
+      }
+      NodeFS.symlinkSync(sshKeygen, NodePath.join(bin, "ssh-keygen"));
+      NodeFS.writeFileSync(
+        NodePath.join(bin, "uname"),
+        '#!/bin/sh\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac\n',
+        { mode: 0o755 },
+      );
+      NodeFS.writeFileSync(
+        NodePath.join(bin, "curl"),
+        `#!/bin/sh\nfor last; do :; done\nfor a; do case "$a" in http*) src="${release}/\${a##*/}" ;; esac; done\nexec cat "$src" > "$last"\n`,
+        { mode: 0o755 },
+      );
+      const runner = NodePath.join(root, "run-t3.sh");
+      NodeFS.writeFileSync(
+        runner,
+        SshTunnel.buildRemoteT3RunnerScript({
+          ...ARCHIVE,
+          releaseSigningKey: TEST_RELEASE_SIGNING_KEY,
+        }),
+      );
+      const result = NodeChildProcess.spawnSync(NodePath.join(bin, "sh"), [runner, "--version"], {
+        encoding: "utf8",
+        env: { HOME: home, PATH: bin },
+      });
+      const installed = NodePath.join(home, ".catcode/runtime/versions", ARCHIVE.archiveVersion);
+      if (refused) {
+        assert.notEqual(result.status, 0);
+        assert.include(result.stderr, "is not signed by the Catgirl Code release key");
+        assert.isFalse(NodeFS.existsSync(installed));
+      } else {
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(result.stdout.trim(), "ok");
+        assert.deepEqual(NodeFS.readdirSync(installed).sort(), [".install-complete", "catcode"]);
+      }
     } finally {
       NodeFS.rmSync(root, { recursive: true, force: true });
     }

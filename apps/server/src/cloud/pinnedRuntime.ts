@@ -1,5 +1,6 @@
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
+import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Hex from "effect/encoding/Hex";
@@ -23,6 +24,10 @@ import {
 } from "@t3tools/shared/cliRelease";
 
 import { CATGIRL_COMMAND, LEGACY_COMMAND } from "@t3tools/shared/catgirlRelease";
+import {
+  CATGIRL_RELEASE_SIGNATURE_FILE,
+  verifyCatgirlReleaseSignature,
+} from "@t3tools/shared/catgirlReleaseSignature";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
 import * as ProcessRunner from "../processRunner.ts";
@@ -338,21 +343,40 @@ const installFromArchive = Effect.fn("cloud.pinned_runtime.install_archive")(fun
 });
 
 /** The release's archive for this machine and its checksum; fails when the release lists none. */
+/**
+ * Catgirl Code: whether a release's SHA256SUMS carries the release key's signature. A release
+ * whose checksums are not signed by it is refused. Tests swap in a check with their own key.
+ */
+export const ReleaseSignatureCheck = Context.Reference<
+  (checksums: Uint8Array, signature: string) => boolean
+>("catgirl/cloud/releaseSignatureCheck", {
+  defaultValue: () => (checksums, signature) => verifyCatgirlReleaseSignature(checksums, signature),
+});
+
 const publishedArchive = Effect.fn("cloud.pinned_runtime.published_archive")(function* (
   input: PinnedRuntimeInstallInput,
   platformKey: CliArchivePlatformKey,
 ) {
   const fileName = cliArchiveFileName(input.version, platformKey);
-  const checksums = parseChecksums(
-    new TextDecoder().decode(
-      yield* fetchReleaseAsset(
-        input.httpClient,
-        cliReleaseAssetUrl(input.version, CLI_RELEASE_CHECKSUMS_FILE, input.releaseBaseUrl),
-        "downloading the t3 release checksums",
-        false,
-      ),
-    ),
+  const checksumBytes = yield* fetchReleaseAsset(
+    input.httpClient,
+    cliReleaseAssetUrl(input.version, CLI_RELEASE_CHECKSUMS_FILE, input.releaseBaseUrl),
+    "downloading the t3 release checksums",
+    false,
   );
+  const signature = yield* fetchReleaseAsset(
+    input.httpClient,
+    cliReleaseAssetUrl(input.version, CATGIRL_RELEASE_SIGNATURE_FILE, input.releaseBaseUrl),
+    "downloading the release signature",
+    false,
+  );
+  const signedByReleaseKey = yield* ReleaseSignatureCheck;
+  if (!signedByReleaseKey(checksumBytes, new TextDecoder().decode(signature))) {
+    return yield* new PinnedRuntimeInstallError({
+      step: `checking the signature of the ${input.version} release checksums`,
+    });
+  }
+  const checksums = parseChecksums(new TextDecoder().decode(checksumBytes));
   const expected = checksums.get(fileName);
   if (expected === undefined) {
     return yield* new PinnedRuntimeInstallError({

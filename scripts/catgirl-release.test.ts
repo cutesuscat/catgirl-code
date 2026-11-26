@@ -1,6 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off - Reads the real installer and checks it with sh.
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
+import * as NodeHttp from "node:http";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
@@ -15,6 +16,10 @@ import {
   CATGIRL_RELEASES_PAGE_URL,
   CATGIRL_VERSION,
 } from "@t3tools/shared/catgirlRelease";
+import {
+  signReleaseForTest,
+  TEST_RELEASE_SIGNING_KEY,
+} from "@t3tools/shared/catgirlReleaseSignatureTesting";
 import {
   catgirlInstallScript,
   releaseRepositoryProblem,
@@ -54,6 +59,12 @@ describe("the fork's server installer", () => {
     // A word t3 left in the script would name, write or look for T3 Code's command.
     expect(script.match(/(?:(?<![\w$.])|(?<=\\n|%s))t3(?![\w.])/g)).toBeNull();
     expect(script).toContain('t3_home="${T3CODE_HOME:-$(catgirl_home)}"');
+  });
+
+  it("trusts the release key", () => {
+    expect(script).toContain("catgirl_release_signature");
+    expect(script).toContain("SHA256SUMS.sig");
+    expect(script).toContain(" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK9KUKEMEXbU");
   });
 
   it("refuses an installer it no longer recognises", () => {
@@ -225,6 +236,99 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")(
       } finally {
         NodeFS.rmSync(home, { recursive: true, force: true });
       }
+    });
+  },
+);
+
+const hasSshKeygen =
+  NodeChildProcess.spawnSync("sh", ["-c", "command -v ssh-keygen && command -v curl"]).status === 0;
+
+/** Serves a release of a `catcode` that prints its version, signed as `sign` says, to the fork's installer. */
+const installSigned = async (sign: (sums: Buffer) => string | undefined) => {
+  const root = NodeFS.realpathSync(NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "cg-sig-")));
+  const release = NodePath.join(root, "release", "v1.2.4");
+  const home = NodePath.join(root, "home");
+  const archive = "catcode-1.2.4-linux-x64.tar.gz";
+  NodeFS.mkdirSync(NodePath.join(root, "pack", "catcode-1.2.4-linux-x64"), { recursive: true });
+  NodeFS.mkdirSync(release, { recursive: true });
+  NodeFS.mkdirSync(home);
+  NodeFS.writeFileSync(
+    NodePath.join(root, "pack", "catcode-1.2.4-linux-x64", "catcode"),
+    "#!/bin/sh\necho 'catcode v1.2.4'\n",
+    { mode: 0o755 },
+  );
+  NodeChildProcess.execFileSync(
+    "tar",
+    ["-czf", NodePath.join(release, archive), "catcode-1.2.4-linux-x64"],
+    {
+      cwd: NodePath.join(root, "pack"),
+    },
+  );
+  NodeChildProcess.execFileSync("sh", ["-c", `sha256sum ${archive} > SHA256SUMS`], {
+    cwd: release,
+  });
+  const signature = sign(NodeFS.readFileSync(NodePath.join(release, "SHA256SUMS")));
+  if (signature !== undefined)
+    NodeFS.writeFileSync(NodePath.join(release, "SHA256SUMS.sig"), signature);
+  const server = NodeHttp.createServer((request, response) => {
+    const file = NodePath.join(root, "release", NodePath.normalize(request.url ?? "/"));
+    if (!file.startsWith(NodePath.join(root, "release")) || !NodeFS.existsSync(file)) {
+      response.writeHead(404).end();
+      return;
+    }
+    response.writeHead(200).end(NodeFS.readFileSync(file));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const port = typeof address === "object" && address !== null ? address.port : 0;
+  const installer = NodePath.join(root, "install.sh");
+  NodeFS.writeFileSync(installer, catgirlInstallScript(upstream, TEST_RELEASE_SIGNING_KEY));
+  try {
+    const result = await new Promise<{ code: number | null; output: string }>((resolve, reject) => {
+      const child = NodeChildProcess.spawn("sh", [installer], {
+        env: {
+          HOME: home,
+          PATH: "/usr/bin:/bin",
+          T3CODE_VERSION: "1.2.4",
+          T3CODE_INSTALL_BIN_DIR: NodePath.join(home, ".local/bin"),
+          T3CODE_RELEASE_BASE_URL: `http://127.0.0.1:${port}`,
+        },
+      });
+      let output = "";
+      child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
+      child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
+      child.on("error", reject);
+      child.on("close", (code) => resolve({ code, output }));
+    });
+    const versionDir = NodePath.join(home, ".catcode/runtime/versions/1.2.4");
+    return {
+      ...result,
+      installed: NodeFS.existsSync(versionDir) ? NodeFS.readdirSync(versionDir).sort() : null,
+    };
+  } finally {
+    server.close();
+    NodeFS.rmSync(root, { recursive: true, force: true });
+  }
+};
+
+describe.skipIf(HostProcess.Platform.defaultValue() !== "linux" || !hasSshKeygen)(
+  "the fork's installer and the release signature",
+  () => {
+    it("installs a release the key signed, and leaves no signature files behind", async () => {
+      const result = await installSigned((sums) => signReleaseForTest(sums));
+      expect(result.code, result.output).toBe(0);
+      expect(result.installed).toEqual([".install-complete", "catcode"]);
+    });
+
+    it.each([
+      { case: "signs other checksums", sign: () => signReleaseForTest("other\n") },
+      { case: "is for another purpose", sign: (sums: Buffer) => signReleaseForTest(sums, "file") },
+      { case: "is missing", sign: () => undefined },
+    ])("refuses a release whose signature $case", async ({ sign }) => {
+      const result = await installSigned(sign);
+      expect(result.code).not.toBe(0);
+      expect(result.output).toContain("is not signed");
+      expect(result.installed).toBeNull();
     });
   },
 );

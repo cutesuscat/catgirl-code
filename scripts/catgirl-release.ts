@@ -20,6 +20,12 @@ import {
   CATGIRL_UPSTREAM_VERSION,
   CATGIRL_VERSION,
 } from "@t3tools/shared/catgirlRelease";
+import {
+  CATGIRL_RELEASE_SIGNATURE_FILE,
+  CATGIRL_RELEASE_SIGNING_KEY,
+  CATGIRL_RELEASE_SIGNING_KEY_FINGERPRINT,
+  catgirlReleaseSignatureShellFunction,
+} from "@t3tools/shared/catgirlReleaseSignature";
 import { renameProduct } from "./lib/catgirl-branding.ts";
 
 const LOGO_LINES = `  printf '  %s\\n' '██████████ ████████ ' >&2
@@ -82,12 +88,54 @@ function withCommandAliases(script: string): string {
     .replace(BIN_DIR_DOC, () => doc);
 }
 
+// SHA256SUMS counts only when the release key signed it: a release changed after it was signed,
+// or one with no signature, is refused. A machine without OpenSSH 8.1 cannot check, and says so.
+const CHECKSUMS_FETCHED = `    fail "could not download the release checksums"\n  fi\n`;
+const STAGING_CLEANUP = `  rm -f "\${staging}/\${archive}" "\${staging}/SHA256SUMS"\n`;
+const signatureStep = (publicKey: string) => `${catgirlReleaseSignatureShellFunction(publicKey)
+  .split("\n")
+  .map((line) => (line === "" ? line : `  ${line}`))
+  .join(
+    "\n",
+  )}  fetch "\${base_url}/v\${version}/${CATGIRL_RELEASE_SIGNATURE_FILE}" "\${staging}/${CATGIRL_RELEASE_SIGNATURE_FILE}" ||
+    fail "release \${version} is not signed (it has no ${CATGIRL_RELEASE_SIGNATURE_FILE}), so it is not installed"
+  signature_status=0
+  catgirl_release_signature "\${staging}/SHA256SUMS" "\${staging}/${CATGIRL_RELEASE_SIGNATURE_FILE}" "\${staging}/allowed_signers" ||
+    signature_status=$?
+  case "$signature_status" in
+    0) ;;
+    2) printf '\\n  This machine cannot check the release signature (it needs OpenSSH 8.1 or newer); checking the checksum only.\\n' >&2 ;;
+    *) fail "release \${version} is not signed by the Catgirl Code release key (${CATGIRL_RELEASE_SIGNING_KEY_FINGERPRINT}), so it is not installed" ;;
+  esac
+`;
+
+function withSignatureCheck(script: string, publicKey: string): string {
+  for (const text of [CHECKSUMS_FETCHED, STAGING_CLEANUP]) {
+    if (script.split(text).length !== 2) {
+      throw new RangeError(`scripts/install.sh no longer contains exactly one: ${text}`);
+    }
+  }
+  return script
+    .replace(CHECKSUMS_FETCHED, () => CHECKSUMS_FETCHED + signatureStep(publicKey))
+    .replace(
+      STAGING_CLEANUP,
+      () =>
+        `  rm -f "\${staging}/\${archive}" "\${staging}/SHA256SUMS" "\${staging}/${CATGIRL_RELEASE_SIGNATURE_FILE}" "\${staging}/allowed_signers"\n`,
+    );
+}
+
 const INSTALL_SCRIPT_NOTE = `# Catgirl Code's installer: an unofficial fork of T3 Code, not affiliated with T3 Tools, Inc.
 # Generated from T3 Code's scripts/install.sh (MIT) by scripts/catgirl-release.ts.
 `;
 
-/** The fork's installer, made from T3 Code's. Throws when upstream reworded a line it replaces. */
-export function catgirlInstallScript(upstreamScript: string): string {
+/**
+ * The fork's installer, made from T3 Code's. Throws when upstream reworded a line it replaces.
+ * `publicKey` is the release key it trusts; tests pass their own.
+ */
+export function catgirlInstallScript(
+  upstreamScript: string,
+  publicKey: string = CATGIRL_RELEASE_SIGNING_KEY,
+): string {
   let script = upstreamScript;
   for (const [from, to] of INSTALL_SCRIPT_EDITS) {
     if (script.split(from).length !== 2) {
@@ -96,6 +144,7 @@ export function catgirlInstallScript(upstreamScript: string): string {
     script = script.replace(from, () => to);
   }
   script = withCommandAliases(script.replace(COMMAND_WORD, CATGIRL_COMMAND));
+  script = withSignatureCheck(script, publicKey);
   const [shebang = "", ...rest] = renameProduct(script).split("\n");
   return [shebang, INSTALL_SCRIPT_NOTE.trimEnd(), ...rest].join("\n");
 }
@@ -121,6 +170,8 @@ function main(args: ReadonlyArray<string>): number {
     "letter-version": CATGIRL_LETTER_VERSION,
     "upstream-version": CATGIRL_UPSTREAM_VERSION,
     repository: CATGIRL_RELEASE_REPOSITORY,
+    "signing-key": CATGIRL_RELEASE_SIGNING_KEY,
+    "signing-key-fingerprint": CATGIRL_RELEASE_SIGNING_KEY_FINGERPRINT,
   };
   const fact = command === undefined ? undefined : facts[command];
   if (fact !== undefined) {
@@ -141,7 +192,7 @@ function main(args: ReadonlyArray<string>): number {
     return 0;
   }
   process.stderr.write(
-    "Usage: catgirl-release.ts version | letter-version | upstream-version | repository | check-tag <tag> | check-repository <owner/name> | install-script <file>\n",
+    "Usage: catgirl-release.ts version | letter-version | upstream-version | repository | signing-key | signing-key-fingerprint | check-tag <tag> | check-repository <owner/name> | install-script <file>\n",
   );
   return 2;
 }

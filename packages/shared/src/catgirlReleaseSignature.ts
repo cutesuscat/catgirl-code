@@ -16,7 +16,7 @@ export const CATGIRL_RELEASE_SIGNING_KEY_FINGERPRINT =
 /** `ssh-keygen -Y`'s namespace: a signature made for anything else is not a release signature. */
 export const CATGIRL_RELEASE_SIGNATURE_NAMESPACE = "catgirl-code-release";
 /** The signer's name in an allowed-signers file. Only a label; the key is what is checked. */
-export const CATGIRL_RELEASE_SIGNER = "catgirl-code-releases";
+const CATGIRL_RELEASE_SIGNER = "catgirl-code-releases";
 /** The release file that holds the signature of `SHA256SUMS`. */
 export const CATGIRL_RELEASE_SIGNATURE_FILE = "SHA256SUMS.sig";
 
@@ -143,7 +143,7 @@ export const catgirlReleaseSignatureShellFunction = (
   command -v ssh-keygen >/dev/null 2>&1 || return 2
   # Before OpenSSH 8.1, -Y is an unknown option.
   if ssh-keygen -Y verify 2>&1 | grep -q 'option -- '; then return 2; fi
-  printf '%s' '${catgirlReleaseAllowedSigners(publicKey)}' > "$3" || return 1
+  printf '%s\\n' '${catgirlReleaseAllowedSigners(publicKey).trimEnd()}' > "$3" || return 1
   ssh-keygen -Y verify -f "$3" -I ${CATGIRL_RELEASE_SIGNER} -n ${CATGIRL_RELEASE_SIGNATURE_NAMESPACE} -s "$2" < "$1" >/dev/null 2>&1 || return 1
 }
 `;

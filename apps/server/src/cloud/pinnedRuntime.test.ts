@@ -6,6 +6,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 import * as NodePath from "node:path";
@@ -15,6 +16,11 @@ import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { verifyCatgirlReleaseSignature } from "@t3tools/shared/catgirlReleaseSignature";
+import {
+  signReleaseForTest,
+  TEST_RELEASE_SIGNING_KEY,
+} from "@t3tools/shared/catgirlReleaseSignatureTesting";
 
 import * as ProcessRunner from "../processRunner.ts";
 import {
@@ -29,6 +35,7 @@ import {
   posixLauncherScript,
   prunePinnedRuntimes,
   resolveLauncherPath,
+  ReleaseSignatureCheck,
 } from "./pinnedRuntime.ts";
 import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
 
@@ -47,7 +54,12 @@ const validChecksums = archiveHex(archiveBytes).pipe(
 const releaseHttpClient = (checksums: string, requests: string[] = []) =>
   HttpClient.make((request) => {
     requests.push(request.url);
-    const body = new URL(request.url).pathname.endsWith("/SHA256SUMS") ? checksums : archiveBytes;
+    const pathname = new URL(request.url).pathname;
+    const body = pathname.endsWith("/SHA256SUMS")
+      ? checksums
+      : pathname.endsWith("/SHA256SUMS.sig")
+        ? signReleaseForTest(checksums)
+        : archiveBytes;
     return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(body)));
   });
 const extractingRunner = (fs: FileSystem.FileSystem, path: Path.Path, commands: string[] = []) =>
@@ -76,7 +88,12 @@ const extractingRunner = (fs: FileSystem.FileSystem, path: Path.Path, commands: 
       }),
   });
 
-it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
+// Releases in these tests are signed with the test key, and checked against it.
+const testKeyCheck = Layer.succeed(ReleaseSignatureCheck, (checksums, signature) =>
+  verifyCatgirlReleaseSignature(checksums, signature, TEST_RELEASE_SIGNING_KEY),
+);
+
+it.layer(Layer.merge(NodeServices.layer, testKeyCheck))("ensurePinnedRuntimeInstalled", (it) => {
   it.effect("installs the verified release archive as the runtime executable", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -104,6 +121,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
       assert.deepEqual(pinnedRuntimeCommand(paths), { command: paths.entryPath, args: [] });
       assert.deepEqual(requests, [
         `https://releases.example/download/v${version}/SHA256SUMS`,
+        `https://releases.example/download/v${version}/SHA256SUMS.sig`,
         `https://releases.example/download/v${version}/${archiveName}`,
       ]);
       assert.deepEqual(commands, ["tar"]);
@@ -126,16 +144,18 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
             request,
             request.url.endsWith("/SHA256SUMS")
               ? new Response(checksums)
-              : new Response(
-                  new ReadableStream({
-                    start(controller) {
-                      controller.enqueue(archiveBytes.slice(0, 4));
-                    },
-                    cancel() {
-                      cancelled = true;
-                    },
-                  }),
-                ),
+              : request.url.endsWith("/SHA256SUMS.sig")
+                ? new Response(signReleaseForTest(checksums))
+                : new Response(
+                    new ReadableStream({
+                      start(controller) {
+                        controller.enqueue(archiveBytes.slice(0, 4));
+                      },
+                      cancel() {
+                        cancelled = true;
+                      },
+                    }),
+                  ),
           ),
         ),
       );
@@ -187,7 +207,9 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
                 request,
                 request.url.endsWith("/SHA256SUMS")
                   ? new Response(checksums)
-                  : new Response("", { status }),
+                  : request.url.endsWith("/SHA256SUMS.sig")
+                    ? new Response(signReleaseForTest(checksums))
+                    : new Response("", { status }),
               ),
             ),
           ),
@@ -225,10 +247,17 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
               HttpClientResponse.fromWeb(request, new Response("", { status: 504 })),
             );
           }
+          const isSignature = request.url.endsWith("/SHA256SUMS.sig");
           return Effect.succeed(
             HttpClientResponse.fromWeb(
               request,
-              new Response(isChecksums ? checksums : archiveBytes),
+              new Response(
+                isChecksums
+                  ? checksums
+                  : isSignature
+                    ? signReleaseForTest(checksums)
+                    : archiveBytes,
+              ),
             ),
           );
         }),
@@ -283,6 +312,11 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
         platform: "linux",
         arch: "x64",
         httpClient: HttpClient.make((request) => {
+          if (request.url.endsWith("/SHA256SUMS.sig")) {
+            return Effect.succeed(
+              HttpClientResponse.fromWeb(request, new Response(signReleaseForTest(checksums))),
+            );
+          }
           if (request.url.endsWith("/SHA256SUMS")) {
             checksumRanges.push(request.headers["range"]);
             const response = HttpClientResponse.fromWeb(request, new Response(checksums));
@@ -442,6 +476,52 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
     }),
   );
 
+  it.effect.each([
+    { case: "signs other checksums", signature: () => signReleaseForTest("other\n") },
+    {
+      case: "signs them for another purpose",
+      signature: (sums: string) => signReleaseForTest(sums, "file"),
+    },
+    { case: "is missing", signature: () => undefined },
+  ])("refuses a release whose signature $case, and calls it no missing release", ({ signature }) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-pinned-unsigned-" });
+      const checksums = yield* validChecksums;
+      const requests: string[] = [];
+      const error = yield* ensurePinnedRuntimeInstalled({
+        baseDir,
+        version,
+        fs,
+        path,
+        platform: "linux",
+        arch: "x64",
+        httpClient: HttpClient.make((request) => {
+          requests.push(request.url);
+          const body = request.url.endsWith("/SHA256SUMS")
+            ? checksums
+            : request.url.endsWith("/SHA256SUMS.sig")
+              ? signature(checksums)
+              : archiveBytes;
+          return Effect.succeed(
+            HttpClientResponse.fromWeb(
+              request,
+              body === undefined ? new Response("", { status: 404 }) : new Response(body),
+            ),
+          );
+        }),
+        releaseBaseUrl: "https://updates.example.com/t3code",
+        runner: extractingRunner(fs, path),
+        validate: () => Effect.die("must not validate an unsigned release"),
+      }).pipe(Effect.flip);
+      assert.instanceOf(error, PinnedRuntimeInstallError);
+      assert.isFalse(isUnpublishedRelease(error));
+      assert.isFalse(requests.some((url) => url.endsWith(archiveName)));
+      assert.deepEqual(yield* fs.readDirectory(path.join(baseDir, "runtime", "versions")), []);
+    }),
+  );
+
   it.effect("validates a staging tree before atomically publishing it", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -562,6 +642,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
       // Listed, so the cached runtime is used without downloading it again.
       assert.deepEqual(requests, [
         `https://updates.example.com/t3code/v${version}/SHA256SUMS?token=abc`,
+        `https://updates.example.com/t3code/v${version}/SHA256SUMS.sig?token=abc`,
       ]);
     }),
   );
@@ -610,6 +691,29 @@ it("isVersionExecutable accepts only <version>/t3, never another drive or progra
   assert.isFalse(isVersionExecutable(win32, "C:\\t3\\versions", "D:\\t3.exe"));
   assert.isFalse(
     isVersionExecutable(win32, "C:\\t3\\versions", "C:\\t3\\versions\\1.0.0\\node.exe"),
+  );
+});
+
+it.layer(NodeServices.layer)("the release key", (it) => {
+  it.effect("refuses a release signed by any other key", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-pinned-other-key-" });
+      const error = yield* ensurePinnedRuntimeInstalled({
+        baseDir,
+        version,
+        fs,
+        path,
+        platform: "linux",
+        arch: "x64",
+        httpClient: releaseHttpClient(yield* validChecksums),
+        runner: extractingRunner(fs, path),
+        validate: () => Effect.die("must not validate an unsigned release"),
+      }).pipe(Effect.flip);
+      assert.instanceOf(error, PinnedRuntimeInstallError);
+      assert.equal(error.step, `checking the signature of the ${version} release checksums`);
+    }),
   );
 });
 

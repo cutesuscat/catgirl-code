@@ -547,6 +547,10 @@
       "types": "./src/catgirlReleaseSignature.ts",
       "import": "./src/catgirlReleaseSignature.ts"
     },
+    "./catgirlReleaseSignatureTesting": {
+      "types": "./src/catgirlReleaseSignatureTesting.ts",
+      "import": "./src/catgirlReleaseSignatureTesting.ts"
+    },
     "./diffCutLines": {
       "types": "./src/diffCutLines.ts",
       "import": "./src/diffCutLines.ts"
