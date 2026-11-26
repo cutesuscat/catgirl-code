@@ -111,6 +111,10 @@
       "types": "./src/feedbackRequest.ts",
       "default": "./src/feedbackRequest.ts"
     },
+    "./catgirl-feedback": {
+      "types": "./src/catgirlFeedback.ts",
+      "default": "./src/catgirlFeedback.ts"
+    },
     "./link-batch": {
       "types": "./src/linkBatch.ts",
       "default": "./src/linkBatch.ts"

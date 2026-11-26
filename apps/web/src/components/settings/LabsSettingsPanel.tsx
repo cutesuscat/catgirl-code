@@ -16,6 +16,7 @@ import { NumberField, NumberFieldGroup, NumberFieldInput } from "../ui/number-fi
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { commitNumberFieldOnEnter } from "./commitNumberFieldOnEnter";
+import { AgentFeedbackRecipientRows } from "./AgentFeedbackRecipientSettings";
 import { ScopedSwitch } from "./ScopedSwitch";
 import {
   SettingResetButton,
@@ -47,7 +48,7 @@ export function LabsSettingsPanel() {
         <PromptSuggestionsRow />
         <SimlockHostsRow />
         <FastWorktreeCheckoutRow />
-        <AgentFeedbackRow />
+        <AgentFeedbackRecipientRows upstream={<AgentFeedbackRow />} />
       </SettingsSection>
     </SettingsPageContainer>
   );
