@@ -84,7 +84,7 @@ jobs:
 
           requirement="$(codesign --display --requirements - "$APP" 2>&1 | sed -n 's/^designated => //p')"
           echo "installed app's designated requirement: $requirement"
-          codesign --verify --deep --strict -R "$requirement" "$next_app"
+          codesign --verify --deep --strict -R "=$requirement" "$next_app"
 
           mkdir -p feed
           name="Catgirl-Code-$NEXT-arm64.zip"

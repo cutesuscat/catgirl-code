@@ -318,11 +318,11 @@ jobs:
             echo "::error::the app's designated requirement is not: $expected"
             exit 1
           fi
-          codesign --verify --deep --strict -R "$expected" "$app"
+          codesign --verify --deep --strict -R "=$expected" "$app"
           # The disk image people download holds the same signed app.
           mount="$RUNNER_TEMP/dmg"
           hdiutil attach -nobrowse -readonly -mountpoint "$mount" "release/T3-Code-$VERSION-arm64.dmg" > /dev/null
-          codesign --verify --deep --strict -R "$expected" "$mount/$(basename "$app")"
+          codesign --verify --deep --strict -R "=$expected" "$mount/$(basename "$app")"
           hdiutil detach "$mount" > /dev/null
           feed="$app/Contents/Resources/app-update.yml"
           cat "$feed"
