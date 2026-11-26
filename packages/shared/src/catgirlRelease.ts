@@ -62,6 +62,47 @@ export function upstreamVersionOf(version: string): string {
   return parseCatgirlVersion(version)?.upstreamVersion ?? version;
 }
 
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+const LETTER_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)([a-z]{1,3})$/;
+// Counted as spreadsheet columns are: 1 is a, 26 is z, 27 is aa.
+const buildLetters = (build: number): string =>
+  build === 0 ? "" : buildLetters(Math.floor((build - 1) / 26)) + LETTERS[(build - 1) % 26];
+
+/**
+ * A Catgirl Code version in both forms, given either: the plain number every comparison uses
+ * (`1.12.1`) and the letter version people see (`0.1.12a`: the T3 Code release, then the build
+ * as letters, so build 2 is `0.1.12b`). `undefined` for anything else, such as T3 Code's own.
+ */
+export function catgirlVersionForms(
+  version: string,
+): { readonly version: string; readonly letterVersion: string } | undefined {
+  const text = version.trim().replace(/^v/, "");
+  const lettered = LETTER_VERSION.exec(text);
+  if (lettered === null) {
+    const parts = parseCatgirlVersion(text);
+    if (parts === undefined) return undefined;
+    return { version: text, letterVersion: `${parts.upstreamVersion}${buildLetters(parts.build)}` };
+  }
+  const [, major = "", minor = "", patch = "", letters = ""] = lettered;
+  const build = [...letters].reduce((total, letter) => total * 26 + LETTERS.indexOf(letter) + 1, 0);
+  const plain = `${Number(major) * UPSTREAM_MINOR_LIMIT + Number(minor)}.${patch}.${build}`;
+  const upstreamVersion = `${major}.${minor}.${patch}`;
+  return parseCatgirlVersion(plain)?.upstreamVersion === upstreamVersion
+    ? { version: plain, letterVersion: `${upstreamVersion}${letters}` }
+    : undefined;
+}
+
+/** What a person is shown for `version`: a Catgirl Code build's letter version, anything else as it is. */
+export function displayVersion(version: string): string;
+export function displayVersion(version: string | null | undefined): string | null | undefined;
+export function displayVersion(version: string | null | undefined): string | null | undefined {
+  if (version === null || version === undefined) return version;
+  return catgirlVersionForms(version)?.letterVersion ?? version;
+}
+
+/** This source's version as people see it, such as 0.1.12a: release titles, file names, About. */
+export const CATGIRL_LETTER_VERSION = displayVersion(CATGIRL_VERSION);
+
 // Written in two parts: the builds rename T3 Code's name wherever it appears whole, and this
 // sentence has to keep saying whose fork this is.
 const UPSTREAM_NAME = ["T3", "Code"].join(" ");

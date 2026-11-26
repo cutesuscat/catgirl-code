@@ -3,6 +3,7 @@ import { EnvironmentId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 import { ChevronRightIcon } from "lucide-react";
 import { msg, T, useGT, useMessages } from "gt-react";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { Fragment, type RefObject, useRef } from "react";
 
 import { environmentThreadShells } from "~/state/threads";
@@ -142,7 +143,7 @@ function UpdateEverythingDialogContent({
         <AlertDialogDescription>
           {version !== null ? (
             <>
-              T3 Code <span className="font-mono text-xs">{version}</span>
+              T3 Code <span className="font-mono text-xs">{displayVersion(version)}</span>
             </>
           ) : null}
           {version !== null && providerCount > 0 ? " · " : null}

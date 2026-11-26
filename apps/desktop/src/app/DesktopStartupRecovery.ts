@@ -1,4 +1,5 @@
 import type { DesktopUpdateState } from "@t3tools/contracts";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -166,7 +167,7 @@ pre{flex:1;min-height:60px;margin:0;overflow:auto;background:var(--code);border:
 <p>${escapeHtml(offer.text)}</p>
 <div class="actions">${offer.action}${actionLink("copy", m(msg("Copy details")))}${actionLink("quit", m(msg("Quit", { $context: "button, quits the app" })))}</div>
 <pre>${escapeHtml(output.length > 0 ? output : m(msg("The server wrote no output.")))}</pre>
-<p class="muted">${escapeHtml(m(msg("Version {version}. T3 Code tries again in the background. Logs: {logDir}"), { version: input.appVersion, logDir: input.logDir }))}</p>
+<p class="muted">${escapeHtml(m(msg("Version {version}. T3 Code tries again in the background. Logs: {logDir}"), { version: displayVersion(input.appVersion), logDir: input.logDir }))}</p>
 </body></html>`;
 }
 
@@ -267,7 +268,7 @@ export const listen: Effect.Effect<
         const failure = yield* Ref.get(failureRef);
         if (Option.isNone(failure)) return;
         yield* electronShell.copyText(
-          `T3 Code ${environment.appVersion} (${environment.platform} ${environment.processArch}) could not start.\n${failure.value.reason}\n\n${failure.value.output}`,
+          `T3 Code ${displayVersion(environment.appVersion)} (${environment.platform} ${environment.processArch}) could not start.\n${failure.value.reason}\n\n${failure.value.output}`,
         );
         return;
       }

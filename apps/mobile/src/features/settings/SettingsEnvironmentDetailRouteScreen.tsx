@@ -13,6 +13,7 @@ import {
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { managedUpdatesDenial } from "@t3tools/client-runtime/contract-labels";
 import { sessionPermissionsUnavailableMessage } from "@t3tools/shared/authScopeOptions";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import * as Cause from "effect/Cause";
 import * as Exit from "effect/Exit";
 import { AsyncResult } from "effect/reactivity";
@@ -164,7 +165,11 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                 input: { targetVersion },
               });
               if (AsyncResult.isFailure(result)) throw squashAtomCommandFailure(result);
-              setNotice(gt("Updated to {version}.", { version: result.value.targetVersion }));
+              setNotice(
+                gt("Updated to {version}.", {
+                  version: displayVersion(result.value.targetVersion),
+                }),
+              );
             }),
         },
       ],
@@ -334,7 +339,9 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                   supportsEnvironmentUpdate(config.environment.capabilities) ? (
                     <SettingsActionRow
                       icon="arrow.up.circle"
-                      label={gt("Update to {version}", { version: checkedRelease.targetVersion })}
+                      label={gt("Update to {version}", {
+                        version: displayVersion(checkedRelease.targetVersion),
+                      })}
                       disabled={disabled}
                       loading={pending === "server" || running}
                       onPress={requestServerUpdate}

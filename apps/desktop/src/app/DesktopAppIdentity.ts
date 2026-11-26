@@ -1,3 +1,4 @@
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -97,7 +98,7 @@ export const make = Effect.gen(function* () {
     );
     yield* electronApp.setAboutPanelOptions({
       applicationName: environment.displayName,
-      applicationVersion: environment.appVersion,
+      applicationVersion: displayVersion(environment.appVersion),
       version: Option.getOrElse(commitHash, () => "unknown"),
     });
 

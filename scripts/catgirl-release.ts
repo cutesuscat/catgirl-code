@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // @effect-diagnostics nodeBuiltinImport:off - A release helper the workflow runs before any build.
 
-// Catgirl Code's release helper: prints the version this source builds and the T3 Code release
-// it is based on, refuses a tag or a repository that does not match the source, and writes the
+// Catgirl Code's release helper: prints the version this source builds (plain, and as people see
+// it), the T3 Code release it is based on, refuses a tag or a repository that does not match the source, and writes the
 // fork's server installer.
 import * as NodeFS from "node:fs";
 import * as NodeURL from "node:url";
 
 import {
   CATGIRL_INSTALL_SCRIPT_URL,
+  CATGIRL_LETTER_VERSION,
   CATGIRL_RELEASE_REPOSITORY,
   CATGIRL_RELEASES_PAGE_URL,
   CATGIRL_UPSTREAM_VERSION,
@@ -72,6 +73,7 @@ function main(args: ReadonlyArray<string>): number {
   const [command, argument] = args;
   const facts: Readonly<Record<string, string>> = {
     version: CATGIRL_VERSION,
+    "letter-version": CATGIRL_LETTER_VERSION,
     "upstream-version": CATGIRL_UPSTREAM_VERSION,
     repository: CATGIRL_RELEASE_REPOSITORY,
   };
@@ -94,7 +96,7 @@ function main(args: ReadonlyArray<string>): number {
     return 0;
   }
   process.stderr.write(
-    "Usage: catgirl-release.ts version | upstream-version | repository | check-tag <tag> | check-repository <owner/name> | install-script <file>\n",
+    "Usage: catgirl-release.ts version | letter-version | upstream-version | repository | check-tag <tag> | check-repository <owner/name> | install-script <file>\n",
   );
   return 2;
 }

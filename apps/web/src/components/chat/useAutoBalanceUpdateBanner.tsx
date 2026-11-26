@@ -1,4 +1,5 @@
 import { T, useGT, useMessages } from "gt-react";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { useAtomValue } from "@effect/atom-react";
 import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import { useState } from "react";
@@ -127,7 +128,9 @@ export function useAutoBalanceUpdateBanner(
                 ) : (
                   <div className="text-muted-foreground">
                     {machine.connected
-                      ? gt("Ready to update to {version}", { version: machine.targetVersion })
+                      ? gt("Ready to update to {version}", {
+                          version: displayVersion(machine.targetVersion),
+                        })
                       : gt("Reconnect this machine to update")}
                   </div>
                 )}

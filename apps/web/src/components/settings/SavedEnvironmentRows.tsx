@@ -24,6 +24,7 @@ import {
 } from "@t3tools/client-runtime/connection";
 import * as Option from "effect/Option";
 import { msg, T, useGT, useMessages } from "gt-react";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { m, type MessageResolver } from "../../i18n/messages";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
@@ -236,7 +237,7 @@ export function SavedBackendListRow({
     environmentTransportLabel(environment, connectedTarget, messages),
     // The headline below names the failure in full.
     diagnosis ? null : resumingServerUpdate ? gt("Restarting") : status.text,
-    enabled && versionMismatch ? serverVersion : null,
+    enabled && versionMismatch ? displayVersion(serverVersion) : null,
   ]
     .filter((value): value is string => value !== null)
     .join(" · ");
@@ -257,8 +258,8 @@ export function SavedBackendListRow({
   }${
     versionMismatch
       ? `\n${gt("Update available: {serverVersion} → {clientVersion}", {
-          serverVersion: versionMismatch.serverVersion,
-          clientVersion: versionMismatch.clientVersion,
+          serverVersion: displayVersion(versionMismatch.serverVersion),
+          clientVersion: displayVersion(versionMismatch.clientVersion),
         })}`
       : ""
   }`;

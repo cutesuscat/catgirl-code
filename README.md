@@ -26,7 +26,9 @@ The command is still `t3` and the data folder is still `~/.t3`, so a machine can
 
 ## Versions
 
-A release is numbered after the T3 Code release it is based on, with the fork's own build number last: build 3 on T3 Code 0.1.12 is **1.12.3**, and its tag is `v1.12.3`. Settings › About shows the version and the T3 Code release under it.
+A release is named after the T3 Code release it is based on, with a letter for the fork's own build: the first build on T3 Code 0.1.12 is **0.1.12a**, the second **0.1.12b**, and after **0.1.12z** comes **0.1.12aa**. That is what the apps, Settings › About and the release titles show.
+
+Machines need a number that sorts above T3 Code's own 0.1.12, so underneath each release has a plain version too: 0.1.12a is **1.12.1** and 0.1.12b is **1.12.2** (the T3 Code release's minor and patch, then the build). The release tag is that plain version, `v1.12.1`, and so are the server archive's name, `t3 --version` and the version `t3 update` takes. Each release's notes give both.
 
 ## Install
 
@@ -34,7 +36,7 @@ Everything is on the [releases page](../../releases). Nothing here is signed or 
 
 ### Mac
 
-Download `Catgirl-Code-<version>-arm64.dmg` (Apple Silicon), open it and drag the app to Applications. macOS blocks an unsigned app the first time, so run this once:
+Download `Catgirl-Code-<version>-arm64.dmg` (Apple Silicon, for example `Catgirl-Code-0.1.12a-arm64.dmg`), open it and drag the app to Applications. macOS blocks an unsigned app the first time, so run this once:
 
 ```bash
 xattr -cr "/Applications/Catgirl Code.app"
@@ -66,7 +68,7 @@ A machine that runs T3 Code's own `t3` keeps looking at T3 Code's releases. One 
 T3CODE_RELEASE_BASE_URL=https://github.com/nickypro/catgirl-code/releases/download t3 update <version>
 ```
 
-`<version>` is a Catgirl Code version such as `1.12.1`. Stop the server and start it again afterwards; that ends the threads running on it, so pick a quiet moment.
+`<version>` is a release's plain version, such as `1.12.1` for 0.1.12a: T3 Code's own `t3` knows only plain numbers. Stop the server and start it again afterwards; that ends the threads running on it, so pick a quiet moment.
 
 ### Sign in to an agent
 

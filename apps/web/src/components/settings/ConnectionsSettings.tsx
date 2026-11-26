@@ -7,6 +7,7 @@ import { ChevronRightIcon, EllipsisIcon } from "lucide-react";
 import { useAtom, useAtomValue } from "@effect/atom-react";
 import { type ReactNode, useState } from "react";
 import { T, useGT, useMessages, Var } from "gt-react";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
@@ -1352,7 +1353,7 @@ function ConnectionsSettingsContent({
                     <ServerUpdateProgress state={primaryServerUpdateState} />
                   ) : (
                     [
-                      primaryServerConfig?.environment.serverVersion ?? null,
+                      displayVersion(primaryServerConfig?.environment.serverVersion) ?? null,
                       primaryEnvironment?.displayUrl ?? null,
                     ]
                       .filter((value): value is string => value !== null)
@@ -1381,7 +1382,7 @@ function ConnectionsSettingsContent({
                         primaryServerUpdateState.status === "failed"
                           ? gt("Retry update")
                           : gt("Update to {version}", {
-                              version: primaryVersionMismatch.clientVersion,
+                              version: displayVersion(primaryVersionMismatch.clientVersion),
                             })
                       }
                     />

@@ -7,6 +7,8 @@ name: Catgirl Code release
 # Release: set CATGIRL_BUILD (and CATGIRL_UPSTREAM_VERSION after moving to a
 # newer T3 Code) in packages/shared/src/catgirlRelease.ts, commit, then push
 # the tag `node scripts/catgirl-release.ts version` prints, with a "v" in front.
+# The tag is the plain version (v1.12.1) the apps download by; the title and
+# the Mac file carry the letter version people see (0.1.12a).
 # Rehearse: run this workflow by hand; it builds the same files into a draft.
 #
 # The Android app is not built here. It is signed on the maintainer's machine
@@ -236,7 +238,7 @@ jobs:
           set -euo pipefail
           ls -la release
           # The packager still names the file after T3 Code. A fork's download is not called that.
-          mv release/*"$VERSION"*.dmg "release/Catgirl-Code-$VERSION-arm64.dmg"
+          mv release/*"$VERSION"*.dmg "release/Catgirl-Code-$(node scripts/catgirl-release.ts letter-version)-arm64.dmg"
           count() { { grep -rl --exclude='*.map' "$@" || true; } | wc -l | tr -d ' '; }
           [[ "$(count "T3 Connect" apps/server/dist)" == "0" ]]
           [[ "$(count "Catgirl Code" apps/server/dist/client/assets)" != "0" ]]
@@ -318,9 +320,12 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node scripts/catgirl-release.ts version)"
+          letters="$(node scripts/catgirl-release.ts letter-version)"
           upstream="$(node scripts/catgirl-release.ts upstream-version)"
           cat > release-notes.md <<EOF
-          Catgirl Code $version, an unofficial fork of [T3 Code](https://github.com/pingdotgg/t3code) based on T3 Code $upstream. It is not affiliated with, endorsed by or supported by T3 Tools, Inc.
+          Catgirl Code $letters, an unofficial fork of [T3 Code](https://github.com/pingdotgg/t3code) based on T3 Code $upstream. It is not affiliated with, endorsed by or supported by T3 Tools, Inc.
+
+          Machines know this release as version $version (tag \`v$version\`): that is the number \`t3 --version\` prints and \`t3 update\` takes. The apps show $letters.
 
           - **Server** (\`t3-$version-<platform>.tar.gz\`): the apps download and start it on a machine they reach over SSH. To install it by hand: \`curl -fsSL $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/v$version/install.sh | T3CODE_VERSION=$version sh\`
           - **Mac** (\`.dmg\`, Apple Silicon): unsigned. After copying it to Applications, run \`xattr -cr "/Applications/Catgirl Code.app"\` once.
@@ -340,6 +345,7 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node scripts/catgirl-release.ts version)"
+          letters="$(node scripts/catgirl-release.ts letter-version)"
           tag="v$version"
           # The apps fetch from the repository named in the source. Releasing anywhere else reaches nobody.
           if ! node scripts/catgirl-release.ts check-repository "$GITHUB_REPOSITORY"; then
@@ -351,7 +357,7 @@ jobs:
             gh release delete "$tag" --yes
           fi
           gh release create "$tag" --draft --target "$GITHUB_SHA" \
-            --title "Catgirl Code $version" --notes-file release-notes.md \
+            --title "Catgirl Code $letters" --notes-file release-notes.md \
             release-assets/*.tar.gz release-assets/SHA256SUMS release-assets/install.sh release-assets/*.dmg
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             gh release edit "$tag" --draft=false --latest

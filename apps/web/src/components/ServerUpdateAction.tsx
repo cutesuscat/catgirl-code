@@ -39,6 +39,7 @@ import { useManagedPolicy } from "~/state/managedPolicy";
 import { environmentPresentations } from "~/state/presentation";
 import { ManagedControl } from "./ManagedPolicy";
 import { manualServerUpdateCommand } from "~/versionSkew";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { crossesReleaseTrack } from "@t3tools/shared/cliRelease";
 import { Button } from "./ui/button";
 import { toastManager } from "./ui/toast";
@@ -176,10 +177,14 @@ export function useServerUpdate() {
           selfUpdate === "desktop-managed"
             ? m(
                 msg("Desktop app relaunched on {version}.", {
-                  version: result.value.targetVersion,
+                  version: displayVersion(result.value.targetVersion),
                 }),
               )
-            : m(msg("Reconnected on t3@{version}.", { version: result.value.targetVersion })),
+            : m(
+                msg("Reconnected on t3@{version}.", {
+                  version: displayVersion(result.value.targetVersion),
+                }),
+              ),
       });
     }
     return { status: "updated" };
@@ -483,7 +488,11 @@ export function OutdatedServerUpdateAction({
     toastManager.add({
       type: "success",
       title: m(msg("{serverLabel} updated", { serverLabel })),
-      description: m(msg("Reconnected on t3@{version}.", { version: result.value.targetVersion })),
+      description: m(
+        msg("Reconnected on t3@{version}.", {
+          version: displayVersion(result.value.targetVersion),
+        }),
+      ),
     });
   };
   if (fromVersion !== undefined && crossesReleaseTrack(fromVersion, targetVersion)) {

@@ -1,10 +1,14 @@
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { msg, T, useGT } from "gt-react";
 
-import { APP_VERSION } from "../../branding";
+import { APP_VERSION as BUILD_VERSION } from "../../branding";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { InlineButton } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+
+// Catgirl Code: people see a build's letter version, such as 0.1.12a.
+const APP_VERSION = displayVersion(BUILD_VERSION);
 
 export function AboutVersionTitle() {
   const gt = useGT();

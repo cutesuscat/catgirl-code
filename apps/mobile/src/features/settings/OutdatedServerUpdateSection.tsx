@@ -1,4 +1,5 @@
 import { useGT, useMessages } from "gt-react-native";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { useAtom, useAtomValue } from "@effect/atom-react";
 import { serverUpdateFailureText } from "@t3tools/client-runtime/state/server";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -96,7 +97,9 @@ export function OutdatedServerUpdateSection({
                 : gt("Downloading update…")
             : release
               ? release.targetVersion
-                ? gt("Version {version} is available.", { version: release.targetVersion })
+                ? gt("Version {version} is available.", {
+                    version: displayVersion(release.targetVersion),
+                  })
                 : gt("No newer version is available yet.")
               : gt("This app needs a newer version of {product} on this machine.", {
                   product: "T3 Code",
@@ -121,7 +124,7 @@ export function OutdatedServerUpdateSection({
           label={
             state.status === "failed"
               ? gt("Retry update")
-              : gt("Update to {version}", { version: release.targetVersion })
+              : gt("Update to {version}", { version: displayVersion(release.targetVersion) })
           }
           disabled={busy}
           loading={state.status === "running"}

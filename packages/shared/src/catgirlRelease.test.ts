@@ -3,11 +3,14 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   CATGIRL_BUILD,
   CATGIRL_INSTALL_COMMAND,
+  CATGIRL_LETTER_VERSION,
   CATGIRL_RELEASE_REPOSITORY,
   CATGIRL_RELEASES_PAGE_URL,
   CATGIRL_UPSTREAM_VERSION,
   CATGIRL_VERSION,
   catgirlVersion,
+  catgirlVersionForms,
+  displayVersion,
   parseCatgirlVersion,
   upstreamVersionOf,
 } from "./catgirlRelease.ts";
@@ -143,5 +146,51 @@ describe("how Catgirl Code builds are numbered", () => {
     expect(satisfiesSemverRange(basedOn, ">=0.1.13")).toBe(false);
     // The raw number would claim every future T3 Code release.
     expect(satisfiesSemverRange(catgirlVersion("0.1.12", 3), ">=0.1.13")).toBe(true);
+  });
+});
+
+describe("the letter version people see", () => {
+  const forms = (version: string, letterVersion: string) => ({ version, letterVersion });
+
+  it("is the T3 Code release with the build as letters", () => {
+    expect(displayVersion(catgirlVersion("0.1.12", 1))).toBe("0.1.12a");
+    expect(displayVersion(catgirlVersion("0.1.12", 2))).toBe("0.1.12b");
+    expect(displayVersion(catgirlVersion("0.1.12", 26))).toBe("0.1.12z");
+    expect(displayVersion(catgirlVersion("0.1.12", 27))).toBe("0.1.12aa");
+    expect(displayVersion(catgirlVersion("0.1.13", 1))).toBe("0.1.13a");
+    expect(displayVersion(catgirlVersion("1.0.0", 3))).toBe("1.0.0c");
+    expect(CATGIRL_LETTER_VERSION).toBe(displayVersion(CATGIRL_VERSION));
+    expect(CATGIRL_LETTER_VERSION.startsWith(CATGIRL_UPSTREAM_VERSION)).toBe(true);
+  });
+
+  it("maps both ways, and each form back to the same pair", () => {
+    expect(catgirlVersionForms("1.12.1")).toEqual(forms("1.12.1", "0.1.12a"));
+    expect(catgirlVersionForms("0.1.12a")).toEqual(forms("1.12.1", "0.1.12a"));
+    expect(catgirlVersionForms("v0.1.12b")).toEqual(forms("1.12.2", "0.1.12b"));
+    expect(catgirlVersionForms(" v1.12.28 ")).toEqual(forms("1.12.28", "0.1.12ab"));
+    for (let build = 1; build <= 800; build += 1) {
+      const version = catgirlVersion("0.1.12", build);
+      const letterVersion = catgirlVersionForms(version)?.letterVersion ?? "";
+      expect(catgirlVersionForms(letterVersion)).toEqual(forms(version, letterVersion));
+    }
+  });
+
+  it("leaves every other version as it is", () => {
+    for (const other of ["0.1.12", "0.1.10", "0.1.13-nightly.20261126.1", "0.0.0", "dev", ""]) {
+      expect(catgirlVersionForms(other)).toBeUndefined();
+      expect(displayVersion(other)).toBe(other);
+    }
+    for (const notOurs of ["0.0.44a", "0.100.0a", "0.1.12A", "0.1.12-a", "0.1.12abcd"]) {
+      expect(catgirlVersionForms(notOurs)).toBeUndefined();
+    }
+    expect(displayVersion(null)).toBeNull();
+    expect(displayVersion(undefined)).toBeUndefined();
+  });
+
+  it("runs past z as spreadsheet columns do", () => {
+    const builds = [1, 2, 25, 26, 27, 52, 53, 702, 703];
+    expect(builds.map((build) => displayVersion(catgirlVersion("0.1.12", build)))).toEqual(
+      ["a", "b", "y", "z", "aa", "az", "ba", "zz", "aaa"].map((letters) => `0.1.12${letters}`),
+    );
   });
 });
