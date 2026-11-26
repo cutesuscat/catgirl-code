@@ -22,13 +22,13 @@ Catgirl Code runs the coding agents on your machines and gives them one interfac
 - **Your own Connect service.** The relay and sign-in service are a setting, not a constant.
 - **A different look.** Its own name and icon, and your machines as cat planets in the sidebar.
 
-The command is still `t3` and the data folder is still `~/.t3`, so a machine can move between the two without losing its threads.
+The server's command is `catcode` (`catgirlcode` and `catgirl-code` work too), and it keeps its state in `~/.catcode`. The first time it runs on a machine it moves an older `~/.t3` there and leaves `~/.t3` as a link to it, so threads, projects and worktrees carry over and a T3 Code server sharing the machine finds them too. An older `t3` command is left as it is.
 
 ## Versions
 
 A release is named after the T3 Code release it is based on, with a letter for the fork's own build: the first build on T3 Code 0.1.12 is **0.1.12a**, the second **0.1.12b**, and after **0.1.12z** comes **0.1.12aa**. That is what the apps, Settings › About and the release titles show.
 
-Machines need a number that sorts above T3 Code's own 0.1.12, so underneath each release has a plain version too: 0.1.12a is **1.12.1** and 0.1.12b is **1.12.2** (the T3 Code release's minor and patch, then the build). The release tag is that plain version, `v1.12.1`, and so are the server archive's name, `t3 --version` and the version `t3 update` takes. Each release's notes give both.
+Machines need a number that sorts above T3 Code's own 0.1.12, so underneath each release has a plain version too: 0.1.12a is **1.12.1** and 0.1.12b is **1.12.2** (the T3 Code release's minor and patch, then the build). The release tag is that plain version, `v1.12.1`, and so are the server archive's name, `catcode --version` and the version `catcode update` takes. Each release's notes give both.
 
 ## Install
 
@@ -58,17 +58,11 @@ To install it by hand, or to use the web app without a desktop app:
 curl -fsSL https://github.com/cutesuscat/catgirl-code/releases/latest/download/install.sh | sh
 ```
 
-This installs the `t3` command under `~/.t3` and `~/.local/bin`. Run `t3` to start the server and open the web app. Later, `t3 update` moves the machine to the newest release. The installer needs only `sh`, `tar`, and `curl` or `wget`. Every release has a Linux x64 archive; Linux arm64 and Apple Silicon archives are attached when their builds pass.
+This installs the `catcode` command under `~/.catcode` and `~/.local/bin`, with `catgirlcode` and `catgirl-code` as links to it (`T3CODE_INSTALL_ALIASES=0` leaves them out). Run `catcode` to start the server and open the web app. Later, `catcode update` moves the machine to the newest release. The installer needs only `sh`, `tar`, and `curl` or `wget`. Every release has a Linux x64 archive; Linux arm64 and Apple Silicon archives are attached when their builds pass.
 
-### Moving a machine from T3 Code
+### Moving a machine from T3 Code, or from Catgirl Code 0.1.12c or older
 
-A machine that runs T3 Code's own `t3` keeps looking at T3 Code's releases. One command moves it:
-
-```bash
-T3CODE_RELEASE_BASE_URL=https://github.com/cutesuscat/catgirl-code/releases/download t3 update <version>
-```
-
-`<version>` is a release's plain version, such as `1.12.1` for 0.1.12a: T3 Code's own `t3` knows only plain numbers. Stop the server and start it again afterwards; that ends the threads running on it, so pick a quiet moment.
+Their `t3 update` looks for archives named `t3-…`, and releases from 0.1.12d on are named `catcode-…`, so it reports that no release archive was published, even pointed at this repository (`T3CODE_RELEASE_BASE_URL=https://github.com/cutesuscat/catgirl-code/releases/download t3 update <version>`, which moved machines up to 0.1.12c). Run the installer above instead: it installs `catcode` beside the old `t3`, moves `~/.t3` to `~/.catcode` and leaves the old command alone. A machine the Mac or Android app started a server on over SSH needs nothing: the app installs the new server itself. Then stop the old server and start `catcode` (or the background service, with `catcode service install`); that ends the threads running on it, so pick a quiet moment.
 
 ### Sign in to an agent
 
