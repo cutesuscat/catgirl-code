@@ -13,9 +13,6 @@ import * as Schema from "effect/Schema";
 import { Argument, Command, GlobalFlag } from "effect/cli";
 
 import packageJson from "../../package.json" with { type: "json" };
-import { BUILD_MIGRATION_HEAD, recordedMigrations } from "../persistence/databaseMigrationHead.ts";
-import { resolveCliAuthConfig } from "./config.ts";
-import { withThreadTools } from "./thread.ts";
 
 /** A person drops this file into the T3 home's runtime folder to say "replace it now anyway". */
 const REPLACE_BUSY_SERVER_FILE = "replace-busy-server";
@@ -67,22 +64,26 @@ export const deferralRecord = (deferral: UpdateDeferral, serverVersion: string |
 
 /** Threads with a run in progress, asked of the running server as `t3 thread list` asks it. */
 const countRunningThreads = (baseDir: string) =>
-  withThreadTools(
-    { baseDir: Option.some(baseDir), json: true, clientLabel: "t3 ssh launch" },
-    (tools) =>
-      tools
-        .call(
-          "t3_thread_list",
-          {
-            allProjects: true,
-            statuses: ACTIVE_THREAD_STATUSES,
-            includeSubagents: true,
-            limit: 100,
-          },
-          ThreadCount,
-        )
-        .pipe(Effect.map((result) => result.total ?? result.threads.length)),
-  ).pipe(
+  // Loaded on use: every SSH helper call loads this file, and only this check needs the client.
+  Effect.promise(() => import("./thread.ts")).pipe(
+    Effect.flatMap(({ withThreadTools }) =>
+      withThreadTools(
+        { baseDir: Option.some(baseDir), json: true, clientLabel: "t3 ssh launch" },
+        (tools) =>
+          tools
+            .call(
+              "t3_thread_list",
+              {
+                allProjects: true,
+                statuses: ACTIVE_THREAD_STATUSES,
+                includeSubagents: true,
+                limit: 100,
+              },
+              ThreadCount,
+            )
+            .pipe(Effect.map((result) => result.total ?? result.threads.length)),
+      ),
+    ),
     Effect.timeout(ASK_TIMEOUT),
     Effect.map((count): number | undefined => count),
     Effect.catchCause(() => Effect.undefined),
@@ -94,6 +95,10 @@ const decide = Effect.fn("cli.deferUpdate.decide")(function* (
   pid: number,
   replaceRequested: boolean,
 ) {
+  const [{ resolveCliAuthConfig }, { BUILD_MIGRATION_HEAD, recordedMigrations }] =
+    yield* Effect.promise(() =>
+      Promise.all([import("./config.ts"), import("../persistence/databaseMigrationHead.ts")]),
+    );
   const config = yield* resolveCliAuthConfig(
     { baseDir: Option.some(baseDir) },
     yield* GlobalFlag.LogLevel,
