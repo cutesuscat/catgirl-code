@@ -7,12 +7,17 @@ name: Catgirl Code release
 # CATGIRL_MAC_SIGNING_P12 and CATGIRL_MAC_SIGNING_P12_PASSWORD), which is what
 # lets an installed copy update itself from these releases.
 #
+# Every run stops at a draft. SHA256SUMS is signed with the release key, which
+# never comes here: the maintainer signs it and publishes the draft with
+#   scripts/catgirl-sign-release.sh v<version> <key file> --publish
+# The installers and servers refuse a release whose SHA256SUMS that key did not sign.
+#
 # Release: set CATGIRL_BUILD (and CATGIRL_UPSTREAM_VERSION after moving to a
-# newer T3 Code) in packages/shared/src/catgirlRelease.ts, commit, then push
-# the tag `node scripts/catgirl-release.ts version` prints, with a "v" in front.
-# The tag is the plain version (v1.12.1) the apps download by; the title and
-# the Mac file carry the letter version people see (0.1.12a).
-# Rehearse: run this workflow by hand; it builds the same files into a draft.
+# newer T3 Code) in packages/shared/src/catgirlRelease.ts, commit, push, then
+# run this workflow by hand on that commit. The tag is the plain version
+# (v1.12.1) the apps download by; the title and the Mac file carry the letter
+# version people see (0.1.12a). Publishing the draft makes the tag. A tag
+# pushed by hand builds a draft too.
 #
 # The Android app is not built here. It is signed on the maintainer's machine
 # with a key that never leaves it, and attached to the release afterwards:
@@ -408,7 +413,8 @@ jobs:
           name: mac-arm64
           path: release-assets
 
-      # The apps and the installer verify an archive against this file, in sha256sum's own format.
+      # The apps and the installer verify an archive against this file, in sha256sum's own format,
+      # once the maintainer has signed it. It lists the installer too, for people who check by hand.
       - name: Write checksums and the installer
         shell: bash
         run: |
@@ -416,10 +422,10 @@ jobs:
           cd release-assets
           version="$(node ../scripts/catgirl-release.ts version)"
           test -f "catcode-$version-linux-x64.tar.gz"
-          sha256sum catcode-*.tar.gz > SHA256SUMS
-          cat SHA256SUMS
           node ../scripts/catgirl-release.ts install-script install.sh
           sh -n install.sh
+          sha256sum catcode-*.tar.gz install.sh > SHA256SUMS
+          cat SHA256SUMS
           ls -la
 
       - name: Write the release notes
@@ -440,12 +446,20 @@ jobs:
           - **Mac** (\`.dmg\`, Apple Silicon): not signed by Apple. After copying it to Applications the first time, run \`xattr -cr "/Applications/Catgirl Code.app"\` once. From 0.1.12c on, the app updates itself from these releases: it asks before it downloads and before it restarts. (The \`.zip\` and \`latest-mac.yml\` are what it downloads.)
           - **Android** (\`.apk\`): attached after the build, signed with the maintainer's key.
 
-          Nothing here is signed by Apple or notarized. The Mac app is signed with Catgirl Code's own certificate (SHA-1 \`$CATGIRL_MAC_SIGNING_IDENTITY\`), and an installed copy accepts only updates signed with it. \`SHA256SUMS\` lists the server archives.
+          Nothing here is signed by Apple or notarized. The Mac app is signed with Catgirl Code's own certificate (SHA-1 \`$CATGIRL_MAC_SIGNING_IDENTITY\`), and an installed copy accepts only updates signed with it.
+
+          \`SHA256SUMS\` lists the server archives and the installer. \`SHA256SUMS.sig\` is its signature by the Catgirl Code release key, \`$(node scripts/catgirl-release.ts signing-key)\` (fingerprint \`$(node scripts/catgirl-release.ts signing-key-fingerprint)\`), which never leaves the maintainer's machine. The installer, the apps and \`catcode update\` refuse a release that key did not sign. To check by hand, with OpenSSH 8.1 or newer:
+
+          \`\`\`
+          echo "catgirl-code-releases $(node scripts/catgirl-release.ts signing-key)" > allowed_signers
+          ssh-keygen -Y verify -f allowed_signers -I catgirl-code-releases -n catgirl-code-release -s SHA256SUMS.sig < SHA256SUMS
+          sha256sum --check --ignore-missing SHA256SUMS
+          \`\`\`
           EOF
           cat release-notes.md
 
-      # A draft first: its files are not public, so no app sees the release before
-      # every file is attached. A run started by hand stops at the draft.
+      # Always a draft: its files are not public, so no app sees the release before
+      # the maintainer has signed SHA256SUMS and attached every file.
       - name: Publish
         shell: bash
         env:
@@ -469,8 +483,4 @@ jobs:
             --title "Catgirl Code $letters" --notes-file release-notes.md \
             release-assets/*.tar.gz release-assets/SHA256SUMS release-assets/install.sh release-assets/*.dmg \
             release-assets/*.zip release-assets/*.zip.blockmap release-assets/latest-mac.yml
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            gh release edit "$tag" --draft=false --latest
-          else
-            echo "::notice::Draft release $tag created. Publish it by pushing the tag, or delete the draft."
-          fi
+          echo "::notice::Draft release $tag created. Sign and publish it with scripts/catgirl-sign-release.sh $tag <key file> --publish, or delete the draft."
