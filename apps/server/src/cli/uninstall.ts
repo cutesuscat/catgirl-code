@@ -3,6 +3,7 @@
 import * as NodeChildProcess from "node:child_process";
 import * as NodePath from "node:path";
 
+import { CATGIRL_COMMAND } from "@t3tools/shared/catgirlRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
@@ -174,7 +175,8 @@ const planUninstall = Effect.fn("cli.uninstall.plan")(function* (input: {
         ...(launchedFrom === undefined ? [] : [launchedFrom]),
         ...(yield* findRecordedLaunchers(versionsDir)),
       ]),
-    ],
+      // A `t3` launcher is an older install's, or T3 Code's in a shared home: never removed.
+    ].filter((launcher) => path.parse(launcher).name === CATGIRL_COMMAND),
     runtimeDir: (yield* fs.exists(runtimeDir).pipe(Effect.orElseSucceed(() => false)))
       ? runtimeDir
       : undefined,

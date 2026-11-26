@@ -5,6 +5,10 @@
 /** The GitHub repository whose releases hold this fork's builds. Rename it here and nowhere else. */
 export const CATGIRL_RELEASE_REPOSITORY = "cutesuscat/catgirl-code";
 
+/** The server's command, its executable and the start of its release archives' names. */
+export const CATGIRL_COMMAND = "catcode";
+/** T3 Code's command. Its launchers are left alone; only programs that run it still look for it. */
+export const LEGACY_COMMAND = "t3";
 /** The folder in a person's home that holds the server's state, unless T3CODE_HOME names another. */
 export const CATGIRL_HOME_DIR = ".catcode";
 /** T3 Code's folder for the same state. An older one is moved and left as a link (catgirlHome.ts). */

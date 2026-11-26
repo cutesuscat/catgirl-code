@@ -4,6 +4,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Random from "effect/Random";
 
+import { CATGIRL_COMMAND } from "@t3tools/shared/catgirlRelease";
+
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import { makeComponentLogger } from "./DesktopObservability.ts";
 
@@ -141,7 +143,7 @@ export const launcherPath = (environment: DesktopEnvironment.DesktopEnvironment[
   environment.path.join(
     environment.baseDir,
     "bin",
-    environment.platform === "win32" ? "t3.cmd" : "t3",
+    environment.platform === "win32" ? `${CATGIRL_COMMAND}.cmd` : CATGIRL_COMMAND,
   );
 
 export const install = Effect.gen(function* () {

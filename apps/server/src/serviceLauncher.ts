@@ -9,6 +9,7 @@ import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 import { acquireServiceSelectionLock } from "./cloud/serviceSelectionLock.ts";
 import { RESTORE_OOMD_WATCH_SCRIPT } from "./cloud/userManagerOom.ts";
+import { CATGIRL_COMMAND, LEGACY_COMMAND } from "@t3tools/shared/catgirlRelease";
 import { windowsSystem32Path } from "@t3tools/shared/windowsSystem";
 import { isNoCopyOnWrite, markNoCopyOnWrite } from "./noCopyOnWrite.ts";
 
@@ -77,7 +78,7 @@ interface ManagedChild {
 const runtimePaths = (baseDir: string, version: string) => {
   const versionDir = NodePath.join(baseDir, "runtime", "versions", version);
   // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
-  const executableName = process.platform === "win32" ? "t3.exe" : "t3";
+  const executableName = process.platform === "win32" ? `${CATGIRL_COMMAND}.exe` : CATGIRL_COMMAND;
   return {
     versionDir,
     entryPath: NodePath.join(versionDir, executableName),
@@ -256,10 +257,19 @@ async function serviceUnitFromEnvironment(
 // systemd's ExecStart value, or the plist string or task argument before __service-launcher.
 // Only the version segment changes, so quoted or escaped paths stay as rendered.
 // The launch agent's PATH names a versions directory without the executable; leave it.
+// Units written before the rename name `t3`; the new version's runtime is `catcode`.
+const UNIT_EXECUTABLE = `(?:${LEGACY_COMMAND}|${CATGIRL_COMMAND})`;
 const SERVICE_UNIT_PROGRAMS = [
-  /^(ExecStart=.*?[\\/]runtime[\\/]versions[\\/])([^\\/\s"]+)([\\/]t3)(?=["\s])/m,
-  /(<string>[^<]*?[\\/]runtime[\\/]versions[\\/])([^\\/<]+)([\\/]t3<\/string>\s*<string>__service-launcher<\/string>)/,
-  /(<Arguments>--headless "[^"<]*?[\\/]runtime[\\/]versions[\\/])([^\\/"<]+)([\\/]t3\.exe" "__service-launcher")/,
+  new RegExp(
+    String.raw`^(ExecStart=.*?[\\/]runtime[\\/]versions[\\/])([^\\/\s"]+)([\\/])${UNIT_EXECUTABLE}((?=["\s]))`,
+    "m",
+  ),
+  new RegExp(
+    String.raw`(<string>[^<]*?[\\/]runtime[\\/]versions[\\/])([^\\/<]+)([\\/])${UNIT_EXECUTABLE}(<\/string>\s*<string>__service-launcher<\/string>)`,
+  ),
+  new RegExp(
+    String.raw`(<Arguments>--headless "[^"<]*?[\\/]runtime[\\/]versions[\\/])([^\\/"<]+)([\\/])${UNIT_EXECUTABLE}(\.exe" "__service-launcher")`,
+  ),
 ] as const;
 
 /**
@@ -271,11 +281,14 @@ function repointServiceUnit(contents: string, version: string): string {
   for (const program of SERVICE_UNIT_PROGRAMS) {
     const match = program.exec(contents);
     if (match === null) continue;
-    const [, prefix = "", current = "", suffix = ""] = match;
+    const [, prefix = "", current = "", separator = "", suffix = ""] = match;
     if (isExactServiceVersion(current) && compareExactServiceVersions(current, version) >= 0) {
       return contents;
     }
-    return contents.replace(program, () => `${prefix}${version}${suffix}`);
+    return contents.replace(
+      program,
+      () => `${prefix}${version}${separator}${CATGIRL_COMMAND}${suffix}`,
+    );
   }
   return contents;
 }

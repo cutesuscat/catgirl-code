@@ -2,6 +2,7 @@
 // Catgirl Connect on a machine: `t3 connect --relay`, and the service a machine saved, read at start.
 import type { ConnectServiceSettings } from "@t3tools/contracts";
 import { resolveCatgirlHome } from "@t3tools/shared/catgirlHome";
+import { CATGIRL_COMMAND } from "@t3tools/shared/catgirlRelease";
 import {
   connectDiagnosticsOffers,
   connectHostedAppUrl,
@@ -204,7 +205,7 @@ async function refreshAtServerStart(
   }
   if (refreshed.outcome === "identity-changed" && !next.connect?.identityChange?.declined) {
     io.warn(
-      `Catgirl Connect: the service at ${saved.relayUrl} changed its identity to ${identityInline(fingerprintOf(next.connect?.identityChange?.envelope.key ?? ""))}. Keeping the settings it last trusted. To review, run: t3 connect --relay ${saved.relayUrl}`,
+      `Catgirl Connect: the service at ${saved.relayUrl} changed its identity to ${identityInline(fingerprintOf(next.connect?.identityChange?.envelope.key ?? ""))}. Keeping the settings it last trusted. To review, run: ${CATGIRL_COMMAND} connect --relay ${saved.relayUrl}`,
     );
   }
   io.writeFile(path, JSON.stringify(next));

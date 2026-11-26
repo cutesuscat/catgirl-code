@@ -33,7 +33,7 @@ import {
 import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
 
 const version = "1.2.3";
-const archiveName = `t3-${version}-linux-x64.tar.gz`;
+const archiveName = `catcode-${version}-linux-x64.tar.gz`;
 const archiveBytes = new TextEncoder().encode("not really a tarball");
 const archiveHex = (bytes: Uint8Array) =>
   Effect.promise(() => crypto.subtle.digest("SHA-256", bytes)).pipe(
@@ -60,7 +60,9 @@ const extractingRunner = (fs: FileSystem.FileSystem, path: Path.Path, commands: 
         if (input.command !== "tar" || stagingDir === undefined) {
           return yield* Effect.die(`unexpected command ${input.command}`);
         }
-        yield* fs.writeFileString(path.join(stagingDir, "t3"), "#!/bin/sh\n").pipe(Effect.orDie);
+        yield* fs
+          .writeFileString(path.join(stagingDir, "catcode"), "#!/bin/sh\n")
+          .pipe(Effect.orDie);
         return {
           stdout: "",
           stderr: "",
@@ -98,7 +100,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
             Effect.orDie,
           ),
       });
-      assert.equal(paths.entryPath, path.join(paths.versionDir, "t3"));
+      assert.equal(paths.entryPath, path.join(paths.versionDir, "catcode"));
       assert.deepEqual(pinnedRuntimeCommand(paths), { command: paths.entryPath, args: [] });
       assert.deepEqual(requests, [
         `https://releases.example/download/v${version}/SHA256SUMS`,
@@ -1033,10 +1035,10 @@ it.layer(NodeServices.layer)("launcher lookup on PATH", (it) => {
       yield* fs.writeFileString(executable, "", { mode: 0o755 });
       const bin = path.join(root, "bin");
       yield* fs.makeDirectory(bin);
-      yield* fs.writeFileString(path.join(bin, "t3"), posixLauncherScript(executable), {
+      yield* fs.writeFileString(path.join(bin, "catcode"), posixLauncherScript(executable), {
         mode: 0o755,
       });
-      const script = yield* fs.realPath(path.join(bin, "t3"));
+      const script = yield* fs.realPath(path.join(bin, "catcode"));
       const missing = path.join(root, "missing");
       const lookup = (searchPath: string) =>
         findPosixLauncher({ launchedAs: executable, versionsDir }).pipe(

@@ -48,7 +48,7 @@ describe("where Catgirl Code builds come from", () => {
     expect(CLI_RELEASES_PAGE_URL).toBe(base);
     expect(cliReleaseDownloadBaseUrl(CATGIRL_VERSION)).toBe(`${base}/download/v${CATGIRL_VERSION}`);
     expect(cliReleaseAssetUrl(CATGIRL_VERSION, archive)).toBe(
-      `${base}/download/v${CATGIRL_VERSION}/t3-${CATGIRL_VERSION}-linux-x64.tar.gz`,
+      `${base}/download/v${CATGIRL_VERSION}/catcode-${CATGIRL_VERSION}-linux-x64.tar.gz`,
     );
     expect(cliReleaseIndexPageUrl(2)).toBe(
       `https://api.github.com/repos/${CATGIRL_RELEASE_REPOSITORY}/releases?per_page=100&page=2`,

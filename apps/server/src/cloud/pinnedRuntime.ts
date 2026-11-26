@@ -22,6 +22,7 @@ import {
   parseChecksums,
 } from "@t3tools/shared/cliRelease";
 
+import { CATGIRL_COMMAND, LEGACY_COMMAND } from "@t3tools/shared/catgirlRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
 import * as ProcessRunner from "../processRunner.ts";
@@ -61,7 +62,10 @@ export function pinnedRuntimePaths(
   const versionDir = path.join(pinnedRuntimeVersionsDir(path, baseDir), version);
   return {
     versionDir,
-    entryPath: path.join(versionDir, platform === "win32" ? "t3.exe" : "t3"),
+    entryPath: path.join(
+      versionDir,
+      platform === "win32" ? `${CATGIRL_COMMAND}.exe` : CATGIRL_COMMAND,
+    ),
     sentinelPath: path.join(versionDir, ".install-complete"),
   };
 }
@@ -577,7 +581,13 @@ export const recordPinnedRuntimeLauncher = Effect.fn("cloud.pinned_runtime.recor
   },
 );
 
-/** Whether `candidate` is a version's own executable, `<versionsDir>/<version>/t3[.exe]`. */
+// Versions from before the rename, and T3 Code's own in a shared home, run `t3`.
+const VERSION_EXECUTABLE = new RegExp(
+  `^(?!\\.\\.)[^\\\\/]+[\\\\/](?:${CATGIRL_COMMAND}|${LEGACY_COMMAND})(?:\\.exe)?$`,
+  "i",
+);
+
+/** Whether `candidate` is a version's own executable, `<versionsDir>/<version>/catcode[.exe]`. */
 export function isVersionExecutable(
   path: Path.Path,
   versionsDir: string,
@@ -585,7 +595,7 @@ export function isVersionExecutable(
 ): boolean {
   const relative = path.relative(versionsDir, path.resolve(candidate));
   // On another Windows drive, relative() returns the absolute path, like `D:\t3.exe`.
-  return !path.isAbsolute(relative) && /^(?!\.\.)[^\\/]+[\\/]t3(?:\.exe)?$/i.test(relative);
+  return !path.isAbsolute(relative) && VERSION_EXECUTABLE.test(relative);
 }
 
 /** The executable a `t3.cmd` shim written by the install script or `t3 update` runs. */
@@ -653,12 +663,12 @@ export const findPosixLauncher = Effect.fn("cloud.pinned_runtime.find_posix_laun
       // PATH first, resolved like the shell does: it decides which t3 the user runs. An empty
       // entry of a nonempty PATH is the working directory; an empty PATH searches nothing.
       ...(searchPath.length === 0 ? [] : searchPath.split(":")).map((directory) =>
-        path.resolve(cwd, directory || ".", "t3"),
+        path.resolve(cwd, directory || ".", CATGIRL_COMMAND),
       ),
       path.join(
         environment["T3CODE_INSTALL_BIN_DIR"] ||
           path.join(yield* HostProcess.HomeDirectory, ".local", "bin"),
-        "t3",
+        CATGIRL_COMMAND,
       ),
       ...recorded.split(/\r?\n/),
     ].filter((candidate) => path.isAbsolute(candidate));
@@ -706,7 +716,10 @@ const shellLauncherTargets = Effect.fn("cloud.pinned_runtime.shell_launcher_targ
   const platform = yield* HostProcess.Platform;
   const environment = yield* HostProcess.Environment;
   const home = yield* HostProcess.HomeDirectory;
-  const launcherName = platform === "win32" ? "t3.cmd" : "t3";
+  // Old `t3` launchers, ours or T3 Code's, still run versions in this home.
+  const launcherNames = [CATGIRL_COMMAND, LEGACY_COMMAND].map((name) =>
+    platform === "win32" ? `${name}.cmd` : name,
+  );
   const launchersFile = path.join(baseDir, PINNED_RUNTIME_DIR, PINNED_RUNTIME_LAUNCHERS_FILE);
   const recorded = (yield* fs.readFileString(launchersFile).pipe(Effect.orElseSucceed(() => "")))
     .split(/\r?\n/)
@@ -716,7 +729,7 @@ const shellLauncherTargets = Effect.fn("cloud.pinned_runtime.shell_launcher_targ
     ...(environment["PATH"] ?? environment["Path"] ?? "").split(platform === "win32" ? ";" : ":"),
   ]
     .filter((directory) => path.isAbsolute(directory))
-    .map((directory) => path.join(directory, launcherName));
+    .flatMap((directory) => launcherNames.map((name) => path.join(directory, name)));
   const versionsDir = pinnedRuntimeVersionsDir(path, baseDir);
   const realVersionsDir = yield* fs
     .realPath(versionsDir)

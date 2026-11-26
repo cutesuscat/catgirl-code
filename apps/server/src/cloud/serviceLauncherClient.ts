@@ -1,4 +1,5 @@
 import type { ServerSelfUpdateOutcome } from "@t3tools/contracts";
+import { CATGIRL_COMMAND } from "@t3tools/shared/catgirlRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Cause from "effect/Cause";
@@ -165,13 +166,13 @@ export const repointLaunchers = Effect.fn("cloud.service_launcher_client.repoint
       environment["T3CODE_INSTALL_BIN_DIR"] ||
       (environment["HOME"] ? path.join(environment["HOME"], ".local", "bin") : undefined);
     const candidates = new Set<string>();
-    if (installBinDir !== undefined) candidates.add(path.join(installBinDir, "t3"));
+    if (installBinDir !== undefined) candidates.add(path.join(installBinDir, CATGIRL_COMMAND));
     const searchPath = environment["PATH"] ?? "";
     const cwd = yield* HostProcess.WorkingDirectory;
     for (const directory of searchPath.split(":")) {
       // Like the shell, an empty entry of a nonempty PATH is the working directory.
       if (directory.length === 0 && searchPath.length === 0) continue;
-      const candidate = path.join(directory || cwd, "t3");
+      const candidate = path.join(directory || cwd, CATGIRL_COMMAND);
       if (directory.length === 0) {
         // The shell passes over a working-directory entry it cannot run and keeps searching.
         const info = yield* fs.stat(candidate).pipe(Effect.option);

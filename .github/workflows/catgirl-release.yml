@@ -164,8 +164,8 @@ jobs:
           mkdir -p "$unpacked" "$RUNNER_TEMP/home"
           tar -xzf release-cli/*.tar.gz -C "$unpacked" --strip-components=1
           export HOME="$RUNNER_TEMP/home" T3CODE_HOME="$RUNNER_TEMP/home/t3" NO_COLOR=1
-          [[ "$("$unpacked/t3" --version)" == "t3 v$VERSION" ]]
-          "$unpacked/t3" --help > help.txt
+          [[ "$("$unpacked/catcode" --version)" == "catcode v$VERSION" ]]
+          "$unpacked/catcode" --help > help.txt
           grep -q "Catgirl Code" help.txt
           grep -rq "TELEMETRY_ON_BY_DEFAULT = false" apps/server/dist
           grep -rqF "$(node scripts/catgirl-release.ts repository)/releases" apps/server/dist
@@ -175,7 +175,7 @@ jobs:
               exit 1
             fi
           }
-          # `t3 feedback` names T3 Code's team on purpose: it is one of the recipients a person can choose.
+          # `catcode feedback` names T3 Code's team on purpose: it is one of the recipients a person can choose.
           tr '\n' ' ' < help.txt | tr -s ' ' | sed -e 's/T3 Code team//g' -e 's/about T3 Code itself//g' > help-names.txt
           refuse "T3 Code" help-names.txt
           refuse "pingdotgg/t3code/releases" apps/server/dist --include='*.mjs' --exclude-dir=client
@@ -415,8 +415,8 @@ jobs:
           set -euo pipefail
           cd release-assets
           version="$(node ../scripts/catgirl-release.ts version)"
-          test -f "t3-$version-linux-x64.tar.gz"
-          sha256sum t3-*.tar.gz > SHA256SUMS
+          test -f "catcode-$version-linux-x64.tar.gz"
+          sha256sum catcode-*.tar.gz > SHA256SUMS
           cat SHA256SUMS
           node ../scripts/catgirl-release.ts install-script install.sh
           sh -n install.sh
@@ -432,9 +432,11 @@ jobs:
           cat > release-notes.md <<EOF
           Catgirl Code $letters, an unofficial fork of [T3 Code](https://github.com/pingdotgg/t3code) based on T3 Code $upstream. It is not affiliated with, endorsed by or supported by T3 Tools, Inc.
 
-          Machines know this release as version $version (tag \`v$version\`): that is the number \`t3 --version\` prints and \`t3 update\` takes. The apps show $letters.
+          Machines know this release as version $version (tag \`v$version\`): that is the number \`catcode --version\` prints and \`catcode update\` takes. The apps show $letters.
 
-          - **Server** (\`t3-$version-<platform>.tar.gz\`): the apps download and start it on a machine they reach over SSH. To install it by hand: \`curl -fsSL $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/v$version/install.sh | T3CODE_VERSION=$version sh\`
+          The server's command is \`catcode\`, and it keeps its state in \`~/.catcode\`. The first time it runs on a machine, it moves an older \`~/.t3\` there and leaves \`~/.t3\` as a link to it, so nothing is copied or lost. An older \`t3\` command is left as it is.
+
+          - **Server** (\`catcode-$version-<platform>.tar.gz\`): the apps download and start it on a machine they reach over SSH. To install it by hand: \`curl -fsSL $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/v$version/install.sh | T3CODE_VERSION=$version sh\`
           - **Mac** (\`.dmg\`, Apple Silicon): not signed by Apple. After copying it to Applications the first time, run \`xattr -cr "/Applications/Catgirl Code.app"\` once. From 0.1.12c on, the app updates itself from these releases: it asks before it downloads and before it restarts. (The \`.zip\` and \`latest-mac.yml\` are what it downloads.)
           - **Android** (\`.apk\`): attached after the build, signed with the maintainer's key.
 

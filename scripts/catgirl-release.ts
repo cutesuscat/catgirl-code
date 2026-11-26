@@ -9,6 +9,7 @@ import * as NodeURL from "node:url";
 
 import { CATGIRL_HOME_SHELL_FUNCTION } from "@t3tools/shared/catgirlHomeScript";
 import {
+  CATGIRL_COMMAND,
   CATGIRL_HOME_DIR,
   CATGIRL_INSTALL_SCRIPT_URL,
   CATGIRL_LETTER_VERSION,
@@ -46,6 +47,10 @@ const INSTALL_SCRIPT_EDITS: ReadonlyArray<readonly [from: string, to: string]> =
     "",
   ],
 ];
+// Every word `t3` names the command, which is the fork's own: not the home `.t3`, the variables
+// that contain the word (`t3_home`), or T3 Code's site. `%s` or `\n` stands before it in printf.
+const COMMAND_WORD = /(?<=^|[^\w$.]|%s|\\n)t3(?!\w|\.codes)/gm;
+
 const INSTALL_SCRIPT_NOTE = `# Catgirl Code's installer: an unofficial fork of T3 Code, not affiliated with T3 Tools, Inc.
 # Generated from T3 Code's scripts/install.sh (MIT) by scripts/catgirl-release.ts.
 `;
@@ -59,6 +64,7 @@ export function catgirlInstallScript(upstreamScript: string): string {
     }
     script = script.replace(from, () => to);
   }
+  script = script.replace(COMMAND_WORD, CATGIRL_COMMAND);
   const [shebang = "", ...rest] = renameProduct(script).split("\n");
   return [shebang, INSTALL_SCRIPT_NOTE.trimEnd(), ...rest].join("\n");
 }

@@ -1,3 +1,4 @@
+import { CATGIRL_COMMAND } from "@t3tools/shared/catgirlRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import {
   CLI_RELEASE_BASE_URL_ENV,
@@ -218,7 +219,7 @@ export const findWindowsShim = Effect.fn("cli.update.find_windows_shim")(functio
   ]
     .filter((entry) => entry.trim().length > 0)
     .map((directory) => ({
-      shimPath: path.join(directory, "t3.cmd"),
+      shimPath: path.join(directory, `${CATGIRL_COMMAND}.cmd`),
       parseTarget: windowsShimTarget,
     }));
   if (versionsDir !== undefined) {
@@ -226,7 +227,10 @@ export const findWindowsShim = Effect.fn("cli.update.find_windows_shim")(functio
       .readFileString(path.join(path.dirname(versionsDir), "launchers"))
       .pipe(Effect.orElseSucceed(() => ""));
     for (const shimPath of recorded.split(/\r?\n/)) {
-      if (path.isAbsolute(shimPath) && path.basename(shimPath).toLowerCase() === "t3.cmd") {
+      if (
+        path.isAbsolute(shimPath) &&
+        path.basename(shimPath).toLowerCase() === `${CATGIRL_COMMAND}.cmd`
+      ) {
         candidates.push({ shimPath, parseTarget: generatedWindowsShimTarget });
       }
     }

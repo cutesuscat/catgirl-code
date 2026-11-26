@@ -7,6 +7,7 @@ import {
   DESKTOP_READINESS_PROOF_PATH,
   isValidDesktopReadinessProof,
 } from "@t3tools/shared/desktopReadinessProof";
+import { CATGIRL_COMMAND } from "@t3tools/shared/catgirlRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -444,7 +445,7 @@ const runWslPreflight = Effect.fn("desktop.backendConfiguration.wslPreflight")(f
           _tag: "Ready",
           runningDistro,
           windowsEntryPath: environment.backendEntryPath,
-          runtime: { kind: "executable", entryPath: `${runtime.linuxAppRoot}/t3` },
+          runtime: { kind: "executable", entryPath: `${runtime.linuxAppRoot}/${CATGIRL_COMMAND}` },
           resolvedPath: stagedProbe.resolvedPath,
           t3Home: stagedProbe.t3Home,
           runtimeId: input.runtimeArchive.runtimeId,
