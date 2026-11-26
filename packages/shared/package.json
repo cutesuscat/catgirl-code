@@ -511,6 +511,10 @@
       "types": "./src/cliRelease.ts",
       "import": "./src/cliRelease.ts"
     },
+    "./catgirlRelease": {
+      "types": "./src/catgirlRelease.ts",
+      "import": "./src/catgirlRelease.ts"
+    },
     "./diffCutLines": {
       "types": "./src/diffCutLines.ts",
       "import": "./src/diffCutLines.ts"

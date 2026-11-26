@@ -68,7 +68,11 @@
         "graphql.config.ts",
       ],
       // The generated operations export every selection's class.
-      "ignoreIssues": { "**/*.graphql.ts": ["exports", "types", "namespaceMembers"] },
+      // Catgirl Code: ws.ts provides src/cloud/catgirlRelease.ts in place of npmRelease.ts's layer.
+      "ignoreIssues": {
+        "**/*.graphql.ts": ["exports", "types", "namespaceMembers"],
+        "src/cloud/npmRelease.ts": ["exports"],
+      },
       // Keep the transitive Effect runtime pinned for standalone npm installs.
       // The Vite+ web build prerequisite.
       // Native and disk-loaded provider packages stay external to the bundle; the
