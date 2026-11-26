@@ -74,6 +74,11 @@ vp run typecheck
 Backend changes should include tests. Prefer testing the real business logic with external
 dependencies represented at their boundary rather than mocking internal behavior.
 
+## Self-hosting
+
+To run your own Catgirl Connect instance on a Cloudflare account, with a signed service document
+and opt-in diagnostics, follow [SELF-HOSTING.md](./SELF-HOSTING.md) (`node scripts/self-host.ts deploy`).
+
 ## Deployment
 
 The relay deploys with the Alchemy CLI (`vp run --filter t3code-relay deploy` is `alchemy deploy`

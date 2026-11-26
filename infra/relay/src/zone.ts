@@ -5,6 +5,7 @@ import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
+import * as SelfHost from "./selfHost.ts";
 import {
   MANAGED_ENDPOINT_ZONE_OWNER_STAGE,
   relayOwnsManagedEndpointZone,
@@ -21,6 +22,17 @@ function withLogicalId<Resource extends object>(resource: Resource, logicalId: s
 
 export const RelayDeploymentConfig = Effect.gen(function* () {
   const { stage } = yield* Alchemy.Stack;
+  if (!(yield* SelfHost.profile).zones) {
+    // A self-hosted relay without a domain lives at the workers.dev address its deploy computed.
+    const relayPublicDomain = yield* Config.NonEmptyString("RELAY_DOMAIN");
+    return {
+      stage,
+      relayPublicDomain,
+      relayPublicOrigin: `https://${relayPublicDomain}`,
+      relayApiZoneName: "",
+      managedEndpointZoneName: "",
+    };
+  }
   const relayApiZoneName = yield* Config.NonEmptyString("RELAY_API_ZONE_NAME");
   const managedEndpointZoneName = yield* Config.NonEmptyString("RELAY_TUNNEL_ZONE_NAME");
   const relayPublicDomainOverride = yield* Config.String("RELAY_DOMAIN").pipe(
@@ -45,9 +57,10 @@ export const RelayDeploymentConfig = Effect.gen(function* () {
   };
 });
 
-export const ManagedEndpointZone = RelayDeploymentConfig.pipe(
-  Effect.flatMap(({ stage, managedEndpointZoneName }) =>
-    relayOwnsManagedEndpointZone(stage)
+// A self-hosted relay owns (adopts and retains) its zones whatever its stage is called.
+export const ManagedEndpointZone = Effect.all([RelayDeploymentConfig, SelfHost.profile]).pipe(
+  Effect.flatMap(([{ stage, managedEndpointZoneName }, selfHost]) =>
+    selfHost.enabled || relayOwnsManagedEndpointZone(stage)
       ? Cloudflare.Zone.Zone("ManagedEndpointZone", { name: managedEndpointZoneName }).pipe(
           adopt(true),
         )
@@ -60,11 +73,11 @@ export const ManagedEndpointZone = RelayDeploymentConfig.pipe(
   ),
 );
 
-export const RelayApiZone = RelayDeploymentConfig.pipe(
-  Effect.flatMap(({ stage, relayApiZoneName, managedEndpointZoneName }) =>
+export const RelayApiZone = Effect.all([RelayDeploymentConfig, SelfHost.profile]).pipe(
+  Effect.flatMap(([{ stage, relayApiZoneName, managedEndpointZoneName }, selfHost]) =>
     relayApiZoneName === managedEndpointZoneName
       ? ManagedEndpointZone
-      : relayOwnsManagedEndpointZone(stage)
+      : selfHost.enabled || relayOwnsManagedEndpointZone(stage)
         ? Cloudflare.Zone.Zone("RelayApiZone", { name: relayApiZoneName }).pipe(adopt(true))
         : Cloudflare.Zone.Zone.ref("RelayApiZone", {
             stage: MANAGED_ENDPOINT_ZONE_OWNER_STAGE,
