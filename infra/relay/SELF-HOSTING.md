@@ -96,6 +96,18 @@ the new key by themselves. Apps that missed a whole generation see "identity cha
 their owner. To bring an existing key, set `CONNECT_SIGNING_KEY` (64 hex digits or base64url of
 the 32-byte seed).
 
+Apps show the fingerprint as 8 emoji with their names, then the 16 hex digits a setup link
+carries. Every key the deploy generates starts with the cat 🐈 (it tries keys until one does,
+about 64 tries), so the cat says "a Catgirl Connect instance" and the other 7 emoji tell
+instances apart. Apps accept a key that starts elsewhere, such as one you bring.
+
+An instance deployed before cat-first keys (before Catgirl Code 0.1.12b) keeps its plain key
+until it rotates. To rotate it to a cat-first key, raise `CONNECT_SIGNING_KEY_GENERATION` and set
+`CONNECT_SIGNING_KEY_CAT_FIRST_SINCE` to that same new generation, and keep both from then on.
+Without the second setting the deploy would not find the old key, and apps would see "identity
+changed" instead of an endorsed rotation. Try it with `--dry-run` first: the plan should create
+`ConnectCatSigningKey<new>` and leave `ConnectSigningKey<previous>` unchanged.
+
 If the state store is lost, the next deploy makes a new key, and everyone sees "identity
 changed". `RELAY_STATE=local` keeps the state in `infra/relay/.alchemy` instead; then back that
 folder up.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import vector from "../src/connect/catgirlConnectDocument.vector.json" with { type: "json" };
-import { parseEnvFile, planDeployment, readEnvelope } from "./self-host.ts";
+import { identityLines, parseEnvFile, planDeployment, readEnvelope } from "./self-host.ts";
 
 const BASE = {
   CLOUDFLARE_API_TOKEN: "token",
@@ -67,6 +67,17 @@ describe("the deployed document check", () => {
     expect(typeof checked === "string" ? checked : checked.setupLink).toBe(
       `https://relay.example.com/#fp=${vector.keys.old.fingerprint.replaceAll(" ", "")}`,
     );
+  });
+
+  it("prints the fingerprint as the apps show it, and says when it is not cat-first", () => {
+    expect(identityLines(vector.keys.old.fingerprint)).toEqual([
+      "Fingerprint  🐙       🐰      🌙    🌷      ⌛         🐢      ✈️         🍓",
+      "             Octopus  Rabbit  Moon  Flower  Hourglass  Turtle  Aeroplane  Strawberry",
+      "             3475 0f98 bd59 fcfc",
+      "             (Not cat-first: a key from before cat-first keys, or one you brought. Apps accept it.)",
+    ]);
+    expect(identityLines("0123 4567 89ab cdef")[0]).toMatch(/^Fingerprint {2}🐈/u);
+    expect(identityLines("0123 4567 89ab cdef")).toHaveLength(3);
   });
 
   it("refuses an altered payload and a document for another address", () => {

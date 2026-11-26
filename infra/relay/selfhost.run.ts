@@ -9,6 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as SelfHost from "./src/selfHost.ts";
+import { CatFirstSigningKeyProvider } from "./src/connect/SigningKey.ts";
 import * as RelayWorker from "./src/worker.ts";
 
 /**
@@ -26,6 +27,7 @@ export default Alchemy.Stack(
       Cloudflare.providers(),
       Drizzle.providers(),
       Planetscale.providers(),
+      CatFirstSigningKeyProvider(),
     ),
     state:
       process.env.RELAY_STATE === "local"

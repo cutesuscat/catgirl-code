@@ -6,6 +6,10 @@ import * as NodePath from "node:path";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as PgClient from "@effect/sql-pg/PgClient";
+import {
+  connectFingerprintEmoji,
+  connectFingerprintEmojiLines,
+} from "@t3tools/shared/connectFingerprintEmoji";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
@@ -310,6 +314,24 @@ export function readEnvelope(
   };
 }
 
+/** The fingerprint as the apps show it: the emoji, each name under its emoji, then the hex. */
+export function identityLines(fingerprint: string): ReadonlyArray<string> {
+  const label = "Fingerprint  ";
+  const indent = " ".repeat(label.length);
+  const lines = connectFingerprintEmojiLines(fingerprint);
+  const catFirst = connectFingerprintEmoji(fingerprint)?.[0]?.name === "Cat";
+  return [
+    ...(lines === null
+      ? [`${label}${fingerprint}`]
+      : [`${label}${lines.emoji}`, `${indent}${lines.names}`, `${indent}${fingerprint}`]),
+    ...(catFirst
+      ? []
+      : [
+          `${indent}(Not cat-first: a key from before cat-first keys, or one you brought. Apps accept it.)`,
+        ]),
+  ];
+}
+
 const getJson = (url: string, init?: RequestInit) =>
   Effect.tryPromise({
     try: () =>
@@ -431,7 +453,7 @@ const program = Effect.gen(function* () {
       "",
       `Instance     ${relayUrl}`,
       `Service      ${String((checked.document.service as { name?: string } | undefined)?.name ?? "(no CONNECT_SERVICE_NAME)")}`,
-      `Fingerprint  ${checked.fingerprint}`,
+      ...identityLines(checked.fingerprint),
       `Setup link   ${checked.setupLink}`,
       `Operator     ${relayUrl}/operator (any user name; the key is in .alchemy/self-host/${plan.stage}/operator-key)`,
       `Expires      ${String(checked.document.expiresAt)} (renewed every hour)`,

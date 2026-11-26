@@ -15,6 +15,7 @@ import * as CollectRoutes from "./CollectRoutes.ts";
 import * as CollectStore from "./CollectStore.ts";
 import * as CollectStoreObject from "./CollectStoreObject.ts";
 import * as ServiceDocument from "./ServiceDocument.ts";
+import * as SigningKey from "./SigningKey.ts";
 
 /**
  * Catgirl Connect v2 on the relay: the signed service document, the collect-token route,
@@ -82,16 +83,20 @@ export const make = Effect.fn("ConnectService.make")(function* (input: ConnectSe
   const generation = yield* Config.Int("CONNECT_SIGNING_KEY_GENERATION").pipe(
     Config.withDefault(1),
   );
+  // Only for instances deployed before cat-first keys: their older generations stay as pinned.
+  const catFirstSince = yield* Config.Int("CONNECT_SIGNING_KEY_CAT_FIRST_SINCE").pipe(
+    Config.withDefault(1),
+  );
   const explicitKey = yield* Config.Redacted("CONNECT_SIGNING_KEY").pipe(Config.option);
   const explicitPrevious = yield* Config.Redacted("CONNECT_PREVIOUS_SIGNING_KEY").pipe(
     Config.option,
   );
   const generatedKey = Option.isNone(explicitKey)
-    ? yield* yield* Alchemy.makeRandom(`ConnectSigningKey${generation}`, { bytes: 32 })
+    ? yield* yield* SigningKey.makeSigningSeed(generation, catFirstSince)
     : undefined;
   const generatedPrevious =
     Option.isNone(explicitKey) && Option.isNone(explicitPrevious) && generation > 1
-      ? yield* yield* Alchemy.makeRandom(`ConnectSigningKey${generation - 1}`, { bytes: 32 })
+      ? yield* yield* SigningKey.makeSigningSeed(generation - 1, catFirstSince)
       : undefined;
   const collectTokenSecret = yield* yield* Alchemy.makeRandom("ConnectCollectTokenSecret", {
     bytes: 32,

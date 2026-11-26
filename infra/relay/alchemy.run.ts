@@ -13,6 +13,7 @@ import * as RelayDb from "./src/db.ts";
 import { MobileSourceMapsUploadCredentials, RelayObservability } from "./src/observability.ts";
 import { isPreviewStage } from "./src/previewStages.ts";
 import { PreviewTunnelSweep, PreviewTunnelSweepProvider } from "./src/previewTunnelSweep.ts";
+import { CatFirstSigningKeyProvider } from "./src/connect/SigningKey.ts";
 import { ManagedEndpointZone, RelayApiZone, RelayDeploymentConfig } from "./src/zone.ts";
 import * as RelayWorker from "./src/worker.ts";
 
@@ -25,6 +26,7 @@ export default Alchemy.Stack(
       Drizzle.providers(),
       Planetscale.providers(),
       PreviewTunnelSweepProvider(),
+      CatFirstSigningKeyProvider(),
     ),
     state: Cloudflare.state(),
   },
