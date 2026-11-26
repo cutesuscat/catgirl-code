@@ -12069,6 +12069,8 @@
   "3188bc3b3c4508bc": "Privacy policy",
   "901a823214edc8c4": "telemetry analytics usage data tracking legal opt out",
   "82136480255a5106": "OTel OTLP telemetry export endpoints logs traces metrics Grafana",
+  "144b077d72c9222c": "Usage analytics",
+  "1a5a6d20679a11c5": "telemetry analytics usage data tracking PostHog address key opt in",
   "659d081051faf7ff": "logs traces processes resource history failures spans cpu memory",
   "5eaeacfa9f82051a": "report bug problem t3 team send feedback agents tools automatic when i ask",
   "f537f91e1ee41d47": "keyboard shortcuts hotkeys commands bindings json",

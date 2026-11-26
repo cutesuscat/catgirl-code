@@ -12083,6 +12083,8 @@
   "3188bc3b3c4508bc": "隐私政策",
   "901a823214edc8c4": "遥测 分析 用量数据 跟踪 法律 退出",
   "82136480255a5106": "OTel OTLP 遥测 导出 端点 日志 追踪 指标 Grafana",
+  "144b077d72c9222c": "Usage analytics",
+  "1a5a6d20679a11c5": "telemetry analytics usage data tracking PostHog address key opt in",
   "659d081051faf7ff": "日志 追踪 进程 资源历史 失败 span cpu 内存",
   "5eaeacfa9f82051a": "报告 错误 问题 t3 团队 发送 反馈 智能体 工具 自动 当我要求时",
   "f537f91e1ee41d47": "键盘 快捷键 热键 命令 绑定 json",
