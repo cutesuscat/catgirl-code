@@ -80,6 +80,7 @@ import * as HookInboxObject from "./hooks/HookInboxObject.ts";
 import * as MobileTelemetry from "./mobileTelemetry/MobileTelemetry.ts";
 import * as CollectStoreObject from "./connect/CollectStoreObject.ts";
 import * as ConnectService from "./connect/ConnectService.ts";
+import * as T3Gate from "./environments/T3Gate.ts";
 
 const layerWebcrypto = Layer.mergeAll(
   Digest.layerWebCrypto,
@@ -218,6 +219,10 @@ export const layer = Api.make(
     yield* yield* relayApiZone.zoneId;
     const managedEndpointDnsBinding = yield* Cloudflare.DNS.ReadWriteDns(managedEndpointZone);
     const managedEndpointZoneName = yield* managedEndpointZone.name;
+    const t3gate = yield* T3Gate.config;
+    const defaultManagedTunnelLimit = Option.getOrUndefined(
+      Option.filter(yield* Config.option(Config.Int("T3GATE_MAX_TUNNELS")), (value) => value > 0),
+    );
     const managedEndpointCleanupMode = yield* RelayConfiguration.managedEndpointCleanupModeConfig;
     const legacyManagedEndpointCleanupMode =
       yield* RelayConfiguration.legacyManagedEndpointCleanupModeConfig;
@@ -285,6 +290,7 @@ export const layer = Api.make(
         ...(t3ChatLinkSecret
           ? { t3Chat: { baseUrl: t3ChatBaseUrl, linkSecret: t3ChatLinkSecret } }
           : {}),
+        ...(defaultManagedTunnelLimit === undefined ? {} : { defaultManagedTunnelLimit }),
       });
     });
 
@@ -337,8 +343,11 @@ export const layer = Api.make(
       Layer.provideMerge(
         ManagedEndpointProvider.layerCloudflareBindings(
           managedEndpointTunnelBinding,
-          managedEndpointDnsBinding,
+          t3gate ? T3Gate.dnsClient(t3gate, managedEndpointDnsBinding) : managedEndpointDnsBinding,
           alchemyRuntimeContext,
+          t3gate
+            ? (settings) => T3Gate.tunnelClient(t3gate, settings.managedEndpointBaseDomain ?? "")
+            : undefined,
         ),
       ),
       Layer.provideMerge(DpopProofs.layer),

@@ -1619,6 +1619,10 @@ export const layerCloudflareBindings = (
   tunnelClient: ManagedTunnelBinding.ManagedTunnelClient,
   dnsClient: Cloudflare.DNS.ReadWriteDnsClient,
   alchemyRuntimeContext: Alchemy.BaseRuntimeContext,
+  // Replaces Cloudflare's tunnel API, as the optional t3gate mode does (`T3Gate.ts`).
+  tunnelOverride?: (
+    settings: RelayConfiguration.RelayConfiguration["Service"],
+  ) => ManagedEndpointTunnelClient["Service"],
 ) => {
   // Created once per isolate so its cached pause survives layer rebuilds.
   const cloudflare = makeCloudflareApiGate(alchemyRuntimeContext);
@@ -1628,6 +1632,7 @@ export const layerCloudflareBindings = (
         Effect.gen(function* () {
           const pause = yield* CloudflareApiPause.CloudflareApiPause;
           const random = yield* SecureRandom.SecureRandom;
+          const settings = yield* RelayConfiguration.RelayConfiguration;
           const gate = cloudflare(pause);
           return Layer.mergeAll(
             layerTunnelClient({
@@ -1783,6 +1788,8 @@ export const layerCloudflareBindings = (
                   ),
                 ),
             }),
+            // Last, so it wins over the Cloudflare-backed tunnel client above.
+            ...(tunnelOverride ? [layerTunnelClient(tunnelOverride(settings))] : []),
           );
         }),
       ),

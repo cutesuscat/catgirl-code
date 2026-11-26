@@ -74,6 +74,8 @@ export class RelayConfiguration extends Context.Service<
     readonly legacyManagedEndpointCleanupMode?: ManagedEndpointCleanupMode;
     readonly legacyTunnelGraceMinutes?: number;
     readonly t3Chat?: T3ChatSettings;
+    /** Replaces the default managed tunnel cap per account. */
+    readonly defaultManagedTunnelLimit?: number;
   }
 >()("t3code-relay/Config/RelayConfiguration") {}
 
