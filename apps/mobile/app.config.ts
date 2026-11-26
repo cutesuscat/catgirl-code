@@ -38,6 +38,13 @@ if (
   );
 }
 
+// Catgirl Code carries no Expo project and no update feed, so a build cannot reach upstream's.
+if (repoEnv.T3CODE_MOBILE_UPDATES_ENABLED === "1") {
+  throw new Error(
+    "T3CODE_MOBILE_UPDATES_ENABLED=1 asks for over-the-air updates, but Catgirl Code has no update feed: upstream's Expo project was removed from app.config.ts. Build with updates off, or add a feed of your own there first.",
+  );
+}
+
 const DEVELOPMENT_ASSETS = {
   appIcon: fromRepoRoot(BRAND_ASSET_PATHS.developmentIosIconPng),
   iosIcon: fromRepoRoot(BRAND_ASSET_PATHS.developmentIconComposerProject),
@@ -247,9 +254,8 @@ const config: ExpoConfig = {
   icon: variant.assets.appIcon,
   userInterfaceStyle: "automatic",
   updates: {
-    // The feed below is upstream's Expo project, so a Catgirl Code build has to ask for it.
-    enabled: repoEnv.T3CODE_MOBILE_UPDATES_ENABLED === "1",
-    url: "https://u.expo.dev/d763fcb8-d37c-41ea-a773-b54a0ab4a454",
+    // No feed, so no `url`: see the check on T3CODE_MOBILE_UPDATES_ENABLED above.
+    enabled: false,
     checkAutomatically: "ON_LOAD",
     fallbackToCacheTimeout: 0,
   },
@@ -495,11 +501,11 @@ const config: ExpoConfig = {
       tracesToken: repoEnv.EXPO_PUBLIC_OTLP_TRACES_TOKEN ?? null,
     },
     eas: {
-      projectId: "d763fcb8-d37c-41ea-a773-b54a0ab4a454",
+      // Not an Expo project. expo-observe will not start without an id, and the relay takes any GUID.
+      projectId: "00000000-0000-0000-0000-000000000000",
       observe: { endpointUrl: observeEndpointUrl },
     },
   },
-  owner: "pingdotgg",
   experiments: {
     // Metro only runs babel-plugin-react-compiler when this is set; see src/reactCompilerCoverage.test.ts.
     reactCompiler: true,
