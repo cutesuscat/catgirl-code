@@ -311,12 +311,19 @@ jobs:
           codesign --display --verbose=2 "$app" 2>&1 | grep -E '^(Identifier|Authority|Signature|TeamIdentifier)'
           requirement="$(codesign --display --requirements - "$app" 2>&1 | sed -n 's/^designated => //p')"
           echo "designated requirement: $requirement"
-          # The test an installed copy applies to an update: the bundle and this certificate, never one build's hash.
-          if [[ "$requirement" == *cdhash* ]] || ! grep -qi "$CATGIRL_MAC_SIGNING_IDENTITY" <<< "$requirement"; then
-            echo "::error::the app is not signed with the fork's certificate"
+          # The test an installed copy applies to an update: the bundle and this certificate, never one
+          # build's hash. Every release has the same one, so each meets the requirement of those before it.
+          expected="identifier \"com.t3tools.t3code\" and certificate leaf = H\"$(tr 'A-F' 'a-f' <<< "$CATGIRL_MAC_SIGNING_IDENTITY")\""
+          if [[ "$requirement" != "$expected" ]]; then
+            echo "::error::the app's designated requirement is not: $expected"
             exit 1
           fi
-          codesign --verify --deep --strict -R="=$requirement" "$app"
+          codesign --verify --deep --strict -R "$expected" "$app"
+          # The disk image people download holds the same signed app.
+          mount="$RUNNER_TEMP/dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" "release/T3-Code-$VERSION-arm64.dmg" > /dev/null
+          codesign --verify --deep --strict -R "$expected" "$mount/$(basename "$app")"
+          hdiutil detach "$mount" > /dev/null
           feed="$app/Contents/Resources/app-update.yml"
           cat "$feed"
           grep -qx "provider: github" "$feed"
