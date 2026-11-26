@@ -1,13 +1,16 @@
 import { requireOptionalNativeModule } from "expo";
 
 import type {
+  ClientCertificateChoice,
   ClientCertificateSubscription as Subscription,
   ClientCertificateTransferInput,
 } from "./clientCertificates.types";
 
 interface CertificateModule {
   getAlias(url: string): string | null;
-  choose(url: string): Promise<string | null>;
+  choose(url: string, alias: string | null): Promise<string | null>;
+  listChoices(): ReadonlyArray<ClientCertificateChoice>;
+  restore(url: string, alias: string): Promise<boolean>;
   remove(url: string): Promise<void>;
   createTransfer(url: string): string;
   transfer(
@@ -33,11 +36,21 @@ export const selectedClientCertificate = (url: string): string | null =>
   native?.getAlias(url) ?? null;
 export const onClientCertificateChange = (listener: () => void): Subscription =>
   native?.addListener("changed", listener) ?? { remove() {} };
-export const chooseClientCertificate = (url: string): Promise<string | null> => {
+/** `alias` is offered first in the system picker when no choice is saved for `url` yet. */
+export const chooseClientCertificate = (
+  url: string,
+  alias: string | null = null,
+): Promise<string | null> => {
   if (!native)
     return Promise.reject(new Error("Client certificates require the Android custom build."));
-  return native.choose(url);
+  return native.choose(url, alias);
 };
+/** Every saved choice: the address it is for and the certificate's name, never the certificate. */
+export const clientCertificateChoices = (): ReadonlyArray<ClientCertificateChoice> =>
+  native?.listChoices() ?? [];
+/** Saves a choice without asking when Android already lets this app use that certificate. */
+export const restoreClientCertificate = (url: string, alias: string): Promise<boolean> =>
+  native?.restore(url, alias) ?? Promise.resolve(false);
 export const removeClientCertificate = (url: string): Promise<void> => {
   if (!native)
     return Promise.reject(new Error("Client certificates require the Android custom build."));

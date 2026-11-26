@@ -65,7 +65,19 @@ class T3ClientCertificatesModule : Module() {
     Function("getAlias") { url: String ->
       certificateOrigin(url)?.let { resolveCertificateAlias(preferences, it) }
     }
-    AsyncFunction("choose") { url: String, promise: Promise -> choose(url, promise) }
+    // `alias` is the certificate to offer first, for a choice restored from a settings file.
+    AsyncFunction("choose") { url: String, alias: String?, promise: Promise ->
+      choose(url, alias, promise)
+    }
+    // Every saved choice, as the names the system picker shows. Certificates never leave KeyChain.
+    Function("listChoices") {
+      preferences.all.mapNotNull { (origin, alias) ->
+        (alias as? String)?.let { mapOf("origin" to origin, "alias" to it) }
+      }
+    }
+    AsyncFunction("restore") { url: String, alias: String, promise: Promise ->
+      execute(promise) { restore(url, alias, promise) }
+    }
     AsyncFunction("remove") { url: String -> remove(url) }
     // Register synchronously so cancellation cannot overtake the async transfer callback.
     Function("createTransfer") { url: String -> createTransfer(url) }
@@ -116,7 +128,7 @@ class T3ClientCertificatesModule : Module() {
     io.shutdown()
   }
 
-  private fun choose(url: String, promise: Promise) {
+  private fun choose(url: String, preferred: String?, promise: Promise) {
     val origin = certificateOrigin(url)
     val activity = appContext.currentActivity
     if (origin == null || activity == null) {
@@ -129,12 +141,12 @@ class T3ClientCertificatesModule : Module() {
       promise.reject("CERTIFICATE_PICKER", "A certificate picker is already open.", null)
     } else {
       choosing = true
-      activity.runOnUiThread { showPicker(activity, origin, promise) }
+      activity.runOnUiThread { showPicker(activity, origin, preferred, promise) }
     }
   }
 
   @Suppress("TooGenericExceptionCaught") // Every failure must settle the JS promise.
-  private fun showPicker(activity: Activity, origin: String, promise: Promise) {
+  private fun showPicker(activity: Activity, origin: String, preferred: String?, promise: Promise) {
     try {
       val uri = Uri.parse(origin)
       KeyChain.choosePrivateKeyAlias(
@@ -144,7 +156,7 @@ class T3ClientCertificatesModule : Module() {
         null,
         uri.host?.removePrefix("*."),
         if (uri.port == -1) 443 else uri.port,
-        preferences.getString(origin, null)
+        preferences.getString(origin, null) ?: preferred
       )
     } catch (error: Exception) {
       choosing = false
@@ -176,6 +188,33 @@ class T3ClientCertificatesModule : Module() {
       promise.reject("CERTIFICATE_UNAVAILABLE", error.message, error)
     } finally {
       choosing = false
+    }
+  }
+
+  /**
+   * Saves a choice without the picker when this app may already use that certificate, and
+   * resolves false when Android has to ask the user first.
+   */
+  @Suppress("TooGenericExceptionCaught") // Every failure must settle the JS promise.
+  private fun restore(url: String, alias: String, promise: Promise) {
+    try {
+      val origin = requireNotNull(certificateOrigin(url)) { "HTTPS host required" }
+      val granted = runCatching { KeyChain.getPrivateKey(context, alias) != null }.getOrDefault(false)
+      if (!granted) {
+        promise.resolve(false)
+        return
+      }
+      synchronized(lock) {
+        check(!destroyed) { "Certificate operation cancelled because the app closed." }
+        check(preferences.edit().putString(origin, alias).commit()) {
+          "Could not save certificate choice"
+        }
+        retire(origin)
+      }
+      sendEvent("changed", mapOf("origin" to origin))
+      promise.resolve(true)
+    } catch (error: Exception) {
+      promise.reject("CERTIFICATE_UNAVAILABLE", error.message, error)
     }
   }
 

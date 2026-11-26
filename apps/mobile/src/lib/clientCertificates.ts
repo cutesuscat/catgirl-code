@@ -1,4 +1,5 @@
 import type {
+  ClientCertificateChoice,
   ClientCertificateSubscription,
   ClientCertificateTransferInput,
 } from "./clientCertificates.types";
@@ -15,7 +16,13 @@ export const onClientCertificateChange = (
 ): ClientCertificateSubscription => ({
   remove() {},
 });
-export const chooseClientCertificate = (_url: string): Promise<string | null> => unsupported();
+export const chooseClientCertificate = (
+  _url: string,
+  _alias: string | null = null,
+): Promise<string | null> => unsupported();
+export const clientCertificateChoices = (): ReadonlyArray<ClientCertificateChoice> => [];
+export const restoreClientCertificate = (_url: string, _alias: string): Promise<boolean> =>
+  Promise.resolve(false);
 export const removeClientCertificate = (_url: string): Promise<void> => unsupported();
 export const transferWithClientCertificate = async (
   _input: ClientCertificateTransferInput,
