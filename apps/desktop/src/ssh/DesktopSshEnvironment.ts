@@ -3,6 +3,7 @@ import type {
   DesktopSshEnvironmentBootstrap,
   DesktopSshEnvironmentTarget,
 } from "@t3tools/contracts";
+import { CATGIRL_VERSION } from "@t3tools/shared/catgirlRelease";
 import { CLI_RELEASE_BASE_URL_ENV } from "@t3tools/shared/cliRelease";
 import * as NetService from "@t3tools/shared/Net";
 import * as SshAuth from "@t3tools/ssh/auth";
@@ -92,7 +93,7 @@ export const resolveDesktopSshCliRunner = (
   }
   const releaseBaseUrl = env[CLI_RELEASE_BASE_URL_ENV]?.trim() || undefined;
   return {
-    archiveVersion: environment.appVersion,
+    archiveVersion: CATGIRL_VERSION,
     ...(releaseBaseUrl === undefined ? {} : { releaseBaseUrl }),
   };
 };

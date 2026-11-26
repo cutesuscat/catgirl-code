@@ -8,6 +8,7 @@ import {
   type ServerProviderCompatibilityAdvisory,
 } from "@t3tools/contracts";
 import { brokenVersionDetail } from "@t3tools/provider-core/server/compatibility";
+import { upstreamVersionOf } from "@t3tools/shared/catgirlRelease";
 import { satisfiesSemverRange } from "@t3tools/shared/semver";
 import * as Schema from "effect/Schema";
 import packageJson from "../../package.json" with { type: "json" };
@@ -74,7 +75,7 @@ export function resolveProviderCompatibility(
   policies: ReadonlyArray<ProviderCompatibilityPolicy> | undefined,
   driver: ProviderDriverKind,
   version: string | null,
-  t3CodeVersion = packageJson.version,
+  t3CodeVersion = upstreamVersionOf(packageJson.version),
 ): ServerProviderCompatibilityAdvisory | undefined {
   const policy = policies?.find(
     (entry) => entry.driver === driver && satisfiesSemverRange(t3CodeVersion, entry.t3CodeRange),

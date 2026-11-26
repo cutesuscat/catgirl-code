@@ -1,6 +1,7 @@
 import * as NodePath from "@effect/platform-node/NodePath";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
+import { CATGIRL_VERSION } from "@t3tools/shared/catgirlRelease";
 import { CLI_RELEASE_BASE_URL_ENV } from "@t3tools/shared/cliRelease";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -39,7 +40,7 @@ describe("resolveDesktopSshCliRunner", () => {
       });
 
       assert.deepStrictEqual(runner, {
-        archiveVersion: "0.0.22",
+        archiveVersion: CATGIRL_VERSION,
         releaseBaseUrl: "https://mirror.example.com/t3code",
       });
     }),

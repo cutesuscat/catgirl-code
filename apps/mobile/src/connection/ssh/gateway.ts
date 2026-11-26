@@ -17,6 +17,7 @@ import {
   type DesktopSshEnvironmentTarget,
   type EnvironmentId,
 } from "@t3tools/contracts";
+import { CATGIRL_VERSION } from "@t3tools/shared/catgirlRelease";
 import { waitForHttpReady } from "@t3tools/shared/httpReadiness";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import {
@@ -34,11 +35,8 @@ import { HttpClient } from "effect/http";
 import { type SshNative, sshErrorCode, sshFailureMessage } from "./native";
 import { parseSshConfig, resolveSshHost } from "./sshConfig";
 
-/**
- * The t3 release a host is given when it has no server running yet. The desktop passes its
- * own version here; keep this in step with the server version this build is paired with.
- */
-const REMOTE_T3_VERSION = "0.1.12";
+/** The server a host is given when it has none running yet: this fork's release, as on the desktop. */
+const REMOTE_T3_VERSION = CATGIRL_VERSION;
 
 export interface SshGatewayDependencies {
   readonly native: SshNative;
