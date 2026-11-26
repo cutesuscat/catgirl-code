@@ -47,6 +47,15 @@ const SETTINGS_SEARCH_TERMS = {
     "proxyjump",
     "authorized_keys",
   ],
+  SettingsExport: [
+    msg("backup", { $context: "settings search keyword" }),
+    msg("move to another phone", { $context: "settings search keyword" }),
+    msg("ssh key", { $context: "settings search keyword" }),
+  ],
+  SettingsImport: [
+    msg("restore", { $context: "settings search keyword" }),
+    msg("settings file", { $context: "settings search keyword" }),
+  ],
   SettingsAppearance: [
     msg("theme", { $context: "settings search keyword" }),
     msg("dark mode", { $context: "settings search keyword" }),

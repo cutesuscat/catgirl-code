@@ -145,6 +145,8 @@ import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRoute
 import { SettingsConnectServiceRouteScreen } from "./features/settings/SettingsConnectServiceRouteScreen";
 import { SettingsNotificationsRouteScreen } from "./features/settings/SettingsNotificationsRouteScreen";
 import { SettingsSshRouteScreen } from "./features/settings/SettingsSshRouteScreen";
+import { SettingsExportRouteScreen } from "./features/settings/SettingsExportRouteScreen";
+import { SettingsImportRouteScreen } from "./features/settings/SettingsImportRouteScreen";
 import { SettingsClientCertificateRouteScreen } from "./features/settings/SettingsClientCertificateRouteScreen";
 import { SettingsRouteScreen } from "./features/settings/SettingsRouteScreen";
 import { SettingsLabsRouteScreen } from "./features/settings/ThreadSettingsSections";
@@ -186,6 +188,8 @@ const ROUTE_TITLES: Readonly<Record<string, string>> = {
   SettingsNotifications: msg("Notifications"),
   SettingsClientCertificate: msg("Client certificate"),
   SettingsSsh: "SSH",
+  SettingsExport: msg("Export settings"),
+  SettingsImport: msg("Import settings"),
   SettingsConnectService: msg("T3 Connect service"),
   SettingsThreads: msg("Threads"),
   SettingsAbout: msg("About"),
@@ -319,6 +323,16 @@ const SETTINGS_SCREENS = {
   SettingsConnectService: createNativeStackScreen({
     screen: SettingsConnectServiceRouteScreen,
     linking: "settings/connect-service",
+    options: settingsPage(),
+  }),
+  SettingsExport: createNativeStackScreen({
+    screen: SettingsExportRouteScreen,
+    linking: "settings/export",
+    options: settingsPage(),
+  }),
+  SettingsImport: createNativeStackScreen({
+    screen: SettingsImportRouteScreen,
+    linking: "settings/import",
     options: settingsPage(),
   }),
   SettingsThreads: createNativeStackScreen({

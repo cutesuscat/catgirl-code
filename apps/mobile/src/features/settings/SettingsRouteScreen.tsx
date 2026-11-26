@@ -165,7 +165,21 @@ function LocalSettingsRouteScreen() {
 const sshRows = (gt: ReturnType<typeof useGT>): readonly SettingsListRow[] => [
   ...(sshNative === null
     ? []
-    : [{ id: "SettingsSsh", icon: "terminal", label: "SSH", target: "SettingsSsh" } as const]),
+    : ([
+        { id: "SettingsSsh", icon: "terminal", label: "SSH", target: "SettingsSsh" },
+        {
+          id: "SettingsExport",
+          icon: "tray.and.arrow.up",
+          label: gt("Export settings"),
+          target: "SettingsExport",
+        },
+        {
+          id: "SettingsImport",
+          icon: "tray.and.arrow.down",
+          label: gt("Import settings"),
+          target: "SettingsImport",
+        },
+      ] as const)),
   ...(clientCertificatesAvailable
     ? [
         {
