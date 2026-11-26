@@ -2873,6 +2873,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "mac") {
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
+    // Catgirl Code: signs the app with the fork's own certificate when the release build has it.
+    buildConfig.afterPack = path.join(repoRoot, "scripts/catgirl-mac-after-pack.ts");
     if (resolveDesktopUpdateChannel(version) !== "nightly") {
       buildConfig.extraResources = [
         ...(buildConfig.extraResources as ReadonlyArray<unknown>),
