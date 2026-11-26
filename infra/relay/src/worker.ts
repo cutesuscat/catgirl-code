@@ -78,6 +78,8 @@ import * as HeldHooks from "./hooks/HeldHooks.ts";
 import * as HookInbox from "./hooks/HookInbox.ts";
 import * as HookInboxObject from "./hooks/HookInboxObject.ts";
 import * as MobileTelemetry from "./mobileTelemetry/MobileTelemetry.ts";
+import * as CollectStoreObject from "./connect/CollectStoreObject.ts";
+import * as ConnectService from "./connect/ConnectService.ts";
 
 const layerWebcrypto = Layer.mergeAll(
   Digest.layerWebCrypto,
@@ -255,6 +257,13 @@ export const layer = Api.make(
     const mobileMetricsDataset = yield* observability.mobileMetrics.name;
 
     const alchemyRuntimeContext: Alchemy.BaseRuntimeContext = yield* Cloudflare.Worker;
+    const connect = yield* ConnectService.make({
+      relayUrl: relayPublicOrigin,
+      clerkPublishableKey,
+      clerkJwtTemplate,
+      clerkCliOAuthClientId,
+      alchemyRuntimeContext,
+    });
 
     const loadSettings = Effect.gen(function* () {
       return RelayConfiguration.RelayConfiguration.of({
@@ -583,6 +592,7 @@ export const layer = Api.make(
           clerkJwtTemplate,
           clerkCliOAuthClientId,
         }),
+        connect.routes(layerRuntime),
       ).pipe(
         Layer.provide([Etag.layerWeak, layerHttpPlatformNotSupported, RelayHttpApi.layerCors]),
       ),
@@ -611,6 +621,7 @@ export const layer = Api.make(
         Layer.provideMerge(Cloudflare.Workers.RateLimitBinding),
         Layer.provideMerge(Cloudflare.R2.ReadBucketBinding),
         Layer.provideMerge(HookInboxObject.layer),
+        Layer.provideMerge(CollectStoreObject.layer),
         // Disable the duplicate runtime span; ours applies route/header/token redaction and rejects sender traceparent.
         Layer.provideMerge(
           Alchemy.Telemetry.layer(Layer.succeed(HttpMiddleware.TracerDisabledWhen)(() => true)),
