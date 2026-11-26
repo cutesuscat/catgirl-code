@@ -21,3 +21,8 @@ if (process.env.EXPO_PUBLIC_SHOWCASE === "1") {
 }
 
 registerRootComponent(App);
+
+// Catgirl Connect: re-check a signed service's document against its pinned key, at most daily.
+void import("./src/features/cloud/connectService").then((service) =>
+  service.refreshConnectServiceIfDue(),
+);

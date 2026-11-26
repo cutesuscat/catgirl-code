@@ -5,8 +5,9 @@ import {
   connectServiceCheckProblem,
   connectServiceSourceLabel,
 } from "@t3tools/shared/connectServiceCopy";
+import { parseConnectSetupLink } from "@t3tools/shared/connectDocument";
 import { T, useGT, useMessages } from "gt-react-native";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -17,14 +18,18 @@ import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScroll
 import {
   builtInConnectService,
   checkConnectServiceDraft,
+  currentConnectService,
   savedConnectService,
   storeConnectService,
+  subscribeConnectService,
+  updateConnectService,
 } from "../cloud/connectService";
 import { leaveConnectService, restartApp } from "../cloud/connectServiceSwitch";
 import { resolveBuiltInCloudPublicConfig } from "../cloud/publicConfig";
 import { ConnectionFormField } from "../connection/ConnectionFormField";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
+import { ConnectServiceTrustSection, connectFirstUseText } from "./ConnectServiceTrustSection";
 
 type CheckProblem = Exclude<ConnectServiceCheck, { readonly _tag: "Ready" }>;
 
@@ -34,6 +39,7 @@ export function SettingsConnectServiceRouteScreen() {
   const insets = useSafeAreaInsets();
   const builtIn = builtInConnectService(resolveBuiltInCloudPublicConfig());
   const applied = resolveConnectService(savedConnectService(), builtIn);
+  const current = useSyncExternalStore(subscribeConnectService, currentConnectService);
   const saved = applied.source === "discovered" || applied.source === "manual";
   const typed = applied.source === "manual";
   const [relayUrl, setRelayUrl] = useState(applied.relayUrl ?? "");
@@ -71,9 +77,13 @@ export function SettingsConnectServiceRouteScreen() {
         settings === null
           ? gt("Go back to the built-in service?")
           : gt("Use {host} for T3 Connect?", { host: settings.relayUrl.replace("https://", "") }),
-      message: gt(
-        "The app will restart. You will be signed out of the current service, and machines reached through it leave your list until you link them to the new one.",
-      ),
+      message:
+        gt(
+          "The app will restart. You will be signed out of the current service, and machines reached through it leave your list until you link them to the new one.",
+        ) +
+        (settings?.connect && settings.connect.key !== current?.connect?.key
+          ? connectFirstUseText(settings, parseConnectSetupLink(relayUrl).fingerprint)
+          : ""),
       confirmText: gt("Restart and switch"),
       onConfirm: () => void apply(settings),
     });
@@ -92,6 +102,8 @@ export function SettingsConnectServiceRouteScreen() {
     setChecking(false);
     if (result._tag !== "Success") return setProblem("check-failed");
     const check = result.value;
+    // The section below the address explains it and offers the two choices.
+    if (check._tag === "IdentityChanged") return void updateConnectService(check.settings);
     if (check._tag !== "Ready") {
       if (check._tag === "NotPublished" || check._tag === "UnreadableDocument") {
         setAdvancedOpen(true);
@@ -105,6 +117,7 @@ export function SettingsConnectServiceRouteScreen() {
       next.clerkPublishableKey === applied.clerkPublishableKey &&
       next.clerkJwtTemplate === applied.clerkJwtTemplate
     ) {
+      if (next.connect) updateConnectService(next);
       return setProblem("unchanged");
     }
     confirm(next);
@@ -222,6 +235,13 @@ export function SettingsConnectServiceRouteScreen() {
             </View>
           </View>
         </SettingsSection>
+        {current?.connect && current.relayUrl === applied.relayUrl ? (
+          <ConnectServiceTrustSection
+            current={{ ...current, connect: current.connect }}
+            update={updateConnectService}
+            restartInto={confirm}
+          />
+        ) : null}
       </ScrollView>
     </SettingsScreen>
   );
