@@ -44,6 +44,23 @@ export interface SshExecResult {
   readonly stderr: string;
 }
 
+export type SettingsExportResult =
+  | { readonly status: "cancelled" }
+  /** `sshKey` is false when no SSH key went into the file. */
+  | { readonly status: "saved"; readonly name: string; readonly sshKey: boolean };
+
+export type SettingsPickResult =
+  | { readonly status: "cancelled" }
+  | { readonly status: "picked"; readonly id: string; readonly name: string };
+
+/** A settings file after its passphrase opened it. `app` is the app's own JSON part. */
+export interface OpenedSettingsFile {
+  readonly key: SshPublicKey | null;
+  readonly config: string | null;
+  readonly knownHosts: ReadonlyArray<SshKnownHost>;
+  readonly app: string | null;
+}
+
 /** `modules/t3-ssh`. The private key stays native; failures reject with an `ERR_SSH_*` code. */
 export interface SshNative {
   getPublicKey(): Promise<SshPublicKey | null>;
@@ -64,6 +81,24 @@ export interface SshNative {
   forward(sessionId: string, remotePort: number): Promise<number>;
   isOpen(sessionId: string): boolean;
   close(sessionId: string): Promise<void>;
+  /** Encrypts the SSH state and `app` with `passphrase`, then asks the system where to save. */
+  exportSettings(passphrase: string, app: string, fileName: string): Promise<SettingsExportResult>;
+  /** Asks the system for a file. Rejects with an `ERR_SETTINGS_*` code when it is not ours. */
+  pickSettingsFile(): Promise<SettingsPickResult>;
+  openSettingsFile(id: string, passphrase: string): Promise<OpenedSettingsFile>;
+  /** `add` keeps what this device has; only `replace` overwrites a key or a config. */
+  importSshSettings(
+    id: string,
+    key: "skip" | "add" | "replace",
+    config: "skip" | "add" | "replace",
+    knownHosts: "skip" | "add",
+  ): Promise<{
+    readonly keyImported: boolean;
+    readonly configImported: boolean;
+    readonly knownHostsAdded: number;
+    readonly knownHostsKept: number;
+  }>;
+  closeSettingsFile(id: string): Promise<void>;
 }
 
 /** Null where the platform has no SSH module (iOS). */

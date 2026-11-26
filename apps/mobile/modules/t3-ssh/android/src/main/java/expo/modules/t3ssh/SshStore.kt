@@ -88,6 +88,63 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
     sealer.forget()
   }
 
+  /** This store as settings-file sections. The seed is only ever written into a sealed file. */
+  @Synchronized
+  fun exportSections(): Map<String, ByteArray> {
+    val sections = LinkedHashMap<String, ByteArray>()
+    key()?.let { key ->
+      sections[SshSections.SEED] = key.seedCopy()
+      sections[SshSections.PUBLIC] = (publicKeyLine() ?: key.publicKeyLine("")).toByteArray()
+    }
+    readConfig().takeIf { it.isNotBlank() }?.let { sections[SshSections.CONFIG] = it.toByteArray() }
+    knownHosts().takeIf { it.isNotEmpty() }?.let { hosts ->
+      sections[SshSections.KNOWN_HOSTS] = hosts.joinToString("") { "${it.line}\n" }.toByteArray()
+    }
+    return sections
+  }
+
+  /**
+   * Takes what the caller asked for from a settings file. ADD never changes what this device
+   * already has, so only REPLACE can overwrite a key or a config. The key is sealed again here.
+   */
+  @Synchronized
+  fun importSections(
+    sections: Map<String, ByteArray>,
+    key: SshImport,
+    config: SshImport,
+    knownHosts: SshImport
+  ): SshImportResult {
+    val archive = SshArchive.read(sections)
+    val current = key()
+    val keyTaken = archive.key != null && key != SshImport.SKIP &&
+      (key == SshImport.REPLACE || current == null) &&
+      !archive.key.publicKey.contentEquals(current?.publicKey)
+    if (keyTaken) {
+      writeAtomically(sealedSeedFile, sealer.seal(archive.key!!.seedCopy()))
+      writeAtomically(publicKeyFile, archive.publicKeyLine + "\n")
+    }
+    val configTaken = archive.config != null && config != SshImport.SKIP &&
+      (config == SshImport.REPLACE || readConfig().isBlank()) && archive.config != readConfig()
+    if (configTaken) writeConfig(archive.config!!)
+    var hostsAdded = 0
+    var hostsKept = 0
+    if (knownHosts != SshImport.SKIP) {
+      val merged = knownHosts().toMutableList()
+      for (entry in archive.knownHosts) {
+        if (entry in merged) continue
+        // A name this device already trusts under another key keeps this device's key.
+        if (merged.any { known -> entry.names.any(known::matches) }) {
+          hostsKept += 1
+        } else {
+          merged += entry
+          hostsAdded += 1
+        }
+      }
+      if (hostsAdded > 0) saveKnownHosts(merged)
+    }
+    return SshImportResult(keyTaken, configTaken, hostsAdded, hostsKept)
+  }
+
   private fun saveKnownHosts(entries: List<KnownHost>) =
     writeAtomically(knownHostsFile, entries.joinToString("") { "${it.line}\n" })
 
@@ -100,6 +157,63 @@ class SshStore(private val dir: File, private val sealer: SeedSealer) {
     val temp = File(dir, file.name + ".tmp")
     temp.writeBytes(bytes)
     if (!temp.renameTo(file)) throw java.io.IOException("Could not save ${file.name}.")
+  }
+}
+
+/** The names of the SSH sections in a settings file. */
+object SshSections {
+  const val SEED = "ssh/seed"
+  const val PUBLIC = "ssh/public"
+  const val CONFIG = "ssh/config"
+  const val KNOWN_HOSTS = "ssh/known_hosts"
+}
+
+enum class SshImport { SKIP, ADD, REPLACE }
+
+data class SshImportResult(
+  val keyImported: Boolean,
+  val configImported: Boolean,
+  val knownHostsAdded: Int,
+  val knownHostsKept: Int
+)
+
+/** The SSH part of an opened settings file, checked before anything is shown or stored. */
+class SshArchive private constructor(
+  val key: Ed25519Key?,
+  val publicKeyLine: String?,
+  val config: String?,
+  val knownHosts: List<KnownHost>
+) {
+  companion object {
+    fun read(sections: Map<String, ByteArray>): SshArchive {
+      val seed = sections[SshSections.SEED]
+      val key = seed?.let {
+        if (it.size != Ed25519Key.SEED_BYTES) throw damagedKey()
+        Ed25519Key(it)
+      }
+      val line = key?.let { publicLine(it, sections[SshSections.PUBLIC]) }
+      return SshArchive(
+        key = key,
+        publicKeyLine = line,
+        config = sections[SshSections.CONFIG]?.toString(Charsets.UTF_8)?.takeIf { it.isNotBlank() },
+        knownHosts = KnownHosts.parse(
+          sections[SshSections.KNOWN_HOSTS]?.toString(Charsets.UTF_8).orEmpty()
+        ),
+      )
+    }
+
+    // The line is rebuilt from the seed, so a file cannot pair a seed with another key's line.
+    private fun publicLine(key: Ed25519Key, stored: ByteArray?): String {
+      val fields = stored?.toString(Charsets.UTF_8)?.trim()?.split(Regex("\\s+")).orEmpty()
+      val line = key.publicKeyLine(fields.drop(2).joinToString(" "))
+      if (fields.size >= 2 && fields.take(2) != line.split(' ').take(2)) throw damagedKey()
+      return line
+    }
+
+    private fun damagedKey() = SettingsArchiveException(
+      SettingsArchiveException.Reason.DAMAGED,
+      "The SSH key in this settings file is damaged. Export it again."
+    )
   }
 }
 
