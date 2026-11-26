@@ -1,71 +1,32 @@
-import { getClerkInstance } from "@clerk/expo";
-import { runAtomCommand, settlePromise } from "@t3tools/client-runtime/state/runtime";
+import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import type { ConnectServiceSettings } from "@t3tools/contracts";
 import { type ConnectServiceCheck, resolveConnectService } from "@t3tools/shared/connectService";
 import {
   connectServiceCheckProblem,
   connectServiceSourceLabel,
 } from "@t3tools/shared/connectServiceCopy";
-import * as Updates from "expo-updates";
 import { T, useGT, useMessages } from "gt-react-native";
 import { useState } from "react";
-import { DevSettings, View } from "react-native";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/ui/AppText";
 import { Button } from "../../components/ui/Button";
 import * as Dialog from "../../components/ui/Dialog";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
-import { runtime } from "../../lib/runtime";
-import { appAtomRegistry } from "../../state/atom-registry";
-import { unregisterAgentAwarenessDeviceForCurrentUser } from "../agent-awareness/remoteRegistration";
-import { removeCloudEnvironments } from "../cloud/cloud-drafts";
 import {
   builtInConnectService,
   checkConnectServiceDraft,
   savedConnectService,
   storeConnectService,
 } from "../cloud/connectService";
-import {
-  resolveBuiltInCloudPublicConfig,
-  resolveCloudPublicConfig,
-  resolveRelayClerkTokenOptions,
-} from "../cloud/publicConfig";
+import { leaveConnectService, restartApp } from "../cloud/connectServiceSwitch";
+import { resolveBuiltInCloudPublicConfig } from "../cloud/publicConfig";
 import { ConnectionFormField } from "../connection/ConnectionFormField";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
 
 type CheckProblem = Exclude<ConnectServiceCheck, { readonly _tag: "Ready" }>;
-
-/**
- * Signs out of the service in use and forgets what belongs to it. The account service repeats
- * this after a sign-out, but the restart that follows would cut it short, so it runs here first.
- */
-async function leaveConnectService(): Promise<void> {
-  const { clerk, relay } = resolveCloudPublicConfig();
-  if (!clerk.publishableKey || !relay.url) return;
-  const instance = getClerkInstance({ publishableKey: clerk.publishableKey });
-  await runAtomCommand(appAtomRegistry, removeCloudEnvironments, instance.user?.id ?? null, {
-    reportFailure: false,
-    reportDefect: false,
-  });
-  const session = instance.session;
-  if (!session) return;
-  await settlePromise(() =>
-    runtime.runPromiseExit(
-      unregisterAgentAwarenessDeviceForCurrentUser(() =>
-        session.getToken(resolveRelayClerkTokenOptions()),
-      ),
-    ),
-  );
-  await instance.signOut();
-}
-
-async function restartApp(): Promise<void> {
-  // Development builds have no update runtime to reload through.
-  if (__DEV__) return DevSettings.reload();
-  await Updates.reloadAsync();
-}
 
 export function SettingsConnectServiceRouteScreen() {
   const gt = useGT();
