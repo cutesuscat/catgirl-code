@@ -6,6 +6,8 @@ import type { Plugin } from "vite-plus";
 import type { PackUserConfig } from "vite-plus/pack";
 
 import {
+  CATGIRL_COMMAND,
+  CATGIRL_HOME_DIR,
   CATGIRL_INSTALL_COMMAND,
   CATGIRL_INSTALL_SCRIPT_URL,
   CATGIRL_ISSUES_URL,
@@ -14,6 +16,8 @@ import {
   CATGIRL_README_URL,
   CATGIRL_RELEASE_REPOSITORY,
   CATGIRL_RELEASES_PAGE_URL,
+  LEGACY_COMMAND,
+  LEGACY_HOME_DIR,
 } from "@t3tools/shared/catgirlRelease";
 
 // Catgirl Code: the one place that names the product. The web, server and desktop builds rename
@@ -29,6 +33,22 @@ const NAME = new RegExp(`T3(\\s+)(Code|Connect)\\b${KEPT_AFTER}`, "g");
 // Translators also join the name into compounds ("T3-Code-Desktop-App") and inflect it ("T3 Codes CLI").
 const TRANSLATED_NAME = new RegExp(`T3([\\s-]+)(Code|Connect)(?=s?\\b)${KEPT_AFTER}`, "g");
 const CATALOG_FILE = /\/src\/i18n\/translations\/[^/]+\.json$/;
+// The command is `catcode`. Text names it in code spans ("run `t3 up`", "`t3`"), at the start of a
+// string ("t3 pair") or element, and its home as `~/.t3`. Code that runs it uses the constant.
+const COMMAND = new RegExp(`(?<=^|["\`>])${LEGACY_COMMAND}(?=\`|\\\\\`| [a-z.-]|<)`, "g");
+const HOME = new RegExp(`~/\\${LEGACY_HOME_DIR}\\b`, "g");
+
+// The CLI's own install, update and uninstall commands also name it as a plain word ("Remove t3").
+const COMMAND_WORD_FILES = ["install.ts", "uninstall.ts", "update.ts"].map(
+  (name) => `apps/server/src/cli/${name}`,
+);
+const COMMAND_WORD = new RegExp(`(?<![\\w.$/@\\\\-])${LEGACY_COMMAND}(?![\\w-])`, "g");
+
+// A translation is plain text, and translators drop backticks: every word t3 in it is the command.
+const TRANSLATED_COMMAND = new RegExp(`(?<![\\w.@/$-])${LEGACY_COMMAND}(?![\\w.@/-])`, "g");
+
+const renameCommand = (text: string) =>
+  text.replace(COMMAND, CATGIRL_COMMAND).replace(HOME, `~/${CATGIRL_HOME_DIR}`);
 
 /**
  * Text that another program or an earlier install reads, by source file, kept as upstream wrote
@@ -56,6 +76,12 @@ export const KEPT_TEXT: ReadonlyArray<readonly [file: string, ...text: ReadonlyA
   ],
   // Files and folders that earlier installs left on disk.
   ["apps/desktop/src/app/DesktopCliShim.ts", '"Written by T3 Code:'],
+  // Checkpoint commit messages, which earlier checkpoints carry too.
+  ["apps/server/src/vcs/GitVcsDriver.ts", "`t3 checkpoint"],
+  // T3 Code's npm package, which is not the fork's command.
+  ["apps/server/src/cli/install.ts", "npx t3."],
+  ["apps/server/src/triage/triagePrompt.ts", "runs whatever \\`t3\\` npm resolves"],
+  ["apps/server/src/cli/uninstall.ts", "`npm uninstall -g t3`"],
   ["apps/desktop/src/app/DesktopLegacyLocalStorage.ts", '"T3 Code (Alpha)"'],
   [
     "apps/desktop/src/app/DesktopUserData.ts",
@@ -129,6 +155,17 @@ export const REPLACED_TEXT: ReadonlyArray<readonly [file: string, from: string, 
     `"${CATGIRL_INSTALL_COMMAND}"`,
   ],
   ["apps/server/src/cloud/servicePreflight.ts", "https://t3.codes/install.sh", INSTALL_URL],
+  // Commands to run, past what the command rule sees.
+  [
+    "apps/server/src/cloud/servicePreflight.ts",
+    "\\`which -a t3\\` lists no older t3",
+    `\\\`which -a ${CATGIRL_COMMAND}\\\` lists no older ${CATGIRL_COMMAND}`,
+  ],
+  [
+    "apps/server/src/cloud/servicePreflight.ts",
+    "\\`~/.local/bin/t3 service install\\`",
+    `\\\`~/.local/bin/${CATGIRL_COMMAND} service install\\\``,
+  ],
   ["apps/web/src/versionSkew.ts", "`${runner} t3@${targetVersion}`", INSTALL_VERSION],
   [
     "apps/web/src/versionSkew.ts",
@@ -136,8 +173,14 @@ export const REPLACED_TEXT: ReadonlyArray<readonly [file: string, from: string, 
     INSTALL_VERSION,
   ],
   // `npx t3` would fetch and run T3 Code's server from npm.
-  ["apps/web/src/hooks/useStartTriage.ts", '"npx t3 triage"', '"t3 triage"'],
-  ["apps/web/src/lib/bootError.ts", '"npx t3 triage"', '"t3 triage"'],
+  ["apps/web/src/hooks/useStartTriage.ts", '"npx t3 triage"', `"${CATGIRL_COMMAND} triage"`],
+  ["apps/web/src/lib/bootError.ts", '"npx t3 triage"', `"${CATGIRL_COMMAND} triage"`],
+  // The root command is a subject a report may name, like its subcommands, which the rule renames.
+  [
+    "apps/server/src/feedback/FeedbackReport.ts",
+    'T3_CLI_COMMANDS: ReadonlyArray<string> = [\n  "t3",',
+    `T3_CLI_COMMANDS: ReadonlyArray<string> = [\n  "${CATGIRL_COMMAND}",`,
+  ],
   // Release pages and release notes are the fork's.
   ["apps/web/src/components/desktopUpdate.logic.ts", '"pingdotgg/t3code"', FORK_REPOSITORY],
   [
@@ -155,12 +198,19 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&
 const inFile = (file: string) => (entry: readonly [file: string, ...rest: ReadonlyArray<string>]) =>
   file.endsWith(`/${entry[0]}`);
 
-const renameIn = (value: unknown, name: RegExp): unknown => {
-  if (typeof value === "string") return value.replace(name, "Catgirl$1$2");
-  if (Array.isArray(value)) return value.map((item) => renameIn(item, name));
+const renameIn = (value: unknown, name: RegExp, translated = false): unknown => {
+  if (typeof value === "string") {
+    const renamed = renameCommand(value.replace(name, "Catgirl$1$2"));
+    return translated ? renamed.replace(TRANSLATED_COMMAND, CATGIRL_COMMAND) : renamed;
+  }
+  if (Array.isArray(value)) return value.map((item) => renameIn(item, name, translated));
   if (typeof value !== "object" || value === null) return value;
   return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, renameIn(item, name)]),
+    Object.entries(value).map(([key, item]) => [
+      key,
+      // An element's whole text, as `<code>t3</code>` is in the source.
+      key === "c" && item === LEGACY_COMMAND ? CATGIRL_COMMAND : renameIn(item, name, translated),
+    ]),
   );
 };
 
@@ -172,14 +222,24 @@ export const renameProduct = (code: string, file = ""): string => {
   const path = file.replaceAll("\\", "/");
   const kept = KEPT_TEXT.filter(inFile(path));
   const replaced = new Map(REPLACED_TEXT.filter(inFile(path)).map(([, from, to]) => [from, to]));
-  if (kept.length === 0 && replaced.size === 0) return code.replace(NAME, "Catgirl$1$2");
+  const words = COMMAND_WORD_FILES.some((name) => path.endsWith(`/${name}`));
+  if (kept.length === 0 && replaced.size === 0 && !words) {
+    return renameCommand(code.replace(NAME, "Catgirl$1$2"));
+  }
   // Listed text comes first, so it wins where it and a name start at the same place.
-  const listed = [...replaced.keys(), ...kept.flatMap(([, ...text]) => text)].map(escapeRegExp);
-  const pattern = new RegExp([...listed, NAME.source].join("|"), "g");
+  const listedText = [...replaced.keys(), ...kept.flatMap(([, ...text]) => text)];
+  const listed = new Set(listedText);
+  const sources = [...listedText.map(escapeRegExp), NAME.source, COMMAND.source, HOME.source];
+  if (words) sources.push(COMMAND_WORD.source);
   return code.replace(
-    pattern,
-    (match: string, space?: string, word?: string) =>
-      replaced.get(match) ?? (word === undefined ? match : `Catgirl${space}${word}`),
+    new RegExp(sources.join("|"), "g"),
+    (match: string, space?: string, word?: string) => {
+      const to = replaced.get(match);
+      if (to !== undefined) return to;
+      if (word !== undefined) return `Catgirl${space}${word}`;
+      if (listed.has(match)) return match;
+      return match === LEGACY_COMMAND ? CATGIRL_COMMAND : `~/${CATGIRL_HOME_DIR}`;
+    },
   );
 };
 
@@ -205,7 +265,7 @@ export function rebrandCatalog(
       if (dataFormat === undefined) onUnknownKey(key);
       else renamedKey = hashSource({ source: renamedSource, dataFormat });
     }
-    rebranded[renamedKey] = renameIn(translation, TRANSLATED_NAME);
+    rebranded[renamedKey] = renameIn(translation, TRANSLATED_NAME, true);
   }
   return rebranded;
 }

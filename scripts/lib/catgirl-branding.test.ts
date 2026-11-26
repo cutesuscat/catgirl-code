@@ -27,7 +27,58 @@ describe("renameProduct", () => {
       'gt("Restart Catgirl Code to use Catgirl Connect")',
     );
     expect(renameProduct("<T>Open T3\n  Code</T>")).toBe("<T>Open Catgirl\n  Code</T>");
-    expect(renameProduct('"T3 Chat" "T3 Codex" "t3 code"')).toBe('"T3 Chat" "T3 Codex" "t3 code"');
+    expect(renameProduct('"T3 Chat" "T3 Codex" "t3code"')).toBe('"T3 Chat" "T3 Codex" "t3code"');
+  });
+
+  it("names the catcode command where text names the t3 command", () => {
+    expect(renameProduct('message: "Run `t3 up`, then `t3`."')).toBe(
+      'message: "Run `catcode up`, then `catcode`."',
+    );
+    expect(renameProduct("`Same as \\`t3\\`. Run \\`t3 service status\\`.`")).toBe(
+      "`Same as \\`catcode\\`. Run \\`catcode service status\\`.`",
+    );
+    expect(renameProduct('{ command: "t3 up --lan", label: "t3 pair" }')).toBe(
+      '{ command: "catcode up --lan", label: "catcode pair" }',
+    );
+    // A string's own text, as the phone's Babel plugin and the catalogs pass it.
+    expect(renameProduct("t3 auth pairing create")).toBe("catcode auth pairing create");
+    expect(renameProduct('<code className="font-mono">t3</code>')).toBe(
+      '<code className="font-mono">catcode</code>',
+    );
+    expect(renameProduct("<code>t3 auth pairing create</code>")).toBe(
+      "<code>catcode auth pairing create</code>",
+    );
+    expect(renameProduct("set it in userdata/settings.json in its home (~/.t3).")).toBe(
+      "set it in userdata/settings.json in its home (~/.catcode).",
+    );
+  });
+
+  it("names the command in a file that has listed text, and as a plain word in the CLI's own", () => {
+    const install = "/repo/apps/server/src/cli/install.ts";
+    expect(
+      renameProduct('withDescription("Install this version as the `t3` command.")', install),
+    ).toBe('withDescription("Install this version as the `catcode` command.")');
+    expect(renameProduct("`Installed t3 ${version} at ${link}. Keep using npx t3.`", install)).toBe(
+      "`Installed catcode ${version} at ${link}. Keep using npx t3.`",
+    );
+    const uninstall = "/repo/apps/server/src/cli/uninstall.ts";
+    expect(
+      renameProduct(
+        '"Remove t3 from this machine?" "@t3tools/x" t3code `npm uninstall -g t3`',
+        uninstall,
+      ),
+    ).toBe('"Remove catcode from this machine?" "@t3tools/x" t3code `npm uninstall -g t3`');
+    expect(
+      renameProduct('"Remove t3 from this machine?"', "/repo/apps/server/src/cli/other.ts"),
+    ).toBe('"Remove t3 from this machine?"');
+  });
+
+  it("leaves code that names t3 for another reason", () => {
+    const code =
+      'owner: "t3"; prefix = "t3"; `${HOME}/.t3`; "$HOME/.t3/x"; t3.json; "t3code"; run-t3.sh; { t3, spec }; "T3 thread"';
+    expect(renameProduct(code)).toBe(code);
+    const checkpoint = "const message = `t3 checkpoint ref=${ref}`;";
+    expect(renameProduct(checkpoint, "/repo/apps/server/src/vcs/GitVcsDriver.ts")).toBe(checkpoint);
   });
 
   it("leaves the names of upstream's own things", () => {
@@ -110,6 +161,29 @@ describe("rebrandCatalog", () => {
     });
   });
 
+  it("moves a translation that names the command, and renames the command in it", () => {
+    const english = "Run `t3 connect link` on the host.";
+    const german = { [key(english, "ICU")]: "Führe `t3 connect link` auf dem Host aus." };
+    expect(rebrandCatalog(german, { [key(english, "ICU")]: english }, hashSource)).toEqual({
+      [key("Run `catcode connect link` on the host.", "ICU")]:
+        "Führe `catcode connect link` auf dem Host aus.",
+    });
+  });
+
+  it("renames the command in a code element, and every t3 a translator wrote", () => {
+    const english = ["Use ", { t: "code", i: 1, c: "t3" }, " from any terminal."];
+    const japanese = {
+      [key(english, "JSX")]: [{ t: "code", i: 1, c: "t3" }, " を使う。t3 pair も。"],
+    };
+    const renamedEnglish = ["Use ", { t: "code", i: 1, c: "catcode" }, " from any terminal."];
+    expect(rebrandCatalog(japanese, { [key(english, "JSX")]: english }, hashSource)).toEqual({
+      [key(renamedEnglish, "JSX")]: [
+        { t: "code", i: 1, c: "catcode" },
+        " を使う。catcode pair も。",
+      ],
+    });
+  });
+
   it("leaves an entry that only names upstream's own things", () => {
     const english = { abc: "Enable T3 Code SnapShots to start capturing windows." };
     const german = { abc: "Aktiviere T3 Code SnapShots, um Fenster aufzunehmen." };
@@ -134,8 +208,10 @@ describe("rebrandCatalog", () => {
     (app) => {
       const appHashSource = loadHashSource(repoFile(`apps/${app}/package.json`));
       const english = readCatalog(app, "en");
-      const named = Object.values(english).filter(
-        (source) => renameProduct(JSON.stringify(source)) !== JSON.stringify(source),
+      // The entries whose English the rename changes: the product, the command, a `t3` element.
+      const named = Object.keys(english).filter(
+        (key) =>
+          !Object.hasOwn(rebrandCatalog({ [key]: english[key] }, english, appHashSource), key),
       );
       expect(named.length).toBeGreaterThan(0);
       for (const locale of ["en", "de", "ja", "sv"]) {
