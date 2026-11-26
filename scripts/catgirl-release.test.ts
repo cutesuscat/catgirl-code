@@ -5,7 +5,12 @@ import * as NodeURL from "node:url";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { CATGIRL_RELEASE_REPOSITORY, CATGIRL_VERSION } from "@t3tools/shared/catgirlRelease";
+import {
+  CATGIRL_INSTALL_COMMAND,
+  CATGIRL_RELEASE_REPOSITORY,
+  CATGIRL_RELEASES_PAGE_URL,
+  CATGIRL_VERSION,
+} from "@t3tools/shared/catgirlRelease";
 import {
   catgirlInstallScript,
   releaseRepositoryProblem,
@@ -57,5 +62,18 @@ describe("the release repository", () => {
   it("is the one the apps fetch from", () => {
     expect(releaseRepositoryProblem(CATGIRL_RELEASE_REPOSITORY)).toBeUndefined();
     expect(releaseRepositoryProblem("pingdotgg/t3code")).toContain("CATGIRL_RELEASE_REPOSITORY");
+  });
+});
+
+// The README is the one place outside the code that spells the repository out.
+describe("the README", () => {
+  it("gives the install command and the release address the code uses", () => {
+    const readme = NodeFS.readFileSync(
+      NodeURL.fileURLToPath(new URL("../README.md", import.meta.url)),
+      "utf8",
+    );
+    expect(readme).toContain(CATGIRL_INSTALL_COMMAND);
+    expect(readme).toContain(`T3CODE_RELEASE_BASE_URL=${CATGIRL_RELEASES_PAGE_URL}/download`);
+    expect(readme).toContain("unofficial fork");
   });
 });
