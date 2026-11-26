@@ -495,6 +495,13 @@ export const upCommand = Command.make("up", {
 export const connectCommand = Command.make("connect", {
   ...projectLocationFlags,
   headless: headlessFlag,
+  // Read and removed before parsing (cloud/connectServiceStartup.ts); declared for --help.
+  relay: Flag.String("relay").pipe(
+    Flag.withDescription(
+      "Use the Catgirl Connect service at this address or setup link, checking its signed identity first. `none` goes back to the build's.",
+    ),
+    Flag.optional,
+  ),
 }).pipe(
   Command.withDescription("Set up T3 Connect for this machine. Same as `t3 up --connect`."),
   Command.withHandler((flags) =>

@@ -41,6 +41,9 @@ export async function runCliCommand() {
     // Windows desktop launches without stdin; attach before reading, except on fast paths using pipes.
     const { attachConsoleStdin } = await import("./cli/consoleStdin.ts");
     attachConsoleStdin();
+    // Catgirl Connect: `t3 connect --relay`, and a machine's saved service, before config is read.
+    const { prepareConnectServiceForCli } = await import("./cloud/connectServiceNode.ts");
+    if (!(await prepareConnectServiceForCli())) return;
     const importStart = performance.now();
     const { runCli } = await import("./binCli.ts");
     if (process.env.T3CODE_STARTUP_PROFILE_DIR) {
