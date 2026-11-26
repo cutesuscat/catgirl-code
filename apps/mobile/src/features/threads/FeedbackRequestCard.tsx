@@ -11,6 +11,12 @@ import {
   feedbackTraceSummary,
 } from "@t3tools/client-runtime/feedback-request";
 import {
+  CATGIRL_FEEDBACK_CARD,
+  catgirlFeedbackIssueUrl,
+  feedbackRecipientOf,
+  isCatgirlFeedbackCard,
+} from "@t3tools/client-runtime/catgirl-feedback";
+import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
@@ -27,6 +33,8 @@ import { SymbolView, type AppSymbolName } from "../../components/ui/AppSymbol";
 import { AppText as Text } from "../../components/ui/AppText";
 import { Button } from "../../components/ui/Button";
 import { ThemedSwitch } from "../../components/ui/ThemedSwitch";
+import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
+import { useEnvironmentServerConfig } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 
@@ -46,6 +54,9 @@ export function FeedbackRequestCard(props: {
   if (display.kind === "pending") {
     return <PendingFeedbackRequest environmentId={props.environmentId} item={item} />;
   }
+  // Catgirl Code: a card that went to Catgirl Code says so, and can open its issue again.
+  const catgirlSent =
+    isCatgirlFeedbackCard(item) && display.kind === "answered" && display.outcome === "sent";
   const icon: AppSymbolName =
     display.kind === "pending-elsewhere"
       ? LOCK_SYMBOL
@@ -62,10 +73,14 @@ export function FeedbackRequestCard(props: {
       >
         <SymbolView name={icon} size={13} tintColor={props.iconColor} type="monochrome" />
         <Text className="flex-1 font-sans text-sm text-foreground-muted" numberOfLines={2}>
-          {m(TITLE)} · {display.label}
+          {isCatgirlFeedbackCard(item) ? CATGIRL_FEEDBACK_CARD.title : m(TITLE)} ·{" "}
+          {catgirlSent ? CATGIRL_FEEDBACK_CARD.sentLabel : display.label}
         </Text>
       </Pressable>
       {open ? <FeedbackPreview preview={item.preview} /> : null}
+      {open && catgirlSent ? (
+        <OpenCatgirlIssue environmentId={props.environmentId} preview={item.preview} />
+      ) : null}
     </View>
   );
 }
@@ -88,9 +103,18 @@ function PendingFeedbackRequest(props: {
   const [includeConversation, setIncludeConversation] = useState(false);
   // Two taps can land before a re-render; this guard is synchronous.
   const inFlight = useRef(false);
+  const config = useEnvironmentServerConfig(props.environmentId);
+  const recipient = feedbackRecipientOf(config);
+  const catgirl = recipient === "catgirl-code";
 
   const send = async (reply: "send" | "decline") => {
     if (inFlight.current) return;
+    // Built before the answer, from exactly what the card shows.
+    const issue = catgirl
+      ? catgirlFeedbackIssueUrl(feedbackCardPreview(props.item, includeConversation), {
+          version: config?.environment.serverVersion,
+        })
+      : undefined;
     inFlight.current = true;
     setSubmitting(true);
     setError(null);
@@ -101,11 +125,15 @@ function PendingFeedbackRequest(props: {
         turnItemId: props.item.id,
         answer: reply,
         includeConversation,
+        ...(config?.environment.capabilities.agentFeedbackRecipient === true ? { recipient } : {}),
       },
     }).finally(() => {
       inFlight.current = false;
       setSubmitting(false);
     });
+    if (result._tag === "Success" && reply === "send" && issue !== undefined) {
+      void tryOpenExternalUrl(issue);
+    }
     if (result._tag === "Success" || isAtomCommandInterrupted(result)) return;
     pipe(
       squashAtomCommandFailure(result),
@@ -118,10 +146,14 @@ function PendingFeedbackRequest(props: {
     <View className="mb-3 gap-3 rounded-[20px] border border-border bg-card-alt p-4">
       <View className="gap-1">
         <Text className="font-t3-bold text-base text-foreground">
-          <T>Send this report to the T3 team?</T>
+          {catgirl ? CATGIRL_FEEDBACK_CARD.heading : <T>Send this report to the T3 team?</T>}
         </Text>
         <Text className="font-sans text-xs text-foreground-muted">
-          <T>This is everything that leaves your machine. Nothing is sent unless you tap Send.</T>
+          {catgirl ? (
+            CATGIRL_FEEDBACK_CARD.detail
+          ) : (
+            <T>This is everything that leaves your machine. Nothing is sent unless you tap Send.</T>
+          )}
         </Text>
       </View>
       {props.item.conversationTrace !== undefined ? (
@@ -153,7 +185,7 @@ function PendingFeedbackRequest(props: {
         </Text>
       ) : null}
       <Button
-        label={gt("Send")}
+        label={catgirl ? CATGIRL_FEEDBACK_CARD.send : gt("Send")}
         tone="primary"
         fullWidth
         disabled={submitting || !canAnswer}
@@ -166,6 +198,20 @@ function PendingFeedbackRequest(props: {
         onPress={() => void send("decline")}
       />
     </View>
+  );
+}
+
+function OpenCatgirlIssue(props: {
+  readonly environmentId: EnvironmentId;
+  readonly preview: AgentFeedbackPreview;
+}) {
+  const version = useEnvironmentServerConfig(props.environmentId)?.environment.serverVersion;
+  return (
+    <Button
+      label={CATGIRL_FEEDBACK_CARD.openAgain}
+      tone="text"
+      onPress={() => void tryOpenExternalUrl(catgirlFeedbackIssueUrl(props.preview, { version }))}
+    />
   );
 }
 

@@ -23,6 +23,10 @@ import { mobilePreferencesAtom, saveMobilePreferences } from "../../state/prefer
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { ListChoiceRow as SettingsChoiceRow } from "../../components/ui/ListChoiceRow";
+import {
+  AGENT_FEEDBACK_RECIPIENT_CHOICES,
+  AGENT_FEEDBACK_RECIPIENT_NOTE,
+} from "./agentFeedbackRecipientChoices";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -306,6 +310,10 @@ function AgentFeedbackSection() {
         const policy = environment.serverConfig?.managedPolicy;
         const managed = isManagedSettingPath(policy, "agentFeedback");
         const mode = environment.serverConfig?.settings.agentFeedback.mode;
+        const setting = environment.serverConfig?.settings.agentFeedback;
+        // Catgirl Code: a machine that lets you pick who gets reports lists recipients too.
+        const recipients =
+          environment.serverConfig?.environment.capabilities.agentFeedbackRecipient === true;
         return (
           <SettingsSection
             key={environment.environmentId}
@@ -318,31 +326,58 @@ function AgentFeedbackSection() {
               ? { footer: gt("Managed by {organization}.", { organization: policy?.organization }) }
               : {})}
           >
-            {AGENT_FEEDBACK_CHOICES.map((choice, index) => (
-              <SettingsChoiceRow
-                key={choice.mode}
-                label={m(choice.label)}
-                description={m(choice.description)}
-                selected={mode === choice.mode}
-                separated={index > 0}
-                disabled={managed || !writable.has(environment.environmentId)}
-                onPress={() =>
-                  void updateSettings({
-                    environmentId: environment.environmentId,
-                    input: { patch: { agentFeedback: { mode: choice.mode } } },
-                  })
-                }
-              />
-            ))}
+            {recipients && setting !== undefined
+              ? AGENT_FEEDBACK_RECIPIENT_CHOICES.map((choice, index) => (
+                  <SettingsChoiceRow
+                    key={choice.key}
+                    label={choice.label}
+                    description={choice.description}
+                    selected={choice.selected(setting)}
+                    separated={index > 0}
+                    disabled={managed || !writable.has(environment.environmentId)}
+                    onPress={() =>
+                      void updateSettings({
+                        environmentId: environment.environmentId,
+                        input: { patch: { agentFeedback: choice.patch(setting) } },
+                      })
+                    }
+                  />
+                ))
+              : null}
+            {recipients
+              ? null
+              : AGENT_FEEDBACK_CHOICES.map((choice, index) => (
+                  <SettingsChoiceRow
+                    key={choice.mode}
+                    label={m(choice.label)}
+                    description={m(choice.description)}
+                    selected={mode === choice.mode}
+                    separated={index > 0}
+                    disabled={managed || !writable.has(environment.environmentId)}
+                    onPress={() =>
+                      void updateSettings({
+                        environmentId: environment.environmentId,
+                        input: { patch: { agentFeedback: { mode: choice.mode } } },
+                      })
+                    }
+                  />
+                ))}
           </SettingsSection>
         );
       })}
       <Text className="px-2 text-sm text-foreground-muted">
-        <T>
-          Reports go to the T3 team. A report you ask for is shown to you first in a card, with an
-          outline of recent turns. Turn on Include the conversation there to add the messages of the
-          turns the report is about.
-        </T>
+        {supported.some(
+          (environment) =>
+            environment.serverConfig?.environment.capabilities.agentFeedbackRecipient === true,
+        ) ? (
+          AGENT_FEEDBACK_RECIPIENT_NOTE
+        ) : (
+          <T>
+            Reports go to the T3 team. A report you ask for is shown to you first in a card, with an
+            outline of recent turns. Turn on Include the conversation there to add the messages of
+            the turns the report is about.
+          </T>
+        )}
       </Text>
     </View>
   );
