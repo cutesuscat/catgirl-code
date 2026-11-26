@@ -5,6 +5,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
+import { isSameHome } from "@t3tools/shared/catgirlHome";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -97,7 +98,7 @@ const make = Effect.gen(function* () {
     const recordPath = NodePath.join(directory, file);
     const record = readRecord(recordPath);
     if (record === undefined) continue;
-    if (record.hostname !== hostname || record.stateDir !== stateDir) continue;
+    if (record.hostname !== hostname || !isSameHome(record.stateDir, stateDir)) continue;
     if (matches(record.owner)) {
       if (record.owner.pid !== process.pid) hasOtherLiveOwner = true;
       continue;

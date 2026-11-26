@@ -5,6 +5,11 @@
 /** The GitHub repository whose releases hold this fork's builds. Rename it here and nowhere else. */
 export const CATGIRL_RELEASE_REPOSITORY = "cutesuscat/catgirl-code";
 
+/** The folder in a person's home that holds the server's state, unless T3CODE_HOME names another. */
+export const CATGIRL_HOME_DIR = ".catcode";
+/** T3 Code's folder for the same state. An older one is moved and left as a link (catgirlHome.ts). */
+export const LEGACY_HOME_DIR = ".t3";
+
 /** The T3 Code release this source is based on. Move it when the fork moves to a newer one. */
 export const CATGIRL_UPSTREAM_VERSION = "0.1.12";
 /** Which Catgirl Code build of that release this is. Starts at 1; raise it for every release. */

@@ -4,6 +4,8 @@ import * as NodeOS from "node:os";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import { resolveCatgirlHome } from "@t3tools/shared/catgirlHome";
+import { CATGIRL_HOME_DIR } from "@t3tools/shared/catgirlRelease";
 import * as NetService from "@t3tools/shared/Net";
 import { resolveGitWorktreePath, resolveWorktreeT3Home } from "@t3tools/shared/devHome";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -331,8 +333,11 @@ export const createDevRunnerEnv = Effect.fn("dev-runner.createDevRunnerEnv")(fun
 
   const path = yield* Path.Path;
   // The server stores an explicit home's state in userdata, which for ~/.t3 is the live
-  // install. Left implicit, dev state goes to ~/.t3/dev.
-  const isLiveHome = resolvedBaseDir === path.join(yield* HostProcess.HomeDirectory, ".t3");
+  // install. Left implicit, dev state goes to ~/.t3/dev. Catgirl Code's live home is ~/.catcode.
+  const home = yield* HostProcess.HomeDirectory;
+  const isLiveHome = [".t3", CATGIRL_HOME_DIR].some(
+    (dir) => resolvedBaseDir === path.join(home, dir),
+  );
   if (configuredBaseDir !== undefined && !isLiveHome) {
     output.T3CODE_HOME = resolvedBaseDir;
   } else {
@@ -643,7 +648,8 @@ const prepareFirstStart = Effect.fn("dev-runner.prepareFirstStart")(function* (i
         );
       }
     }
-    const source = path.join(yield* HostProcess.HomeDirectory, ".t3", "userdata", "statev2.sqlite");
+    const liveHome = resolveCatgirlHome(yield* HostProcess.HomeDirectory, { move: false });
+    const source = path.join(liveHome, "userdata", "statev2.sqlite");
     // A V1 state.sqlite counts as data too: the server imports it only while
     // statev2.sqlite is missing, so seeding would hide it.
     if (

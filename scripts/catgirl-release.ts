@@ -7,7 +7,9 @@
 import * as NodeFS from "node:fs";
 import * as NodeURL from "node:url";
 
+import { CATGIRL_HOME_SHELL_FUNCTION } from "@t3tools/shared/catgirlHomeScript";
 import {
+  CATGIRL_HOME_DIR,
   CATGIRL_INSTALL_SCRIPT_URL,
   CATGIRL_LETTER_VERSION,
   CATGIRL_RELEASE_REPOSITORY,
@@ -27,9 +29,15 @@ const NAME_LINE = `  printf '  Catgirl Code %s%sserver installer%s\\n' "$reset" 
 `;
 
 // Each is text of T3 Code's scripts/install.sh that must not reach a fork's installer: its
-// repository, its site, its logo, and its npm package, which has no Catgirl Code builds.
+// repository, its site, its logo, its npm package, which has no Catgirl Code builds, and its home,
+// which the fork's installer moves before it writes anything there.
 const INSTALL_SCRIPT_EDITS: ReadonlyArray<readonly [from: string, to: string]> = [
   ['repo="pingdotgg/t3code"', `repo="${CATGIRL_RELEASE_REPOSITORY}"`],
+  ["T3 home directory (default: ~/.t3)", `home directory (default: ~/${CATGIRL_HOME_DIR})`],
+  [
+    't3_home="${T3CODE_HOME:-$HOME/.t3}"',
+    `${CATGIRL_HOME_SHELL_FUNCTION}\nt3_home="\${T3CODE_HOME:-$(catgirl_home)}"`,
+  ],
   ["https://t3.codes/install.sh", CATGIRL_INSTALL_SCRIPT_URL],
   ["https://t3.codes/download", CATGIRL_RELEASES_PAGE_URL],
   [LOGO_LINES, NAME_LINE],

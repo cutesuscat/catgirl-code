@@ -6,6 +6,7 @@ import * as NodeOS from "node:os";
 // @effect-diagnostics-next-line nodeBuiltinImport:off - runs before the Effect runtime exists.
 import * as NodePath from "node:path";
 
+import { resolveCatgirlHome } from "@t3tools/shared/catgirlHome";
 import type * as Undici from "undici";
 
 // undici is external to the CLI bundle; Node single-executables can load it from disk only with require.
@@ -46,7 +47,7 @@ export function readTlsClientCertificate(
   env: NodeJS.ProcessEnv = process.env,
   homeDir: string = NodeOS.homedir(),
 ): TlsClientCertificate | undefined {
-  const t3Home = env.T3CODE_HOME?.trim() || NodePath.join(homeDir, ".t3");
+  const t3Home = env.T3CODE_HOME?.trim() || resolveCatgirlHome(homeDir);
   const certPath =
     env.T3CODE_TLS_CLIENT_CERT?.trim() || NodePath.join(t3Home, "client-cert", "client.crt");
   const keyPath =

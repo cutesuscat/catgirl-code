@@ -1,6 +1,7 @@
 // @effect-diagnostics globalDate:off globalConsole:off - Runs in bin.ts before the CLI and its Effect runtime load.
 // Catgirl Connect on a machine: `t3 connect --relay`, and the service a machine saved, read at start.
 import type { ConnectServiceSettings } from "@t3tools/contracts";
+import { resolveCatgirlHome } from "@t3tools/shared/catgirlHome";
 import {
   connectDiagnosticsOffers,
   connectHostedAppUrl,
@@ -59,14 +60,14 @@ function flagValue(argv: ReadonlyArray<string>, name: string) {
   return null;
 }
 
-/** Where the server keeps its state: `--base-dir`, else `T3CODE_HOME`, else `~/.t3`; then `userdata`. */
+/** Where the server keeps its state: `--base-dir`, else `T3CODE_HOME`, else `~/.catcode`; then `userdata`. */
 export function connectServiceFilePath(
   io: Pick<ConnectServiceStartupIo, "argv" | "env" | "homeDirectory">,
 ) {
   const explicit = flagValue(io.argv, "base-dir")?.value?.trim() || io.env.T3CODE_HOME?.trim();
   const base = explicit
     ? explicit.replace(/^~(?=$|\/)/u, io.homeDirectory)
-    : `${io.homeDirectory}/.t3`;
+    : resolveCatgirlHome(io.homeDirectory);
   return `${base.replace(/\/+$/u, "")}/userdata/${CONNECT_SERVICE_FILE}`;
 }
 

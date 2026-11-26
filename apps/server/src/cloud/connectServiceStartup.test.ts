@@ -18,7 +18,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const at = (days: number) => new Date(NOW.getTime() + days * DAY).toISOString();
 const OLD_FP = "3475 0f98 bd59 fcfc";
 const NEW_FP = "6a38 03d5 f059 902a";
-const FILE = "/home/cat/.t3/userdata/connect-service.json";
+const FILE = "/home/cat/.catcode/userdata/connect-service.json";
 
 const payload = (changes: Record<string, unknown> = {}, signIn: Record<string, unknown> = {}) => ({
   version: 2,

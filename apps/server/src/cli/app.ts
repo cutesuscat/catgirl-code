@@ -218,9 +218,11 @@ const runAppCommand = Effect.fn("cli.app")(function* (flags: {
     Option.getOrUndefined(flags.workspaceRoot) ?? (yield* HostProcess.WorkingDirectory);
   const workspaceRoot = path.resolve(yield* expandHomePath(rawWorkspaceRoot));
   const userId = yield* HostProcess.UserId;
+  // The real path, as the app names it: ~/.t3 and ~/.catcode are one home after the move.
+  const realBaseDir = yield* Effect.promise(() => NodeFSP.realpath(baseDir).catch(() => baseDir));
   const resolveAddress = (stateSubdirectory: "userdata" | "dev") =>
     resolveDesktopAppControlAddress({
-      stateDir: path.join(baseDir, stateSubdirectory),
+      stateDir: path.join(realBaseDir, stateSubdirectory),
       platform: hostPlatform,
       tempDir: NodeOS.tmpdir(),
       userId,

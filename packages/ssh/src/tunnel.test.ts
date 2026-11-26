@@ -34,7 +34,12 @@ import { captureLauncher, captureLauncherFor, runLauncher } from "./launcherTest
 import * as SshAuth from "./auth.ts";
 import { remoteStateKey } from "./command.ts";
 import { SshCommandError, SshPasswordPromptError, SshReadinessError } from "./errors.ts";
-import { decodeRemoteLaunchOutput } from "./remoteScripts.ts";
+import {
+  buildRemoteLogTailScript,
+  buildRemotePairingScript,
+  buildRemoteStopScript,
+  decodeRemoteLaunchOutput,
+} from "./remoteScripts.ts";
 import * as SshTunnel from "./tunnel.ts";
 
 const isSshCommandError = Schema.is(SshCommandError);
@@ -230,7 +235,7 @@ describe("ssh tunnel scripts", () => {
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "t3-ssh-launch-log-" });
       const target = { alias: "devbox", hostname: "devbox", username: null, port: null };
-      const stateDir = NodePath.join(home, ".t3", "ssh-launch", yield* remoteStateKey(target));
+      const stateDir = NodePath.join(home, ".catcode", "ssh-launch", yield* remoteStateKey(target));
       const bin = NodePath.join(home, "bin");
       yield* fs.makeDirectory(stateDir, { recursive: true });
       yield* fs.makeDirectory(bin);
@@ -1320,7 +1325,7 @@ describe("ssh tunnel scripts", () => {
 child.on("exit", (code) => process.exit(code ?? 1));`,
         );
         // A launch that died holding the lock must not block or double-admit later ones.
-        const launchLock = path.join(home, ".t3", "ssh-launch", ".launch.lock");
+        const launchLock = path.join(home, ".catcode", "ssh-launch", ".launch.lock");
         yield* fs.makeDirectory(path.dirname(launchLock), { recursive: true });
         yield* fs.writeFileString(launchLock, "999999999\n");
         const targets = [
@@ -1338,7 +1343,7 @@ child.on("exit", (code) => process.exit(code ?? 1));`,
         ).pipe(Effect.provide(localRemoteShellLayer(home)));
 
         const ownerPid = Number(
-          yield* fs.readFileString(path.join(home, ".t3", "userdata", "server.lock")),
+          yield* fs.readFileString(path.join(home, ".catcode", "userdata", "server.lock")),
         );
         assert.sameMembers(
           launches.map((launch) => launch.remoteServerKind),
@@ -1352,7 +1357,7 @@ child.on("exit", (code) => process.exit(code ?? 1));`,
           if (launch.remoteServerKind !== "managed") continue;
           const stateKey = yield* remoteStateKey(targets[index]!);
           const recordedPid = yield* fs.readFileString(
-            path.join(home, ".t3", "ssh-launch", stateKey, "pid"),
+            path.join(home, ".catcode", "ssh-launch", stateKey, "pid"),
           );
           assert.equal(
             Number(recordedPid.trim()),
@@ -1455,7 +1460,7 @@ server.listen(Number(flag("--port") ?? 0), "127.0.0.1", () => {
         holderPort,
         sshAsLocalShell,
         staleId: staleId === "an unrelated process" ? holder.pid : tid,
-        stateDir: `${home}/.t3/ssh-launch/${yield* remoteStateKey(target)}`,
+        stateDir: `${home}/.catcode/ssh-launch/${yield* remoteStateKey(target)}`,
       };
     });
 
@@ -1489,7 +1494,7 @@ server.listen(Number(flag("--port") ?? 0), "127.0.0.1", () => {
       // Reboot: our server is gone and its recorded PID now names something that
       // answers on the recorded port.
       process.kill(firstPid, "SIGKILL");
-      yield* fs.remove(`${home}/.t3/userdata/server-runtime.json`);
+      yield* fs.remove(`${home}/.catcode/userdata/server-runtime.json`);
       yield* fs.writeFileString(`${stateDir}/pid`, `${staleId}\n`);
       yield* fs.writeFileString(`${stateDir}/port`, `${holderPort}\n`);
 
@@ -1554,7 +1559,7 @@ server.listen(Number(flag("--port") ?? 0), "127.0.0.1", () => {
           launcherId,
         ).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, sshAsLocalShell));
       const runtimePid = fs
-        .readFileString(`${home}/.t3/userdata/server-runtime.json`)
+        .readFileString(`${home}/.catcode/userdata/server-runtime.json`)
         .pipe(Effect.map((runtime) => Number(JSON.parse(runtime).pid)));
       const launchedPids: Array<number> = [];
       yield* Effect.addFinalizer(() =>
@@ -1631,7 +1636,7 @@ server.listen(Number(flag("--port") ?? 0), "127.0.0.1", () => {
             launcherId,
           ).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, sshAsLocalShell));
         const runtimePid = fs
-          .readFileString(`${home}/.t3/userdata/server-runtime.json`)
+          .readFileString(`${home}/.catcode/userdata/server-runtime.json`)
           .pipe(Effect.map((runtime) => Number(JSON.parse(runtime).pid)));
 
         assert.equal((yield* launch("a".repeat(32))).remoteServerKind, "managed");
@@ -1816,18 +1821,18 @@ const canBind = (port) =>
   // Installs a fake runtime per version so the runner never downloads. The
   // seeded remembered port keeps the test off the default 3773, which a live
   // T3 on this machine may own.
-  const prepareLaunch = (versions: ReadonlyArray<string>) =>
+  const prepareLaunch = (versions: ReadonlyArray<string>, homeDir = ".catcode") =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-archive-launch-" });
       const home = `${root}/home`;
-      const stateDir = `${home}/.t3/ssh-launch/test-state`;
+      const stateDir = `${home}/${homeDir}/ssh-launch/test-state`;
       const fakeT3 = `${root}/fake-t3.cjs`;
       yield* fs.makeDirectory(stateDir, { recursive: true });
       yield* fs.writeFileString(`${stateDir}/port`, `${yield* freeLoopbackPort}\n`);
       yield* fs.writeFileString(fakeT3, FAKE_T3);
       for (const version of versions) {
-        const runtimeDir = `${home}/.t3/runtime/versions/${version}`;
+        const runtimeDir = `${home}/${homeDir}/runtime/versions/${version}`;
         yield* fs.makeDirectory(runtimeDir, { recursive: true });
         // The runner gets only HOME, so `node` would resolve on sh's default PATH, which may not have it.
         yield* fs.writeFileString(
@@ -1841,7 +1846,7 @@ const canBind = (port) =>
         .readFileString(`${stateDir}/pid`)
         .pipe(Effect.map((pid) => Number(pid.trim())));
       const readServerVersion = fs
-        .readFileString(`${home}/.t3/userdata/server-runtime.json`)
+        .readFileString(`${home}/.catcode/userdata/server-runtime.json`)
         .pipe(Effect.map((raw) => (JSON.parse(raw) as { serverVersion: string }).serverVersion));
       // Launched servers outlive the script, so stop each PID it recorded.
       const launchedPids = new Set<number>();
@@ -1871,7 +1876,7 @@ const canBind = (port) =>
           return pid;
         });
       const readServerTelemetry = fs
-        .readFileString(`${home}/.t3/userdata/server-runtime.json`)
+        .readFileString(`${home}/.catcode/userdata/server-runtime.json`)
         .pipe(Effect.map((raw) => (JSON.parse(raw) as { telemetry?: string }).telemetry));
       return { connect, home, readManagedPid, readServerVersion, readServerTelemetry };
     });
@@ -1906,6 +1911,51 @@ const canBind = (port) =>
       }).pipe(Effect.provide(NodeServices.layer)),
   );
 
+  it.live.skipIf(windowsHost)("moves an older ~/.t3 to ~/.catcode before the server starts", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const { connect, home, readServerVersion } = yield* prepareLaunch(["0.1.6"], ".t3");
+      yield* fs.writeFileString(`${home}/.t3/threads.sqlite`, "threads");
+      const pid = yield* connect("0.1.6");
+      assert.equal(yield* fs.readLink(`${home}/.t3`), ".catcode");
+      assert.equal(yield* fs.readFileString(`${home}/.catcode/threads.sqlite`), "threads");
+      assert.isFalse(yield* fs.exists(`${home}/.catcode/.t3`));
+      assert.equal(yield* readServerVersion, "0.1.6");
+      if (NodeFS.existsSync(`/proc/${pid}/cmdline`)) {
+        const args = NodeFS.readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0");
+        assert.equal(args[args.indexOf("--base-dir") + 1], `${home}/.catcode`);
+      }
+      // A later launch, or an older app's through the link, reuses that server.
+      assert.equal(yield* connect("0.1.6"), pid);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.live.skipIf(windowsHost)("pairing, stop and log scripts move an older ~/.t3 first", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      for (const script of [
+        buildRemotePairingScript("test-state", {
+          archiveVersion: "0.1.6",
+          releaseBaseUrl: "http://127.0.0.1:9",
+        }),
+        buildRemoteStopScript("test-state", null),
+        buildRemoteLogTailScript("test-state"),
+      ]) {
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-script-home-" });
+        const home = `${root}/home`;
+        yield* fs.makeDirectory(`${home}/.t3/ssh-launch/test-state`, { recursive: true });
+        yield* fs.writeFileString(`${home}/.t3/ssh-launch/test-state/server.log`, "earlier\n");
+        yield* fs.writeFileString(`${root}/script.sh`, script);
+        yield* runScript(home, [`${root}/script.sh`]);
+        assert.equal(yield* fs.readLink(`${home}/.t3`), ".catcode");
+        assert.equal(
+          yield* fs.readFileString(`${home}/.catcode/ssh-launch/test-state/server.log`),
+          "earlier\n",
+        );
+      }
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
   // An NFS home can carry a ~/.t3 symlink whose target exists only on another host.
   it.live.skipIf(windowsHost)("launches through a ~/.t3 symlink whose target is missing", () =>
     Effect.gen(function* () {
@@ -1935,9 +1985,12 @@ const canBind = (port) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const { connect, home, readServerVersion } = yield* prepareLaunch(["0.1.5", "0.1.6"]);
-        const record = `${home}/.t3/ssh-launch/test-state/update-deferred`;
+        const record = `${home}/.catcode/ssh-launch/test-state/update-deferred`;
         const olderPid = yield* connect("0.1.5");
-        yield* fs.writeFileString(`${home}/.t3/busy`, '{"reason":"busy","runningThreads":3}\n');
+        yield* fs.writeFileString(
+          `${home}/.catcode/busy`,
+          '{"reason":"busy","runningThreads":3}\n',
+        );
 
         assert.equal(yield* connect("0.1.6"), olderPid);
         assert.isTrue(isAlive(olderPid), "a busy 0.1.5 server was killed by a 0.1.6 client");
@@ -1946,7 +1999,7 @@ const canBind = (port) =>
         // The runner on the host is the newer one by now; only the record makes this launch ask again.
         assert.equal(yield* connect("0.1.6"), olderPid);
 
-        yield* fs.remove(`${home}/.t3/busy`);
+        yield* fs.remove(`${home}/.catcode/busy`);
         const newerPid = yield* connect("0.1.6");
         assert.notEqual(newerPid, olderPid);
         assert.isFalse(isAlive(olderPid));

@@ -1,3 +1,6 @@
+import { CATGIRL_HOME_SHELL_FUNCTION } from "@t3tools/shared/catgirlHomeScript";
+import { CATGIRL_HOME_DIR, LEGACY_HOME_DIR } from "@t3tools/shared/catgirlRelease";
+
 import { deviceToolMaintenanceScript } from "./deviceToolMaintenance.ts";
 import { AGENT_DEVICE_VERSION, DEVICE_HUB_VERSION } from "./DeviceToolchain.ts";
 
@@ -16,6 +19,8 @@ if [ -z "$JAVA_HOME" ] && ! command -v java >/dev/null 2>&1; then
   done
 fi
 if [ -n "$JAVA_HOME" ]; then export PATH="$JAVA_HOME/bin:$PATH"; fi
+${CATGIRL_HOME_SHELL_FUNCTION}
+catgirl_device_root="$(catgirl_home)/device"
 `;
 
 /** Runs on the host and returns host-local paths. */
@@ -36,7 +41,10 @@ const path = require('node:path');
 const os = require('node:os');
 const net = require('node:net');
 const { spawn, spawnSync } = require('node:child_process');
-const root = path.join(os.homedir(), '.t3', 'device');
+// The shell in front of this script has moved an older home; one it could not move is used as it is.
+const isFolder = (dir) => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } };
+const home = [${JSON.stringify(CATGIRL_HOME_DIR)}, ${JSON.stringify(LEGACY_HOME_DIR)}].map(name => path.join(os.homedir(), name)).find(isFolder) ?? path.join(os.homedir(), ${JSON.stringify(CATGIRL_HOME_DIR)});
+const root = path.join(home, 'device');
 const state = path.join(root, 'hosts', owner);
 const run = (command, args, options = {}) => spawnSync(command, args, { encoding: 'utf8', timeout: 30000, ...options });
 const read = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };

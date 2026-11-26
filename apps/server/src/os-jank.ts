@@ -1,3 +1,4 @@
+import { resolveCatgirlHome } from "@t3tools/shared/catgirlHome";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import {
   buildEnvironmentCaptureCommand,
@@ -250,9 +251,10 @@ export const expandHomePath = Effect.fn(function* (input: string) {
 });
 
 export const resolveBaseDir = Effect.fn(function* (raw: string | undefined) {
-  const { join, resolve } = yield* Path.Path;
+  const { resolve } = yield* Path.Path;
   if (!raw || raw.trim().length === 0) {
-    return join(yield* HostProcess.HomeDirectory, ".t3");
+    const home = yield* HostProcess.HomeDirectory;
+    return yield* Effect.sync(() => resolveCatgirlHome(home));
   }
   return resolve(yield* expandHomePath(raw.trim()));
 });

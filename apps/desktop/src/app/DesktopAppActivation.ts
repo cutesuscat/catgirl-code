@@ -294,6 +294,14 @@ export class DesktopAppActivation extends Context.Service<
 
 const { logWarning } = makeComponentLogger("desktop-app-activation");
 
+const realPathOr = (directory: string) => {
+  try {
+    return NodeFS.realpathSync(directory);
+  } catch {
+    return directory;
+  }
+};
+
 /** @public */
 export const make = Effect.gen(function* () {
   const desktopEnvironment = yield* DesktopEnvironment.DesktopEnvironment;
@@ -303,7 +311,8 @@ export const make = Effect.gen(function* () {
   const userId = yield* HostProcess.UserId;
   const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
   const address = resolveDesktopAppControlAddress({
-    stateDir: path.resolve(desktopEnvironment.stateDir),
+    // The real path, as the CLI names it: ~/.t3 and ~/.catcode are one home after the move.
+    stateDir: realPathOr(path.resolve(desktopEnvironment.stateDir)),
     platform: desktopEnvironment.platform,
     tempDir: NodeOS.tmpdir(),
     userId,

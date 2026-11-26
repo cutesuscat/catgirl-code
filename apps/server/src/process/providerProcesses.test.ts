@@ -62,7 +62,16 @@ describe.runIf(HostProcess.Platform.defaultValue() === "linux")("ProviderProcess
       const directory = NodePath.join(config.stateDir, "provider-processes");
       NodeFS.mkdirSync(directory, { recursive: true });
       type Identity = { readonly pid: number; readonly startTime: string };
-      const record = (owner: Identity, processes: ReadonlyArray<Identity>) => {
+      // The same home spelled another way, as ~/.t3 is after it moved to ~/.catcode.
+      const baseDir = NodePath.dirname(config.stateDir);
+      const oldSpelling = `${baseDir}-old-spelling`;
+      NodeFS.symlinkSync(baseDir, oldSpelling);
+      yield* Effect.addFinalizer(() => Effect.sync(() => NodeFS.rmSync(oldSpelling)));
+      const record = (
+        owner: Identity,
+        processes: ReadonlyArray<Identity>,
+        stateDir = config.stateDir,
+      ) => {
         const instanceId = NodeCrypto.randomUUID();
         NodeFS.writeFileSync(
           NodePath.join(directory, `${instanceId}.json`),
@@ -70,7 +79,7 @@ describe.runIf(HostProcess.Platform.defaultValue() === "linux")("ProviderProcess
             version: 1,
             instanceId,
             hostname: NodeOS.hostname(),
-            stateDir: config.stateDir,
+            stateDir,
             owner: { pid: owner.pid, startTime: owner.startTime },
             processes: processes.map(({ pid, startTime }) => ({ pid, startTime, pgid: 0 })),
           }),
@@ -88,7 +97,9 @@ describe.runIf(HostProcess.Platform.defaultValue() === "linux")("ProviderProcess
       const orphan = yield* ownedProcess;
       const orphanOfReusedOwner = yield* ownedProcess;
       const unrecorded = yield* ownedProcess;
+      const orphanOfOldSpelling = yield* ownedProcess;
       record(liveOwner, [liveProvider]);
+      record(deadOwner, [orphanOfOldSpelling], NodePath.join(oldSpelling, "userdata"));
       record(deadOwner, [reused(reusedProvider)]);
       record(deadOwner, [orphan]);
       record(reused(reusedOwner), [orphanOfReusedOwner]);
@@ -102,6 +113,7 @@ describe.runIf(HostProcess.Platform.defaultValue() === "linux")("ProviderProcess
       expect({
         orphan: orphan.running(),
         orphanOfReusedOwner: orphanOfReusedOwner.running(),
+        orphanOfOldSpelling: orphanOfOldSpelling.running(),
         liveProvider: liveProvider.running(),
         reusedProvider: reusedProvider.running(),
         reusedOwner: reusedOwner.running(),
@@ -109,6 +121,7 @@ describe.runIf(HostProcess.Platform.defaultValue() === "linux")("ProviderProcess
       }).toEqual({
         orphan: false,
         orphanOfReusedOwner: false,
+        orphanOfOldSpelling: false,
         liveProvider: true,
         reusedProvider: true,
         reusedOwner: true,

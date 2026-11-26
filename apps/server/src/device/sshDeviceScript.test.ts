@@ -296,3 +296,27 @@ http.createServer((_request, response) => response.end("ok")).listen(Number(args
     });
   }),
 );
+
+it.effect("moves an older ~/.t3 before device commands use the home", () =>
+  Effect.gen(function* () {
+    if ((yield* HostProcess.Platform) === "win32") return;
+    yield* Effect.promise(async () => {
+      const home = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-ssh-device-home-"));
+      try {
+        await NodeFSP.mkdir(NodePath.join(home, ".t3/device/hosts/owner"), { recursive: true });
+        const result = await exec(
+          "/bin/sh",
+          ["-c", `${remoteDeviceEnvironment}\necho "$catgirl_device_root"`],
+          {
+            env: { HOME: home, PATH: "/usr/bin:/bin" },
+          },
+        );
+        expect(result.stdout.trim()).toBe(NodePath.join(home, ".catcode/device"));
+        expect(await NodeFSP.readlink(NodePath.join(home, ".t3"))).toBe(".catcode");
+        await NodeFSP.access(NodePath.join(home, ".catcode/device/hosts/owner"));
+      } finally {
+        await NodeFSP.rm(home, { recursive: true, force: true });
+      }
+    });
+  }),
+);

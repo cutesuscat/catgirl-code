@@ -120,3 +120,49 @@ describe("DesktopHomeOwner.awaitHomeOwnershipRelease", () => {
     ),
   );
 });
+
+describe("DesktopHomeOwner after ~/.t3 moved to ~/.catcode", () => {
+  it.effect("sees a server that holds the home through the old spelling", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const person = yield* fs.makeTempDirectoryScoped({ prefix: "t3-desktop-person-" });
+      yield* fs.makeDirectory(`${person}/.t3/userdata`, { recursive: true });
+      // A server started on ~/.t3 before the move holds the lock and wrote its record there.
+      const held = new NodeSqlite.DatabaseSync(`${person}/.t3/userdata/server-owner.sqlite`);
+      held.exec("BEGIN EXCLUSIVE;");
+      yield* fs.writeFileString(
+        `${person}/.t3/userdata/server-runtime.json`,
+        JSON.stringify({ pid: process.pid, port: 3790, serverVersion: "1.12.3" }),
+      );
+      const seen = yield* Effect.gen(function* () {
+        const { stateDir } = yield* DesktopEnvironment.DesktopEnvironment;
+        const owned = yield* Effect.forkChild(DesktopHomeOwner.awaitHomeOwnershipRelease());
+        yield* TestClock.adjust("1 minute");
+        const released = yield* Fiber.join(owned);
+        return { stateDir, released, owner: yield* DesktopHomeOwner.readLiveHomeOwner() };
+      }).pipe(
+        Effect.provide(
+          DesktopEnvironment.layer({
+            dirname: "/repo/apps/desktop/src",
+            homeDirectory: person,
+            platform: "linux",
+            processArch: "x64",
+            appVersion: "0.0.0",
+            appPath: "/repo",
+            isPackaged: true,
+            resourcesPath: "/missing/resources",
+            runningUnderArm64Translation: false,
+          }).pipe(Layer.provide(Layer.mergeAll(NodeServices.layer, DesktopConfig.layerTest({})))),
+        ),
+      );
+      held.close();
+      assert.equal(seen.stateDir, `${person}/.catcode/userdata`);
+      assert.equal(yield* fs.readLink(`${person}/.t3`), ".catcode");
+      assert.isFalse(seen.released);
+      assert.deepStrictEqual(
+        seen.owner,
+        Option.some({ pid: process.pid, port: 3790, serverVersion: "1.12.3" }),
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+});

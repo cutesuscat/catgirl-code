@@ -535,6 +535,14 @@
       "types": "./src/catgirlRelease.ts",
       "import": "./src/catgirlRelease.ts"
     },
+    "./catgirlHome": {
+      "types": "./src/catgirlHome.ts",
+      "import": "./src/catgirlHome.ts"
+    },
+    "./catgirlHomeScript": {
+      "types": "./src/catgirlHomeScript.ts",
+      "import": "./src/catgirlHomeScript.ts"
+    },
     "./diffCutLines": {
       "types": "./src/diffCutLines.ts",
       "import": "./src/diffCutLines.ts"

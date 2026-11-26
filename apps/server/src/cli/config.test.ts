@@ -318,8 +318,11 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           Effect.provideService(HostProcess.Platform, "linux"),
           Effect.flip,
         );
+        // An older ~/.t3 has moved to ~/.catcode by now, and the message names where it is.
+        const named = source === "default" ? path.join(home, ".catcode") : baseDir;
+        if (source === "default") expect(yield* fs.readLink(baseDir)).toBe(".catcode");
         // A temp dir with spaces or backslashes is single-quoted for the shell.
-        const homePattern = baseDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const homePattern = named.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         expect(String(error)).toMatch(
           new RegExp(`pair --base-dir (${homePattern}|'${homePattern}')`),
         );
