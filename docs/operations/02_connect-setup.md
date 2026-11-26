@@ -17,7 +17,7 @@ T3CODE_RELAY_URL=https://relay.example.com
 
 ### Changing the service without a rebuild
 
-The built-in values are a default. Each app can save its own service under **Settings > Connections > T3 Connect service** (mobile: **Settings > T3 Connect service**), which replaces all four values on that device until it is reset. The app reads the saved service once at startup, so saving signs out of the old service and restarts the app; a saved value the app cannot read is ignored, never an error. The desktop app also hands its saved service to its local server through the `T3CODE_*` variables above. A standalone server needs none of them when it is linked from an app, which gives it the relay address; only `t3 connect` on the machine itself reads them, from the environment or the build.
+The built-in values are a default. Each app can save its own service under **Settings > Connections > T3 Connect service** (mobile: **Settings > T3 Connect service**), which replaces all four values on that device until it is reset. The app reads the saved service once at startup, so saving signs out of the old service and restarts the app; a saved value the app cannot read is ignored, never an error. The desktop app also hands its saved service to its local server through the `T3CODE_*` variables above. A standalone server needs none of them when it is linked from an app, which gives it the relay address; only `t3 connect` on the machine itself reads them, from the environment, the service saved with `t3 connect --relay` (below), or the build.
 
 Saving takes one address. The app checks that `/.well-known/oauth-authorization-server` there names the same address as its `issuer`, then reads the sign-in values from the relay:
 
@@ -38,6 +38,17 @@ GET /.well-known/t3-connect.json
 ```
 
 `relayUrl` must equal the address the document was fetched from, and `cliOAuthClientId` may be absent. New optional fields keep `version` at 1; a change an older app cannot read raises it, and that app then asks for the values by hand, as it does on a 404. The relay serves the document once it is deployed with `CLERK_JWT_TEMPLATE` (and optionally `CLERK_CLI_OAUTH_CLIENT_ID`); see [`infra/relay/.env.example`](../../infra/relay/.env.example). Everything in it is a public identifier.
+
+### Signed service document (Catgirl Connect version 2)
+
+Apps and machines read `GET /.well-known/catgirl-connect.json` first and fall back to version 1 above. It is an envelope `{ payload, signature, key }`: the payload's UTF-8 bytes in base64url, an Ed25519 signature over exactly those bytes, and the 32-byte public key. Apps check the signature before reading the payload, then that `version` is 2, `relayUrl` is the address it came from, and `expiresAt` is at most 60 days after `issuedAt` and not past. The schema is `ConnectDocumentPayload` in `packages/contracts/src/connectService.ts`; the checks are in `packages/shared/src/connectDocument.ts`.
+
+- **Pinning.** Saving a service pins its key; the app shows the fingerprint (first 16 hex of SHA-256 over the key, in groups of four). A setup link `https://<relay>/#fp=<16 hex>` (or the same link as a QR code) must match, or nothing is saved.
+- **Later checks** (Save, app start at most daily, server start) apply a document from the pinned key, or from a new key whose `keyRotation.endorsement` the pinned key signed. Any other key changes nothing: the app keeps the last good document and asks; a machine warns, and `t3 connect --relay <address>` asks. Sign-in changes apply on restart.
+- **Diagnostics are offers.** Usage data is a per-machine yes (Settings > Diagnostics > Usage analytics, `observability.connectAnalytics`), connection traces a per-phone yes; each then sends with a token from `POST /v1/collect/token`, asked for with the device's or machine's existing Connect credential. Every existing "no" still wins. Phone crash reports keep their compiled address.
+- **Machines.** `t3 connect --relay <address or setup link>` checks and saves the service in `<T3 home>/userdata/connect-service.json`, the file the desktop app writes; environment variables still win over it. `--relay none` removes it. Without `signIn.hostedAppUrl`, machines sign in with a code.
+
+Nothing in a document chooses where code is downloaded from or turns data collection on.
 
 ## Clerk setup
 
