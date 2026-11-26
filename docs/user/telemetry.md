@@ -32,7 +32,7 @@ which is off unless you turn it on.
 > exactly as this section describes, to `ingest.t3.codes`. T3 Code's makers did not make Catgirl
 > Code, so keep those reports to T3 Code itself. This server never sends a report for Catgirl Code:
 > when you approve one, the card opens a new issue on
-> [Catgirl Code's GitHub](https://github.com/nickypro/catgirl-code/issues) with the report filled
+> [Catgirl Code's GitHub](https://github.com/cutesuscat/catgirl-code/issues) with the report filled
 > in, and nothing leaves your machine until you submit it there. Such issues are public and show
 > your GitHub name. Catgirl Code takes only reports you ask for, so **Automatic** and
 > `t3 feedback` work only with the T3 Code team. An open card always names who would get the

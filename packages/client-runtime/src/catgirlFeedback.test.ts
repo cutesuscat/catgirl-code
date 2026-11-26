@@ -79,7 +79,7 @@ describe("the GitHub issue a Catgirl Code report becomes", () => {
   it("is a new issue on the fork's repository, holding what the card shows", () => {
     const issue = parts(catgirlFeedbackIssueUrl(preview, { version: "0.1.12" }));
     expect(issue.origin).toBe("https://github.com");
-    expect(issue.path).toBe("/nickypro/catgirl-code/issues/new");
+    expect(issue.path).toBe("/cutesuscat/catgirl-code/issues/new");
     expect(issue.title).toBe("Agent feedback (Bug): t3_thread_read");
     expect(issue.labels).toBe("agent-feedback");
     expect(issue.body).toContain("Catgirl Code 0.1.12");

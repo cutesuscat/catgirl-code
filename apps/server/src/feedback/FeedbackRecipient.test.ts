@@ -307,7 +307,7 @@ it.effect(
         const card = yield* show(cards, "catgirl-code");
         expect(card.title).toBe(CATGIRL_FEEDBACK_TITLE);
         expect(awaitingApprovalNote("catgirl-code")).toContain("Catgirl Code");
-        expect(awaitingApprovalNote("catgirl-code")).toContain("nickypro/catgirl-code");
+        expect(awaitingApprovalNote("catgirl-code")).toContain("cutesuscat/catgirl-code");
         expect((yield* answer(card, "send", "catgirl-code"))._tag).toBe("Success");
         const closed = yield* Queue.take(cards);
         expect(closed).toMatchObject({ feedbackStatus: "sent", title: CATGIRL_FEEDBACK_TITLE });
