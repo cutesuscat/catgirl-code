@@ -343,6 +343,7 @@ describe("the import plan", () => {
     const instructions = importInstructions(file, EMPTY_SETTINGS_CONTENT, items, selected);
     expect(instructions).toEqual({
       sshKey: "add",
+      sshKeyInKeychain: false,
       sshConfig: "add",
       knownHosts: "add",
       machines: file.machines,
@@ -377,6 +378,7 @@ describe("the import plan", () => {
     expect(selected.size).toBe(0);
     expect(importInstructions(same, same, items, new Set(items.map((item) => item.id)))).toEqual({
       sshKey: "skip",
+      sshKeyInKeychain: false,
       sshConfig: "skip",
       knownHosts: "skip",
       machines: [],
@@ -438,6 +440,21 @@ describe("the import plan", () => {
       clientCertificates: file.clientCertificates,
       preferences: { language: "de", themeMode: "dark" },
     });
+  });
+
+  it("shows a keychain key by its name, since the file holds no more than that", () => {
+    const inKeychain = { ...sshKey("old"), keychainAlias: "my-phone" };
+    const file = content({ sshKey: inKeychain });
+
+    const { items, selected } = plan(file, EMPTY_SETTINGS_CONTENT);
+
+    expect(items[0]).toMatchObject({ id: "ssh-key", action: "add" });
+    expect(items[0]?.detail).toContain('as "my-phone"');
+    expect(importInstructions(file, EMPTY_SETTINGS_CONTENT, items, selected)).toMatchObject({
+      sshKey: "add",
+      sshKeyInKeychain: true,
+    });
+    expect(plan(file, content({ sshKey: inKeychain })).items[0]?.action).toBe("same");
   });
 
   it("merges trusted host keys and never offers to replace one", () => {
@@ -567,6 +584,7 @@ describe("applying an import", () => {
 
   const everything = {
     sshKey: "add",
+    sshKeyInKeychain: false,
     sshConfig: "skip",
     knownHosts: "add",
     machines: [tied("den"), paired("box")],
@@ -611,6 +629,7 @@ describe("applying an import", () => {
       ],
       failed: [],
       certificatesToAllow: [{ origin: "https://b.example/", alias: "asks" }],
+      sshKeyToChoose: null,
       restart: true,
     });
   });
@@ -621,6 +640,7 @@ describe("applying an import", () => {
     const outcome = await applyImport(
       {
         sshKey: "skip",
+        sshKeyInKeychain: false,
         sshConfig: "skip",
         knownHosts: "skip",
         machines: [paired("box")],
@@ -637,6 +657,7 @@ describe("applying an import", () => {
       done: ["1 machine saved."],
       failed: [],
       certificatesToAllow: [],
+      sshKeyToChoose: null,
       restart: false,
     });
   });
@@ -656,6 +677,40 @@ describe("applying an import", () => {
     expect(outcome.failed).toEqual(["SSH settings: keystore unavailable", "den: already managed"]);
     expect(outcome.done).toContain("1 machine saved.");
     expect(calls).toContain("connect-service");
+  });
+
+  it("says when the file's SSH key is a keychain entry this app may not use yet", async () => {
+    const onlyKey = {
+      ...everything,
+      sshKeyInKeychain: true,
+      knownHosts: "skip",
+      machines: [],
+      pairingKey: null,
+      clientCertificates: [],
+      connectService: null,
+      preferences: {},
+    } as const;
+    const result = {
+      keyImported: false,
+      configImported: false,
+      knownHostsAdded: 0,
+      knownHostsKept: 0,
+    };
+
+    const asked = await applyImport(
+      onlyKey,
+      ports({ importSsh: async () => ({ ...result, keychainToChoose: "my-phone" }) }).all,
+    );
+    expect(asked).toMatchObject({ done: [], failed: [], sshKeyToChoose: "my-phone" });
+
+    const allowed = await applyImport(
+      onlyKey,
+      ports({ importSsh: async () => ({ ...result, keyImported: true }) }).all,
+    );
+    expect(allowed).toMatchObject({
+      done: ["SSH key from this phone's keychain selected again."],
+      sshKeyToChoose: null,
+    });
   });
 
   it("does not save a machine whose pairing key could not be stored", async () => {

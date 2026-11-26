@@ -324,11 +324,14 @@ function sshItems(file: SettingsContent, device: SettingsContent): ImportItem[] 
   const items: ImportItem[] = [];
   if (file.sshKey !== null) {
     const same = device.sshKey?.fingerprint === file.sshKey.fingerprint;
+    const alias = file.sshKey.keychainAlias;
     items.push({
       id: "ssh-key",
       group: "ssh",
       title: "SSH key",
-      detail: file.sshKey.fingerprint,
+      detail: alias
+        ? `${file.sshKey.fingerprint}\nKept in the phone's keychain as "${alias}". The file holds only that name.`
+        : file.sshKey.fingerprint,
       action: same ? "same" : device.sshKey === null ? "add" : "replace",
       ...(same || device.sshKey === null
         ? {}
@@ -510,6 +513,8 @@ export function defaultImportSelection(items: ReadonlyArray<ImportItem>): Readon
 
 export interface ImportInstructions {
   readonly sshKey: "skip" | "add" | "replace";
+  /** The file names a key of the system KeyChain instead of carrying one. */
+  readonly sshKeyInKeychain: boolean;
   readonly sshConfig: "skip" | "add" | "replace";
   readonly knownHosts: "skip" | "add";
   readonly machines: ReadonlyArray<SavedMachine>;
@@ -549,6 +554,7 @@ export function importInstructions(
   if (chosen.has("preferences-changed")) for (const key of changed) preferences[key] = from[key];
   return {
     sshKey: mode("ssh-key"),
+    sshKeyInKeychain: Boolean(file.sshKey?.keychainAlias),
     sshConfig: mode("ssh-config"),
     knownHosts: chosen.has("known-hosts") ? "add" : "skip",
     machines,
@@ -583,6 +589,7 @@ export interface SshImportResult {
   readonly configImported: boolean;
   readonly knownHostsAdded: number;
   readonly knownHostsKept: number;
+  readonly keychainToChoose?: string | null;
 }
 
 /** The writes an import makes, so the order and the bookkeeping can be tested without a device. */
@@ -605,6 +612,8 @@ export interface ImportOutcome {
   readonly failed: ReadonlyArray<string>;
   /** Choices that are not saved yet: the person has to pick each certificate once. */
   readonly certificatesToAllow: ReadonlyArray<ClientCertificateChoice>;
+  /** The file's SSH key is this KeyChain entry, which has to be chosen in Settings > SSH. */
+  readonly sshKeyToChoose: string | null;
   /** Something changed that the running app only reads when it starts. */
   readonly restart: boolean;
 }
@@ -623,6 +632,7 @@ export async function applyImport(
   const done: string[] = [];
   const failed: string[] = [];
   const certificatesToAllow: ClientCertificateChoice[] = [];
+  let sshKeyToChoose: string | null = null;
   let restart = false;
   const attempt = async (what: string, run: () => Promise<void>) => {
     try {
@@ -643,7 +653,14 @@ export async function applyImport(
         instructions.sshConfig,
         instructions.knownHosts,
       );
-      if (result.keyImported) done.push("SSH key imported, and sealed with this app's own key.");
+      sshKeyToChoose = result.keychainToChoose ?? null;
+      if (result.keyImported) {
+        done.push(
+          instructions.sshKeyInKeychain
+            ? "SSH key from this phone's keychain selected again."
+            : "SSH key imported, and sealed with this app's own key.",
+        );
+      }
       if (result.configImported) done.push("SSH config imported.");
       if (result.knownHostsAdded > 0) {
         done.push(
@@ -707,7 +724,7 @@ export async function applyImport(
     });
   }
 
-  return { done, failed, certificatesToAllow, restart };
+  return { done, failed, certificatesToAllow, sshKeyToChoose, restart };
 }
 
 const FAILURES: Readonly<Record<string, string>> = {

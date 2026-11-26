@@ -344,7 +344,9 @@ function ImportResult(props: { readonly outcome: ImportOutcome; readonly onDone:
             <ListRowLayout key={line} icon="checkmark" label={line} />
           ))}
         </SettingsSection>
-      ) : outcome.failed.length === 0 && outcome.certificatesToAllow.length === 0 ? (
+      ) : outcome.failed.length === 0 &&
+        outcome.certificatesToAllow.length === 0 &&
+        outcome.sshKeyToChoose === null ? (
         <Notice message="Nothing was changed." />
       ) : null}
       {outcome.failed.map((line) => (
@@ -367,6 +369,11 @@ function ImportResult(props: { readonly outcome: ImportOutcome; readonly onDone:
             />
           ))}
         </SettingsSection>
+      )}
+      {outcome.sshKeyToChoose === null ? null : (
+        <Notice
+          message={`The SSH key in the file is "${outcome.sshKeyToChoose}" in this phone's keychain. Open Settings > SSH and choose it there, so Android lets this app use it.`}
+        />
       )}
       {problem === null ? null : <Notice message={problem} tone="danger" />}
       {outcome.restart ? (

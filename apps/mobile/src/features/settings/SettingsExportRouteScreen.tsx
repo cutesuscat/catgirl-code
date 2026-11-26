@@ -55,7 +55,12 @@ function contents(content: SettingsContent) {
   return [
     {
       label: "SSH key",
-      description: content.sshKey?.fingerprint ?? "None on this device",
+      description:
+        content.sshKey === null
+          ? "None on this device"
+          : content.sshKey.keychainAlias
+            ? `${content.sshKey.fingerprint}, kept in this phone's keychain as "${content.sshKey.keychainAlias}": only that name goes in the file`
+            : content.sshKey.fingerprint,
     },
     {
       label: "SSH config and trusted host keys",
