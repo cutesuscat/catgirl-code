@@ -1,9 +1,10 @@
 # Security
 
-Report vulnerabilities to [security@t3.codes](mailto:security@t3.codes). The
-[security policy](.github/SECURITY.md) covers disclosure and safe harbor.
+Report vulnerabilities in Catgirl Code, an unofficial fork of T3 Code, as its
+[security policy](.github/SECURITY.md) says, and not to T3 Code.
 
-The rest of this file is for agents and maintainers auditing T3 Code or triaging
+The rest of this file is T3 Code's own, kept as it is, for agents and
+maintainers auditing the code or triaging
 reports. It defines who is trusted with what, which boundaries a real finding
 crosses, and what is intended. The reasoning behind each boundary lives in
 [environment auth](docs/internals/04_environment-auth.md),

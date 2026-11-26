@@ -3,14 +3,13 @@ description: Report broken behavior, regressions, crashes, or reliability issues
 title: "[Bug]: "
 labels:
   - bug
-  - needs-triage
 body:
   - type: markdown
     attributes:
       value: |
-        Use this form for broken behavior, regressions, crashes, or reliability problems.
-        Feature requests belong in [Discussions](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
-        Search existing issues first and keep the report focused on one problem.
+        Use this form for something in Catgirl Code that is broken, crashes or stopped working.
+        For an idea, open a blank issue instead. Search existing issues first and keep the report to one problem.
+        Catgirl Code is an unofficial fork of T3 Code, so report its problems here and not to T3 Code.
 
   - type: checkboxes
     id: checks
@@ -85,8 +84,8 @@ body:
     id: version
     attributes:
       label: Version or commit
-      description: Release version, commit SHA, or branch name if known.
-      placeholder: main @ abc1234
+      description: The version in Settings › About, such as 0.1.12a, or a commit if you built it yourself.
+      placeholder: 0.1.12a
 
   - type: input
     id: environment

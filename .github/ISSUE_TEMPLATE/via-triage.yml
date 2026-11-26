@@ -1,5 +1,5 @@
 name: Triage report
-description: Filed with `npx t3 triage`, where a coding agent investigated the machine. For hand-written reports use the bug report template instead.
+description: Filed after `t3 triage`, where a coding agent investigated the machine. For hand-written reports use the bug report template instead.
 labels:
   - via-triage
 body:
@@ -38,7 +38,7 @@ body:
     attributes:
       label: Version
       description: Version the bug happened on (not the `t3 triage` CLI version), or unknown.
-      placeholder: 0.0.33
+      placeholder: 0.1.12a
     validations:
       required: true
 

@@ -65,7 +65,7 @@ describe("the release repository", () => {
   });
 });
 
-// The README is the one place outside the code that spells the repository out.
+// The README and the repository's pages are the places outside the code that spell the repository out.
 describe("the README", () => {
   it("gives the install command and the release address the code uses", () => {
     const readme = NodeFS.readFileSync(
@@ -75,5 +75,21 @@ describe("the README", () => {
     expect(readme).toContain(CATGIRL_INSTALL_COMMAND);
     expect(readme).toContain(`T3CODE_RELEASE_BASE_URL=${CATGIRL_RELEASES_PAGE_URL}/download`);
     expect(readme).toContain("unofficial fork");
+  });
+});
+
+describe("the repository's own pages", () => {
+  it("name the repository the code uses, and no other", () => {
+    for (const file of ["README.md", ".github/SECURITY.md", ".github/CONTRIBUTING.md"]) {
+      const text = NodeFS.readFileSync(
+        NodeURL.fileURLToPath(new URL(`../${file}`, import.meta.url)),
+        "utf8",
+      );
+      const named = [...text.matchAll(/github\.com\/([\w.-]+\/catgirl-code)\b/g)].map(
+        (match) => match[1],
+      );
+      expect(named.length, file).toBeGreaterThan(0);
+      expect(new Set(named), file).toEqual(new Set([CATGIRL_RELEASE_REPOSITORY]));
+    }
   });
 });
