@@ -21,7 +21,7 @@ export const getConnectService = makeSyncIpcMethod({
   channel: IpcChannels.GET_CONNECT_SERVICE_CHANNEL,
   result: Schema.NullOr(ConnectServiceSettings),
   handler: Effect.fn("desktop.ipc.connectService.get")(function* () {
-    return (yield* DesktopConnectService.optional)?.saved ?? null;
+    return (yield* DesktopConnectService.optional)?.current() ?? null;
   }),
 });
 
@@ -39,5 +39,20 @@ export const setConnectService = makeIpcMethod({
     }
     yield* connectService.save(settings);
     yield* lifecycle.relaunch(`connectService=${settings?.source ?? "built-in"}`);
+  }),
+});
+
+// A later check of the same signed service: saved in place, sign-in values unchanged, no relaunch.
+export const updateConnectService = makeIpcMethod({
+  channel: IpcChannels.UPDATE_CONNECT_SERVICE_CHANNEL,
+  payload: ConnectServiceSettings,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.connectService.update")(function* (requested) {
+    const connectService = yield* DesktopConnectService.optional;
+    const settings = readConnectServiceSettings(requested);
+    if (connectService === undefined || settings === null) {
+      return yield* new ConnectServiceRejectedError();
+    }
+    if (!(yield* connectService.update(settings))) return yield* new ConnectServiceRejectedError();
   }),
 });

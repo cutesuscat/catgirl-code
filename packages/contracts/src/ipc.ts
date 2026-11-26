@@ -1148,6 +1148,8 @@ export interface DesktopBridge {
   getConnectService?: () => ConnectServiceSettings | null;
   /** Saves it and relaunches the app; `null` returns to the service the build ships with. */
   setConnectService?: (settings: ConnectServiceSettings | null) => Promise<void>;
+  /** Saves what a signed service's later check found, without relaunching: never its sign-in values. */
+  updateConnectService?: (settings: ConnectServiceSettings) => Promise<void>;
   getClientSettings: () => Promise<ClientSettings | null>;
   setClientSettings: (settings: ClientSettings) => Promise<void>;
   getConnectionCatalog: () => Promise<string | null>;

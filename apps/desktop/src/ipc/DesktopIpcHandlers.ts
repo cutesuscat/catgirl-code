@@ -10,7 +10,11 @@ import {
 import * as DesktopIpc from "./DesktopIpc.ts";
 import { installNotificationBadge } from "./methods/notificationBadge.ts";
 import { getClientSettings, setClientSettings } from "./methods/clientSettings.ts";
-import { getConnectService, setConnectService } from "./methods/connectService.ts";
+import {
+  getConnectService,
+  setConnectService,
+  updateConnectService,
+} from "./methods/connectService.ts";
 import { getConnectionCatalog, setConnectionCatalog } from "./methods/connectionCatalog.ts";
 import {
   getHostEnvironmentId,
@@ -125,6 +129,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(setClientSettings);
   yield* ipc.handleSync(getConnectService);
   yield* ipc.handle(setConnectService);
+  yield* ipc.handle(updateConnectService);
   yield* ipc.handle(getConnectionCatalog);
   yield* ipc.handle(getSnapShotState);
   yield* ipc.handle(setupSnapShot);

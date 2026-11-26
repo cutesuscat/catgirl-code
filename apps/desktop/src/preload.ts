@@ -169,6 +169,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     >,
   setConnectService: (settings) =>
     ipcRenderer.invoke(IpcChannels.SET_CONNECT_SERVICE_CHANNEL, settings),
+  updateConnectService: (settings) =>
+    ipcRenderer.invoke(IpcChannels.UPDATE_CONNECT_SERVICE_CHANNEL, settings),
   getClientSettings: () => ipcRenderer.invoke(IpcChannels.GET_CLIENT_SETTINGS_CHANNEL),
   setClientSettings: (settings) =>
     ipcRenderer.invoke(IpcChannels.SET_CLIENT_SETTINGS_CHANNEL, settings),

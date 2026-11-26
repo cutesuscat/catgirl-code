@@ -18,6 +18,24 @@ const service: ConnectServiceSettings = {
   source: "discovered",
 };
 
+// What a later check of a signed service adds; the file keeps it across launches.
+const trust = {
+  key: "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w",
+  document: {
+    version: 2,
+    issuedAt: "2026-11-26T03:00:00Z",
+    expiresAt: "2026-12-26T03:00:00Z",
+    relayUrl: "https://relay.example.test",
+    signIn: {
+      provider: "clerk",
+      publishableKey: service.clerkPublishableKey,
+      jwtTemplate: "t3-relay",
+    },
+  },
+  checkedAt: "2026-11-27T00:00:00.000Z",
+  recentChanges: [{ at: "2026-11-27T00:00:00.000Z", kind: "name" as const, to: "Cats" }],
+};
+
 const layerNode = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer);
 
 /** One app launch: the service reads its file while this layer builds. */
@@ -111,6 +129,30 @@ describe("DesktopConnectService", () => {
           assert.strictEqual(launched.saved, null);
           assert.deepStrictEqual(launched.backendEnvironment, {});
         }
+      }),
+    ),
+  );
+
+  it.effect("saves a later check of the same service in place, never new sign-in values", () =>
+    withHome((baseDir) =>
+      Effect.gen(function* () {
+        yield* launch(baseDir, (connectService) => connectService.save(service));
+        const checked = { ...service, clerkCliOAuthClientId: "cli-client" } as const;
+        const launched = yield* launch(baseDir, (connectService) =>
+          Effect.gen(function* () {
+            const refused = yield* connectService.update({ ...checked, clerkJwtTemplate: "other" });
+            const saved = yield* connectService.update({ ...checked, connect: trust });
+            return { connectService, refused, saved };
+          }),
+        );
+        assert.strictEqual(launched.refused, false);
+        assert.strictEqual(launched.saved, true);
+        assert.deepStrictEqual(launched.connectService.saved, service);
+        assert.strictEqual(launched.connectService.current()?.connect?.key, trust.key);
+
+        const next = yield* launch(baseDir, Effect.succeed);
+        assert.deepStrictEqual(next.saved?.connect, trust);
+        assert.strictEqual(next.saved?.clerkJwtTemplate, "t3-relay");
       }),
     ),
   );

@@ -1,6 +1,7 @@
 import { ConnectServiceSettings } from "@t3tools/contracts";
 import {
   connectServiceEnvironment,
+  connectServiceNeedsRestart,
   parseConnectServiceSettings,
   readConnectServiceSettings,
 } from "@t3tools/shared/connectService";
@@ -41,6 +42,12 @@ export class DesktopConnectService extends Context.Service<
     readonly save: (
       settings: ConnectServiceSettings | null,
     ) => Effect.Effect<void, DesktopConnectServiceWriteError>;
+    /** What a renderer reads now: the startup record plus later checks of its signed document. */
+    readonly current: () => ConnectServiceSettings | null;
+    /** Saves a later check of the same service. Refused when it would change sign-in values. */
+    readonly update: (
+      settings: ConnectServiceSettings,
+    ) => Effect.Effect<boolean, DesktopConnectServiceWriteError>;
   }
 >()("@t3tools/desktop/settings/DesktopConnectService") {}
 
@@ -55,12 +62,15 @@ const hostnameOf = (saved: ConnectServiceSettings | null): string | undefined =>
   }
 };
 
-const of = (saved: ConnectServiceSettings | null, save: DesktopConnectService["Service"]["save"]) =>
+const of = (
+  saved: ConnectServiceSettings | null,
+  methods: Pick<DesktopConnectService["Service"], "save" | "current" | "update">,
+) =>
   DesktopConnectService.of({
     saved,
     clerkFrontendApiHostname: hostnameOf(saved),
     backendEnvironment: connectServiceEnvironment(saved),
-    save,
+    ...methods,
   });
 
 const make = Effect.gen(function* () {
@@ -74,26 +84,37 @@ const make = Effect.gen(function* () {
     Effect.orElseSucceed(() => null),
   );
 
-  return of(
-    saved,
-    Effect.fn("desktop.connectService.save")(function* (settings) {
-      const tempPath = `${settingsPath}.${process.pid}.tmp`;
-      const write =
-        settings === null
-          ? fileSystem.remove(settingsPath, { force: true })
-          : encodeSettingsJson(settings).pipe(
-              Effect.tap(() => fileSystem.makeDirectory(environment.stateDir, { recursive: true })),
-              Effect.flatMap((json) => fileSystem.writeFileString(tempPath, `${json}\n`)),
-              Effect.andThen(fileSystem.rename(tempPath, settingsPath)),
-              Effect.ensuring(fileSystem.remove(tempPath, { force: true }).pipe(Effect.ignore)),
-            );
-      yield* write.pipe(
-        Effect.mapError(
-          (cause) => new DesktopConnectServiceWriteError({ path: settingsPath, cause }),
-        ),
-      );
+  const write = (settings: ConnectServiceSettings | null) => {
+    const tempPath = `${settingsPath}.${process.pid}.tmp`;
+    const written =
+      settings === null
+        ? fileSystem.remove(settingsPath, { force: true })
+        : encodeSettingsJson(settings).pipe(
+            Effect.tap(() => fileSystem.makeDirectory(environment.stateDir, { recursive: true })),
+            Effect.flatMap((json) => fileSystem.writeFileString(tempPath, `${json}\n`)),
+            Effect.andThen(fileSystem.rename(tempPath, settingsPath)),
+            Effect.ensuring(fileSystem.remove(tempPath, { force: true }).pipe(Effect.ignore)),
+          );
+    return written.pipe(
+      Effect.mapError(
+        (cause) => new DesktopConnectServiceWriteError({ path: settingsPath, cause }),
+      ),
+    );
+  };
+  let current = saved;
+
+  return of(saved, {
+    save: Effect.fn("desktop.connectService.save")(function* (settings) {
+      yield* write(settings);
     }),
-  );
+    current: () => current,
+    update: Effect.fn("desktop.connectService.update")(function* (settings) {
+      if (connectServiceNeedsRestart(saved, settings)) return false;
+      yield* write(settings);
+      current = settings;
+      return true;
+    }),
+  });
 });
 
 export const layer = Layer.effect(DesktopConnectService, make);
