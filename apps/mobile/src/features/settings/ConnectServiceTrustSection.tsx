@@ -12,6 +12,7 @@ import {
 import {
   CONNECT_DIAGNOSTICS_LABELS,
   connectChangeText,
+  connectKeyChangeText,
   connectRefreshProblemText,
 } from "@t3tools/shared/connectDocumentCopy";
 import {
@@ -24,6 +25,11 @@ import { Linking, View } from "react-native";
 import { AppText as Text } from "../../components/ui/AppText";
 import { Button } from "../../components/ui/Button";
 import * as Dialog from "../../components/ui/Dialog";
+import {
+  ConnectIdentityView,
+  connectIdentityInline,
+  connectIdentityText,
+} from "./ConnectIdentityView";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 
@@ -45,7 +51,7 @@ export function connectFirstUseText(
     "",
     `Service: ${connectServiceName(settings.connect.document, settings.relayUrl)}`,
     `Address: ${hostOf(settings.relayUrl)}`,
-    `Identity: ${fingerprint}`,
+    `Identity: ${connectIdentityText(fingerprint)}`,
     linkFingerprint !== null && sameConnectFingerprint(linkFingerprint, fingerprint)
       ? "Matches the setup link. This phone will warn you if it changes."
       : "Check this matches what the service's operator gave you. This phone will warn you if it changes.",
@@ -86,8 +92,9 @@ export function ConnectServiceTrustSection({
     Dialog.confirm({
       title: `Trust the new identity of ${name}?`,
       message: [
-        `Trusted until now: ${fingerprintOf(key)}`,
-        `New identity: ${newFingerprint}`,
+        `Trusted until now: ${connectIdentityText(fingerprintOf(key))}`,
+        "",
+        `New identity: ${connectIdentityText(newFingerprint)}`,
         "",
         "Only do this if the service's operator told you its identity changed, ideally some other way than this app. Any diagnostics you allowed are turned off again.",
       ].join("\n"),
@@ -111,7 +118,7 @@ export function ConnectServiceTrustSection({
       >
         <View className="gap-2 p-4" testID="connect-service-identity">
           <Text className="text-sm text-foreground">{hostOf(current.relayUrl)}</Text>
-          <Text className="font-mono text-sm text-foreground">Identity {fingerprintOf(key)}</Text>
+          <ConnectIdentityView label="Signed by" fingerprint={fingerprintOf(key)} />
           <View className="flex-row flex-wrap gap-3">
             {document.service?.privacyPolicyUrl?.startsWith("https://") ? (
               <Button
@@ -137,8 +144,13 @@ export function ConnectServiceTrustSection({
         <SettingsSection title="This Connect service's identity changed">
           <View className="gap-3 p-4" testID="connect-identity-changed">
             <Text accessibilityRole="alert" className="text-sm text-foreground">
-              {`${name} now presents the identity ${fingerprintOf(identityChange.envelope.key)} instead of ${fingerprintOf(key)}, and the old one did not endorse it. Nothing from it is used: this phone keeps the settings it last trusted until you decide.`}
+              {`${name} now presents a new identity, and the one this phone trusts did not endorse it. Nothing from it is used: this phone keeps the settings it last trusted until you decide.`}
             </Text>
+            <ConnectIdentityView label="Trusted until now" fingerprint={fingerprintOf(key)} />
+            <ConnectIdentityView
+              label="New identity"
+              fingerprint={fingerprintOf(identityChange.envelope.key)}
+            />
             <View className="flex-row flex-wrap gap-3">
               <Button
                 label="Keep using the old settings"
@@ -157,7 +169,7 @@ export function ConnectServiceTrustSection({
       ) : null}
       {identityChange?.declined ? (
         <Text className="px-1 text-sm text-foreground-muted">
-          {`Keeping the old settings. ${name} now presents another identity (${fingerprintOf(identityChange.envelope.key)}).`}
+          {`Keeping the old settings. ${name} now presents another identity (${connectIdentityInline(fingerprintOf(identityChange.envelope.key))}).`}
         </Text>
       ) : null}
 
@@ -225,14 +237,26 @@ export function ConnectServiceTrustSection({
       {changes.length > 0 ? (
         <SettingsSection title="Recent changes">
           <View className="gap-1.5 p-4" testID="connect-recent-changes">
-            {changes.slice(0, 5).map((change) => (
-              <Text
-                key={`${change.at}-${change.kind}-${change.diagnostics ?? ""}`}
-                className="text-sm text-foreground"
-              >
-                {`${change.at.slice(0, 10)}  ${connectChangeText(change)}`}
-              </Text>
-            ))}
+            {changes.slice(0, 5).map((change) => {
+              const keyChange = connectKeyChangeText(change);
+              const rowKey = `${change.at}-${change.kind}-${change.diagnostics ?? ""}`;
+              if (keyChange === null || !change.from || !change.to) {
+                return (
+                  <Text key={rowKey} className="text-sm text-foreground">
+                    {`${change.at.slice(0, 10)}  ${connectChangeText(change)}`}
+                  </Text>
+                );
+              }
+              return (
+                <View key={rowKey} className="gap-2" testID="connect-key-change">
+                  <Text className="text-sm text-foreground">
+                    {`${change.at.slice(0, 10)}  ${keyChange}`}
+                  </Text>
+                  <ConnectIdentityView label="From" fingerprint={change.from} compact />
+                  <ConnectIdentityView label="To" fingerprint={change.to} compact />
+                </View>
+              );
+            })}
           </View>
         </SettingsSection>
       ) : null}
