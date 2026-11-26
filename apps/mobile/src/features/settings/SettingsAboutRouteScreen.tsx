@@ -17,6 +17,7 @@ import {
   registerHiddenUpdateTap,
   runAppUpdateCheck,
 } from "../updates/app-updates";
+import { CatgirlAboutNote } from "./CatgirlAboutNote";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -153,6 +154,7 @@ function AppSettingsSection() {
       ) : (
         versionRow
       )}
+      <CatgirlAboutNote />
     </SettingsSection>
   );
 }

@@ -61,3 +61,9 @@ export function parseCatgirlVersion(
 export function upstreamVersionOf(version: string): string {
   return parseCatgirlVersion(version)?.upstreamVersion ?? version;
 }
+
+// Written in two parts: the builds rename T3 Code's name wherever it appears whole, and this
+// sentence has to keep saying whose fork this is.
+const UPSTREAM_NAME = ["T3", "Code"].join(" ");
+/** What tells a person this is not T3 Code. Its trademark policy asks a published fork to say so. */
+export const CATGIRL_FORK_NOTICE = `Catgirl Code is an unofficial fork of ${UPSTREAM_NAME}, based on ${UPSTREAM_NAME} ${CATGIRL_UPSTREAM_VERSION}. It is not affiliated with, endorsed by or supported by T3 Tools, Inc.`;

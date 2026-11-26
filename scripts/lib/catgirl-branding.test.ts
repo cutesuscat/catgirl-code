@@ -4,6 +4,8 @@ import * as NodeURL from "node:url";
 
 import { describe, expect, it } from "vite-plus/test";
 
+import { CATGIRL_FORK_NOTICE } from "@t3tools/shared/catgirlRelease";
+
 import {
   KEPT_TEXT,
   REPLACED_TEXT,
@@ -65,6 +67,15 @@ describe("renameProduct", () => {
       expect(renamed).toContain(to);
       expect(renamed).not.toContain(from);
     }
+  });
+
+  it("leaves the notice that this is a fork saying whose fork it is", () => {
+    const file = repoFile("packages/shared/src/catgirlRelease.ts");
+    expect(renameProduct(NodeFS.readFileSync(file, "utf8"), file)).toContain(
+      '["T3", "Code"].join(" ")',
+    );
+    expect(CATGIRL_FORK_NOTICE).toContain("an unofficial fork of T3 Code, based on T3 Code 0.");
+    expect(CATGIRL_FORK_NOTICE).toContain("not affiliated with");
   });
 
   it("tells a triage agent that this is a fork, in words the rename leaves alone", () => {
