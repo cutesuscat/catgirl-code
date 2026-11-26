@@ -5,6 +5,7 @@ import type {
   DesktopUpdateState,
 } from "@t3tools/contracts";
 import { desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { msg } from "gt-react";
 
 import { m, type MessageResolver } from "../i18n/messages";
@@ -121,7 +122,9 @@ export function getDesktopUpdateButtonTooltip(
     getDesktopUpdateDownloadedVersion(state) === state.notAppliedVersion
   ) {
     return resolve(
-      msg("Update {version} did not apply. Click to retry.", { version: state.notAppliedVersion }),
+      msg("Update {version} did not apply. Click to retry.", {
+        version: displayVersion(state.notAppliedVersion),
+      }),
     );
   }
   if (
@@ -130,13 +133,19 @@ export function getDesktopUpdateButtonTooltip(
     state.availableVersion
   ) {
     return resolve(
-      msg("Download failed for {version}. Click to retry.", { version: state.availableVersion }),
+      msg("Download failed for {version}. Click to retry.", {
+        version: displayVersion(state.availableVersion),
+      }),
     );
   }
   if (state.status === "available") {
     return state.availableVersion === null
       ? resolve(msg("Update available ready to download"))
-      : resolve(msg("Update {version} ready to download", { version: state.availableVersion }));
+      : resolve(
+          msg("Update {version} ready to download", {
+            version: displayVersion(state.availableVersion),
+          }),
+        );
   }
   if (state.status === "downloading") {
     return typeof state.downloadPercent === "number"
@@ -148,24 +157,32 @@ export function getDesktopUpdateButtonTooltip(
   if (state.status === "downloaded") {
     if (state.errorContext === "install" && state.downloadedVersion) {
       return resolve(
-        msg("Install failed for {version}. Click to retry.", { version: state.downloadedVersion }),
+        msg("Install failed for {version}. Click to retry.", {
+          version: displayVersion(state.downloadedVersion),
+        }),
       );
     }
     const version = state.downloadedVersion ?? state.availableVersion;
     return version === null
       ? resolve(msg("Update ready downloaded. Click to restart and install."))
-      : resolve(msg("Update {version} downloaded. Click to restart and install.", { version }));
+      : resolve(
+          msg("Update {version} downloaded. Click to restart and install.", {
+            version: displayVersion(version),
+          }),
+        );
   }
   if (state.status === "error") {
     if (state.errorContext === "install" && state.downloadedVersion) {
       return resolve(
-        msg("Install failed for {version}. Click to retry.", { version: state.downloadedVersion }),
+        msg("Install failed for {version}. Click to retry.", {
+          version: displayVersion(state.downloadedVersion),
+        }),
       );
     }
     if (state.downloadedVersion) {
       return resolve(
         msg("Update {version} downloaded. Click to restart and install.", {
-          version: state.downloadedVersion,
+          version: displayVersion(state.downloadedVersion),
         }),
       );
     }
@@ -204,7 +221,7 @@ export function getDesktopUpdateInstallConfirmationMessage(
     ? resolve(
         msg(
           "Install update {version} and restart T3 Code?\n\nAny running tasks will be interrupted. Make sure you're ready before continuing.",
-          { version },
+          { version: displayVersion(version) },
         ),
       )
     : resolve(

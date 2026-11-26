@@ -1,4 +1,5 @@
 import type { DesktopBridge, DesktopUpdateState } from "@t3tools/contracts";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { ExternalLinkIcon } from "lucide-react";
 
@@ -86,8 +87,8 @@ export function SidebarUpdateReleaseNotes({
             {state.availableVersion ? (
               <div className="mt-0.5 text-xs leading-4 text-muted-foreground">
                 {releasedAt
-                  ? `${state.availableVersion} · ${formatReleaseAge(releasedAt, m)}`
-                  : state.availableVersion}
+                  ? `${displayVersion(state.availableVersion)} · ${formatReleaseAge(releasedAt, m)}`
+                  : displayVersion(state.availableVersion)}
               </div>
             ) : null}
           </div>
@@ -115,8 +116,8 @@ export function SidebarUpdateReleaseNotes({
                 releaseNote.version !== state.availableVersion && (
                   <h3 className="mb-1 text-xs leading-4 font-medium text-muted-foreground">
                     {releaseNote.releasedAt
-                      ? `${releaseNote.version} · ${formatReleaseAge(releaseNote.releasedAt, m)}`
-                      : releaseNote.version}
+                      ? `${displayVersion(releaseNote.version)} · ${formatReleaseAge(releaseNote.releasedAt, m)}`
+                      : displayVersion(releaseNote.version)}
                   </h3>
                 )
               ) : (
@@ -125,7 +126,7 @@ export function SidebarUpdateReleaseNotes({
                     <T>What's changed</T>
                   ) : (
                     <T>
-                      Changes in <Var>{releaseNote.version}</Var>
+                      Changes in <Var>{displayVersion(releaseNote.version)}</Var>
                     </T>
                   )}
                 </h3>

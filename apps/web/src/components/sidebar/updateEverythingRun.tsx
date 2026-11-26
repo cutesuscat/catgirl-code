@@ -7,6 +7,7 @@ import {
   serverUpdateStateAtom,
 } from "@t3tools/client-runtime/state/server";
 import { EnvironmentId, type ServerConfig } from "@t3tools/contracts";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -445,8 +446,8 @@ export function startDesktopUpdateLaunchNotice(): () => void {
           title: m(msg("Update did not apply")),
           description: m(
             msg("T3 Code is still on {current}. Install {version} again from the update button.", {
-              current: APP_VERSION,
-              version: notAppliedVersion,
+              current: displayVersion(APP_VERSION),
+              version: displayVersion(notAppliedVersion),
             }),
           ),
         }),

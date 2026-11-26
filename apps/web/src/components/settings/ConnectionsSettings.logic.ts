@@ -4,6 +4,7 @@ import { msg } from "gt-react";
 
 import { resolveDesktopPairingUrl, resolveHostedPairingUrl } from "./pairingUrls";
 import { getPairingTokenFromUrl, setPairingTokenOnUrl } from "@t3tools/shared/remote";
+import { displayVersion } from "@t3tools/shared/catgirlRelease";
 import { readHostedPairingRequest } from "../../hostedPairing";
 import { m, type MessageResolver } from "../../i18n/messages";
 import {
@@ -111,7 +112,9 @@ export function resolveLocalVersionStatusLabel(
   if (!state) return resolve(msg("Up to date"));
   if (state.status === "downloading") {
     return state.availableVersion
-      ? resolve(msg("Downloading update {version}", { version: state.availableVersion }))
+      ? resolve(
+          msg("Downloading update {version}", { version: displayVersion(state.availableVersion) }),
+        )
       : resolve(msg("Downloading update"));
   }
   const action = resolveDesktopUpdateButtonAction(state);
@@ -122,12 +125,14 @@ export function resolveLocalVersionStatusLabel(
   ) {
     const version = getDesktopUpdateDownloadedVersion(state);
     return version
-      ? resolve(msg("Update {version} downloaded", { version }))
+      ? resolve(msg("Update {version} downloaded", { version: displayVersion(version) }))
       : resolve(msg("Update downloaded"));
   }
   if (action === "download") {
     return state.availableVersion
-      ? resolve(msg("Update {version} available", { version: state.availableVersion }))
+      ? resolve(
+          msg("Update {version} available", { version: displayVersion(state.availableVersion) }),
+        )
       : resolve(msg("Update available"));
   }
   return resolve(msg("Up to date"));
