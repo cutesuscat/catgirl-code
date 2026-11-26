@@ -267,6 +267,10 @@
       "types": "./src/connectDocumentCopy.ts",
       "import": "./src/connectDocumentCopy.ts"
     },
+    "./connectFingerprintEmoji": {
+      "types": "./src/connectFingerprintEmoji.ts",
+      "import": "./src/connectFingerprintEmoji.ts"
+    },
     "./connectServiceCopy": {
       "types": "./src/connectServiceCopy.ts",
       "import": "./src/connectServiceCopy.ts"
