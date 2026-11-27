@@ -350,9 +350,8 @@ describe("ConnectionResolver", () => {
           expect((yield* prepare).socketUrl).toContain("wsTicket=ssh");
           expect(savedProfile).toMatchObject({ target: preparedTarget });
           expect(calls).toEqual(
-            scenario === "unchanged"
-              ? ["profile", "authorize"]
-              : ["revoke", "profile", "authorize"],
+            // A reconnect to the same host does not save its unchanged profile again.
+            scenario === "unchanged" ? ["authorize"] : ["revoke", "profile", "authorize"],
           );
         }
         expect(yield* permissions.get(entry)).toBe(scenario === "changed" ? "off" : "read-write");

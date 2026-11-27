@@ -50,7 +50,7 @@ import {
   appendOrchestrationProtocol,
   orchestrationProtocolCompatibilityError,
 } from "./compatibility.ts";
-import { credentialConnectionId } from "./routes.ts";
+import { credentialConnectionId, sshTargetKey } from "./routes.ts";
 import { fetchRemoteEnvironmentDescriptor } from "../environment/descriptor.ts";
 
 export class ConnectionResolver extends Context.Service<
@@ -263,7 +263,10 @@ const makeSshBroker = Effect.fn("clientRuntime.connection.broker.makeSsh")(funct
       const permissions = yield* PullRequestRoutingPermissions;
       yield* permissions.forget(target.environmentId);
     }
-    yield* profiles.put(preparedProfile);
+    // Every reconnect gets here; saving an unchanged profile only queues behind other saves.
+    if (sshTargetKey(preparedProfile.target) !== sshTargetKey(profile.target)) {
+      yield* profiles.put(preparedProfile);
+    }
     const authorized = yield* remote.authorizeBearer({
       expectedEnvironmentId: target.environmentId,
       httpBaseUrl: prepared.bootstrap.httpBaseUrl,
