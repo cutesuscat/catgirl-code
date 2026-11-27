@@ -236,6 +236,7 @@ export const makeSshGateway = Effect.fn("mobile.ssh.makeGateway")(function* (
       label: descriptor.label,
       bootstrap,
       bearerToken: access.access_token,
+      descriptor,
     };
   });
 
@@ -250,7 +251,11 @@ export const makeSshGateway = Effect.fn("mobile.ssh.makeGateway")(function* (
     const bearerToken = input.bearerToken;
     if (bearerToken !== undefined) {
       const bootstrap = yield* ensure(input.target, { issuePairingToken: false });
-      yield* describe(bootstrap.httpBaseUrl, input.target, input.expectedEnvironmentId);
+      const descriptor = yield* describe(
+        bootstrap.httpBaseUrl,
+        input.target,
+        input.expectedEnvironmentId,
+      );
       const session = yield* fetchRemoteSessionState({
         httpBaseUrl: bootstrap.httpBaseUrl,
         bearerToken,
@@ -260,11 +265,15 @@ export const makeSshGateway = Effect.fn("mobile.ssh.makeGateway")(function* (
         session.authenticated &&
         AuthStandardClientScopes.every((scope) => granted.includes(scope))
       ) {
-        return { bootstrap, bearerToken };
+        return { bootstrap, bearerToken, descriptor };
       }
     }
     const provisioned = yield* provision(input.target, input.expectedEnvironmentId);
-    return { bootstrap: provisioned.bootstrap, bearerToken: provisioned.bearerToken };
+    return {
+      bootstrap: provisioned.bootstrap,
+      bearerToken: provisioned.bearerToken,
+      descriptor: provisioned.descriptor,
+    };
   });
 
   // A failure after the tunnel opened may mean the host's server moved or stopped, so the next

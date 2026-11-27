@@ -62,6 +62,7 @@ const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((o
   readonly primaryBearerToken?: string;
   readonly prepareSsh?: ClientCapabilities.SshEnvironmentGateway["Service"]["prepare"];
   readonly descriptorProtocolVersion?: number | null | undefined;
+  readonly rememberCheckedDescriptor?: RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization["Service"]["rememberCheckedDescriptor"];
 }) => {
   const profiles = new Map(
     (options?.profiles ?? []).map((profile) => [profile.connectionId, profile]),
@@ -110,7 +111,7 @@ const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((o
     authorizeDpopHttp: () => Effect.die("unused"),
     authorizeDirectDpop: () => Effect.die("unused"),
     authorizeDirectDpopHttp: () => Effect.die("unused"),
-    rememberCheckedDescriptor: () => Effect.void,
+    rememberCheckedDescriptor: options?.rememberCheckedDescriptor ?? (() => Effect.void),
     renewDpopBeforeExpiry: () => Effect.die("unused"),
   });
   const ssh = ClientCapabilities.SshEnvironmentGateway.of({
@@ -356,5 +357,64 @@ describe("ConnectionResolver", () => {
         }
         expect(yield* permissions.get(entry)).toBe(scenario === "changed" ? "off" : "read-write");
       }),
+  );
+
+  it.effect("hands the descriptor the SSH gateway just read to the connect", () =>
+    Effect.gen(function* () {
+      const calls: string[] = [];
+      const target = new SshConnectionTarget({
+        environmentId: ENVIRONMENT_ID,
+        label: "SSH",
+        connectionId: "ssh-1",
+      });
+      const profile = new SshConnectionProfile({
+        connectionId: "ssh-1",
+        environmentId: ENVIRONMENT_ID,
+        label: "SSH",
+        target: SSH_TARGET,
+      });
+      const descriptor = {
+        environmentId: ENVIRONMENT_ID,
+        label: "SSH",
+        platform: { os: "linux" as const, arch: "x64" as const },
+        serverVersion: "0.0.0-test",
+        orchestrationProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION,
+        capabilities: { repositoryIdentity: true },
+      };
+      const layerBroker = yield* makeDependencies({
+        prepareSsh: (input) =>
+          Effect.succeed({
+            bootstrap: {
+              target: input.target,
+              httpBaseUrl: "http://127.0.0.1:4010",
+              wsBaseUrl: "ws://127.0.0.1:4010",
+              pairingToken: null,
+            },
+            bearerToken: "ssh-bearer",
+            descriptor,
+          }),
+        rememberCheckedDescriptor: (httpBaseUrl, remembered, keepsItsHost) =>
+          Effect.sync(() => {
+            expect(Option.getOrNull(remembered)).toBe(descriptor);
+            calls.push(`remember ${httpBaseUrl} ${keepsItsHost}`);
+          }),
+        authorizeBearer: (input) =>
+          Effect.sync(() => {
+            calls.push("authorize");
+            return {
+              environmentId: input.expectedEnvironmentId,
+              label: "SSH",
+              httpBaseUrl: input.httpBaseUrl,
+              socketUrl: "ws://127.0.0.1:4010/ws?wsTicket=ssh",
+              httpAuthorization: { _tag: "Bearer" as const, token: input.bearerToken },
+            };
+          }),
+      });
+      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(layerBroker));
+
+      yield* broker.prepare(catalogEntry(target, Option.some(profile)));
+
+      expect(calls).toEqual(["remember http://127.0.0.1:4010 true", "authorize"]);
+    }),
   );
 });

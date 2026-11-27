@@ -267,6 +267,14 @@ const makeSshBroker = Effect.fn("clientRuntime.connection.broker.makeSsh")(funct
     if (sshTargetKey(preparedProfile.target) !== sshTargetKey(profile.target)) {
       yield* profiles.put(preparedProfile);
     }
+    // The gateway has just read the descriptor through the same forward, so the connect skips it.
+    if (prepared.descriptor !== undefined) {
+      yield* remote.rememberCheckedDescriptor(
+        prepared.bootstrap.httpBaseUrl,
+        Option.some(prepared.descriptor),
+        true,
+      );
+    }
     const authorized = yield* remote.authorizeBearer({
       expectedEnvironmentId: target.environmentId,
       httpBaseUrl: prepared.bootstrap.httpBaseUrl,

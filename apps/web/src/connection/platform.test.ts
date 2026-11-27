@@ -275,6 +275,8 @@ describe("desktop SSH pairing", () => {
       });
 
       expect(prepared.bearerToken).toBe("saved-token");
+      // The connect reuses this descriptor instead of reading it again.
+      expect(prepared.descriptor?.environmentId).toBe("environment-ssh");
       expect(ensure).toHaveBeenCalledExactlyOnceWith(TARGET, { issuePairingToken: false });
       expect(calls).toEqual(["ensure", "descriptor", "session"]);
     }),
