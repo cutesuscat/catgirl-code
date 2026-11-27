@@ -6,6 +6,7 @@ import {
   createEnvironmentThreadDetailAtoms,
   createEnvironmentThreadShellAtoms,
   createEnvironmentThreadStateAtoms,
+  createRecentThreadWarmupAtom,
   EMPTY_ENVIRONMENT_THREAD_STATE,
   type EnvironmentThreadState,
   createOlderSettledThreadAtoms,
@@ -35,6 +36,12 @@ export const threadEnvironment = createThreadEnvironmentAtoms(
   environmentShell.statusAtom,
 );
 const environmentThreads = createEnvironmentThreadStateAtoms(connectionAtomRuntime);
+/** Mounted for the app's life: keeps each machine's latest threads cached on this device. */
+export const recentThreadWarmupAtom = createRecentThreadWarmupAtom({
+  catalogValueAtom: environmentCatalog.catalogValueAtom,
+  shellStateValueAtom: environmentShell.stateValueAtom,
+  threadStateAtom: environmentThreads.stateAtom,
+});
 export const environmentThreadStateAtom = environmentThreads.stateAtom;
 export const environmentThreadDetails = createEnvironmentThreadDetailAtoms(
   environmentThreads.stateAtom,
