@@ -23,6 +23,7 @@ import {
   TrimmedString,
 } from "./baseSchemas.ts";
 import { AgentFeedbackRecipient } from "./agentFeedback.ts";
+import { CatPetSettings } from "./catPet.ts";
 import { UsageLimitSourceId } from "./usageLimitSourceId.ts";
 import { UsageModelFilter } from "./usage.ts";
 import { SecretProviderId, SecretProviderSlug } from "./secretReference.ts";
@@ -586,6 +587,8 @@ export const ClientSettingsSchema = Schema.Struct({
   sidebarCatFleetLimit: SidebarCatFleetLimit.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_SIDEBAR_CAT_FLEET_LIMIT)),
   ),
+  // The desktop pet (Catgirl Code); off unless turned on.
+  catPet: CatPetSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   sidebarProjectGroupingMode: SidebarProjectGroupingMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_SIDEBAR_PROJECT_GROUPING_MODE)),
   ),
@@ -2217,6 +2220,7 @@ export const ClientSettingsPatch = Schema.Struct({
   ),
   sidebarCatFleetEnabled: Schema.optionalKey(Schema.Boolean),
   sidebarCatFleetLimit: Schema.optionalKey(SidebarCatFleetLimit),
+  catPet: Schema.optionalKey(CatPetSettings),
   sidebarProjectGroupingMode: Schema.optionalKey(SidebarProjectGroupingMode),
   sidebarProjectGroupingOverrides: Schema.optionalKey(
     Schema.Record(TrimmedNonEmptyString, SidebarProjectGroupingMode),
