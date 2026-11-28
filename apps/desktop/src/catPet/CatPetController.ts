@@ -642,8 +642,9 @@ export class CatPetController {
       if (focusable) window.setFocusable(true);
       this.panel = panel;
       this.render();
-      // The tray takes keys (arrows, Esc); show() activates where focus() alone is refused.
-      window.show();
+      // The tray takes keys (arrows, Esc). On Linux show() activates where focus() is refused;
+      // elsewhere it could activate the whole app, so focus() alone (a panel on macOS).
+      if (this.deps.platform === "linux") window.show();
       window.focus();
       return;
     }
