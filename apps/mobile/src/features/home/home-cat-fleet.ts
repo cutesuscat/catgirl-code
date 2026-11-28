@@ -5,6 +5,7 @@ import {
   catFleetScatterOf,
   type CatFleetMachine,
 } from "@t3tools/client-runtime/state/cat-fleet";
+import { MAX_SIDEBAR_CAT_FLEET_LIMIT } from "@t3tools/contracts/settings";
 
 // The app icon's palette: the web client's --color-cat-* tokens.
 export const CAT_COLORS = {
@@ -34,6 +35,18 @@ const SCATTER = { size: 3.4, arc: 112, drift: 2.4, overlap: 0.5 };
 /** A phone draws the planet this much larger than the desktop does. */
 export const CAT_SCALE = 1.15;
 const CELL_MIN_WIDTH = CAT_PLANET.width * CAT_SCALE;
+
+/** How many machines the row holds, as on the desktop's "Cat planets" limit. "All" is the top choice. */
+export const HOME_CAT_FLEET_LIMITS = [6, 12, 24, MAX_SIDEBAR_CAT_FLEET_LIMIT] as const;
+export const DEFAULT_HOME_CAT_FLEET_LIMIT = 12;
+
+/** The stored choice, or the default when there is none or it is not a usable count. */
+export function homeCatFleetLimitOf(stored: number | undefined): number {
+  if (stored === undefined || !Number.isInteger(stored) || stored < 1) {
+    return DEFAULT_HOME_CAT_FLEET_LIMIT;
+  }
+  return Math.min(stored, MAX_SIDEBAR_CAT_FLEET_LIMIT);
+}
 
 /**
  * The machines a phone's row draws from, busiest first as on the desktop. A single machine

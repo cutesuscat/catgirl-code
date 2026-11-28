@@ -5,10 +5,13 @@ import {
   CAT_ORBITS,
   CAT_ORBIT_CENTER,
   CAT_PLANET,
+  DEFAULT_HOME_CAT_FLEET_LIMIT,
+  HOME_CAT_FLEET_LIMITS,
   catCoatStops,
   catOrbitPoint,
   catStoppedPoint,
   homeCatFleetCells,
+  homeCatFleetLimitOf,
   mixHexColors,
   pickHomeCatFleet,
   rankHomeCatFleet,
@@ -90,6 +93,40 @@ describe("homeCatFleetCells", () => {
     expect(homeCatFleetCells(70)).toEqual({ count: 0, width: 0 });
     // Before the row is measured its width is not known.
     expect(homeCatFleetCells(-24)).toEqual({ count: 0, width: 0 });
+  });
+});
+
+describe("how many cats the row holds", () => {
+  it("defaults to 12 and offers the desktop's whole fleet as its last choice", () => {
+    expect(DEFAULT_HOME_CAT_FLEET_LIMIT).toBe(12);
+    expect(HOME_CAT_FLEET_LIMITS).toContain(DEFAULT_HOME_CAT_FLEET_LIMIT);
+    expect(HOME_CAT_FLEET_LIMITS.at(-1)).toBe(48);
+    expect([...HOME_CAT_FLEET_LIMITS].sort((a, b) => a - b)).toEqual([...HOME_CAT_FLEET_LIMITS]);
+  });
+
+  it("reads the stored choice, and falls back to the default for anything unusable", () => {
+    expect(homeCatFleetLimitOf(undefined)).toBe(12);
+    expect(homeCatFleetLimitOf(6)).toBe(6);
+    expect(homeCatFleetLimitOf(48)).toBe(48);
+    expect(homeCatFleetLimitOf(500)).toBe(48);
+    expect(homeCatFleetLimitOf(0)).toBe(12);
+    expect(homeCatFleetLimitOf(-3)).toBe(12);
+    expect(homeCatFleetLimitOf(2.5)).toBe(12);
+    expect(homeCatFleetLimitOf(Number.NaN)).toBe(12);
+  });
+
+  it("holds at most the limit, busiest first, keeping a picked machine past it", () => {
+    const fleet = rankHomeCatFleet(
+      Array.from({ length: 20 }, (_, index) =>
+        machine(`m${String(index).padStart(2, "0")}`, 20 - index, 0),
+      ),
+    );
+    const ids = (selected: string | null) =>
+      pickHomeCatFleet(fleet, 6, selected).map((entry) => entry.environmentId);
+
+    expect(ids(null)).toEqual(["m00", "m01", "m02", "m03", "m04", "m05"]);
+    expect(ids("m15")).toEqual(["m00", "m01", "m02", "m03", "m04", "m15"]);
+    expect(pickHomeCatFleet(fleet, 48, null)).toHaveLength(20);
   });
 });
 

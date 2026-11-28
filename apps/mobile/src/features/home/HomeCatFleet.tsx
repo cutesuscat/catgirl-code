@@ -47,6 +47,7 @@ import {
   catOrbitPoint,
   catStoppedPoint,
   homeCatFleetCells,
+  homeCatFleetLimitOf,
   pickHomeCatFleet,
   rankHomeCatFleet,
 } from "./home-cat-fleet";
@@ -93,10 +94,12 @@ export function HomeCatFleet(props: HomeCatFleetProps) {
   if (!AsyncResult.isSuccess(preferences) || preferences.value.catFleetEnabled === false) {
     return null;
   }
-  return <HomeCatFleetRow {...props} />;
+  return (
+    <HomeCatFleetRow {...props} limit={homeCatFleetLimitOf(preferences.value.catFleetLimit)} />
+  );
 }
 
-function HomeCatFleetRow(props: HomeCatFleetProps) {
+function HomeCatFleetRow(props: HomeCatFleetProps & { readonly limit: number }) {
   // Every thread, not the listed ones: the fleet also counts sub-agents and settled threads.
   const threads = useAtomValueWhileVisible(
     environmentThreadShells.quietThreadShellsAtom,
@@ -128,7 +131,11 @@ function HomeCatFleetRow(props: HomeCatFleetProps) {
       onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
       style={{ minHeight: CAT_PLANET.height * CAT_SCALE + 18, paddingHorizontal: ROW_GUTTER }}
     >
-      {pickHomeCatFleet(machines, cells.count, props.selectedEnvironmentId).map((machine) => {
+      {pickHomeCatFleet(
+        machines,
+        Math.min(cells.count, props.limit),
+        props.selectedEnvironmentId,
+      ).map((machine) => {
         const environment = props.environments.find(
           (candidate) => candidate.environmentId === machine.environmentId,
         );
