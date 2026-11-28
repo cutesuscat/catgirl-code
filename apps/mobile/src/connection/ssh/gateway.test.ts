@@ -164,6 +164,8 @@ describe("mobile SSH gateway", () => {
       });
 
       expect(prepared.bearerToken).toBe("token-saved");
+      // The connect reuses this descriptor instead of reading it again.
+      expect(prepared.descriptor?.environmentId).toBe(ENVIRONMENT);
       expect(native.connect).toHaveBeenCalledTimes(1);
       expect(native.exec).not.toHaveBeenCalled();
     }),
@@ -183,6 +185,7 @@ describe("mobile SSH gateway", () => {
       });
 
       expect(prepared.bearerToken).toBe("token-new");
+      expect(prepared.descriptor?.environmentId).toBe(ENVIRONMENT);
       expect(native.exec.mock.calls.map((call) => call[1])).toContain(PAIRING_COMMAND);
     }),
   );

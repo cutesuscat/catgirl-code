@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import { vi } from "vite-plus/test";
 
 vi.mock("react-native", () => ({
@@ -92,6 +94,69 @@ describe("mobile connection catalog storage", () => {
       yield* catalog.update((document) => document);
       expect(memory.values.has(CONNECTION_CATALOG_KEY)).toBe(true);
       expect(memory.values.has(LEGACY_CONNECTIONS_KEY)).toBe(false);
+    }),
+  );
+
+  it.effect("reads while another save is still writing to secure storage", () =>
+    Effect.gen(function* () {
+      const memory = makeStorage({});
+      const writing = yield* Deferred.make<void>();
+      const finishWrite = yield* Deferred.make<void>();
+      const catalog = yield* make().pipe(
+        Effect.provideService(MobileSecureStorage.MobileSecureStorage, {
+          ...memory.storage,
+          setItem: (key, value) =>
+            Deferred.succeed(writing, undefined).pipe(
+              Effect.andThen(Deferred.await(finishWrite)),
+              Effect.andThen(memory.storage.setItem(key, value)),
+            ),
+        }),
+      );
+      expect((yield* catalog.read).profiles).toEqual([]);
+
+      const save = yield* catalog
+        .update((document) => ({ ...document, githubRoutingPermissions: [] }))
+        .pipe(Effect.forkChild);
+      yield* Deferred.await(writing);
+      // The save holds the lock; a read answers from the loaded document all the same.
+      expect((yield* catalog.read.pipe(Effect.timeout("1 second"))).profiles).toEqual([]);
+      yield* Deferred.succeed(finishWrite, undefined);
+      yield* Fiber.join(save);
+    }),
+  );
+
+  it.effect("skips the secure-storage write when a save changes nothing", () =>
+    Effect.gen(function* () {
+      const memory = makeStorage({});
+      let writes = 0;
+      const catalog = yield* make().pipe(
+        Effect.provideService(MobileSecureStorage.MobileSecureStorage, {
+          ...memory.storage,
+          setItem: (key, value) =>
+            Effect.sync(() => {
+              writes += 1;
+            }).pipe(Effect.andThen(memory.storage.setItem(key, value))),
+        }),
+      );
+      yield* catalog.update((document) => ({ ...document }));
+      expect(writes).toBe(1);
+      yield* catalog.update((document) => ({ ...document, profiles: [...document.profiles] }));
+      expect(writes).toBe(1);
+
+      // A catalog read back from storage is known too, so its first unchanged save is skipped.
+      const reopened = yield* make().pipe(
+        Effect.provideService(MobileSecureStorage.MobileSecureStorage, {
+          ...memory.storage,
+          setItem: (key, value) =>
+            Effect.sync(() => {
+              writes += 1;
+            }).pipe(Effect.andThen(memory.storage.setItem(key, value))),
+        }),
+      );
+      yield* reopened.update((document) => ({ ...document }));
+      expect(writes).toBe(1);
+      yield* reopened.update((document) => ({ ...document, githubRoutingPermissions: [] }));
+      expect(writes).toBe(2);
     }),
   );
 });

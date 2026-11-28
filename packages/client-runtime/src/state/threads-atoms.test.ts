@@ -68,6 +68,8 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
   const snapshot = options?.snapshot ?? SNAPSHOT;
   let httpLoads = 0;
   let diskLoads = 0;
+  const saves: Array<OrchestrationV2ThreadDetailSnapshot> = [];
+  const saved = yield* Deferred.make<void>();
   let opened = 0;
   let active = 0;
   const client = {
@@ -178,7 +180,10 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
               diskLoads += 1;
               return Option.none();
             }),
-          saveThread: () => Effect.void,
+          saveThread: (_environmentId, snapshot) =>
+            Effect.sync(() => void saves.push(snapshot)).pipe(
+              Effect.andThen(Deferred.succeed(saved, undefined)),
+            ),
           removeThread: () => Effect.void,
           loadServerConfig: () => Effect.succeedNone,
           saveServerConfig: () => Effect.void,
@@ -234,6 +239,8 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
     olderLoads,
     loadEarlier: () => historyController.loadEarlier(TARGET.environmentId, THREAD_ID),
     counts: () => ({ httpLoads, diskLoads, opened, active }),
+    saves,
+    saved,
   };
 });
 
@@ -290,6 +297,23 @@ describe("createEnvironmentThreadStateAtoms", () => {
       expect(h.counts()).toEqual({ httpLoads: 0, diskLoads: 1, opened: 2, active: 1 });
       remount();
       yield* Deferred.await(next.closed);
+    }),
+  );
+
+  // What the recent-thread warm-up relies on: a thread mounted until live and let go is cached.
+  it.effect("saves a thread to the device cache when it is let go after going live", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness();
+      const unmount = h.registry.mount(h.stateAtom);
+      const first = yield* Queue.take(h.subscriptions);
+      yield* Queue.offer(first.events, { kind: "synchronized" });
+      yield* observeState(h.registry, h.stateAtom, (state) => state.status === "live");
+      unmount();
+      yield* Deferred.await(first.closed);
+      // The save is the state's own finalizer, which runs after the subscription closes.
+      yield* Deferred.await(h.saved);
+      expect(h.saves.at(-1)?.projection.thread.title).toBe("Cached thread");
+      expect(h.saves.at(-1)?.snapshotSequence).toBe(SNAPSHOT.snapshotSequence);
     }),
   );
 

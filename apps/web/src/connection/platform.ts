@@ -292,6 +292,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
     label: descriptor.label,
     bootstrap,
     bearerToken: access.access_token,
+    descriptor,
   };
 });
 
@@ -337,7 +338,7 @@ export const prepareDesktopSshEnvironment = Effect.fn("web.connectionPlatform.ss
         session.authenticated &&
         AuthStandardClientScopes.every((scope) => granted.includes(scope))
       ) {
-        return { bootstrap, bearerToken };
+        return { bootstrap, bearerToken, descriptor };
       }
     }
     const provisioned = yield* provisionDesktopSshEnvironment(
@@ -345,7 +346,11 @@ export const prepareDesktopSshEnvironment = Effect.fn("web.connectionPlatform.ss
       input.target,
       input.expectedEnvironmentId,
     );
-    return { bootstrap: provisioned.bootstrap, bearerToken: provisioned.bearerToken };
+    return {
+      bootstrap: provisioned.bootstrap,
+      bearerToken: provisioned.bearerToken,
+      descriptor: provisioned.descriptor,
+    };
   },
 );
 

@@ -565,6 +565,8 @@ export const makeCatalogStore = Effect.fn("web.connectionStorage.makeCatalogStor
 ) {
   const state = yield* Ref.make<Option.Option<ConnectionCatalogDocumentType>>(Option.none());
   const lock = yield* Semaphore.make(1);
+  // The text the backend holds, once known, so a save that changes nothing is skipped.
+  let stored: string | undefined;
 
   const loadUnlocked = Effect.fn("web.connectionStorage.loadCatalog")(function* () {
     const cached = yield* Ref.get(state);
@@ -575,6 +577,11 @@ export const makeCatalogStore = Effect.fn("web.connectionStorage.makeCatalogStor
     let catalog = EMPTY_CONNECTION_CATALOG_DOCUMENT;
     if (raw !== null && raw.trim() !== "") {
       catalog = yield* decodeCatalog(raw).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            stored = raw;
+          }),
+        ),
         Effect.catch((error) =>
           Effect.gen(function* () {
             yield* Effect.logWarning("Discarding a corrupt web connection catalog.", {
@@ -606,13 +613,23 @@ export const makeCatalogStore = Effect.fn("web.connectionStorage.makeCatalogStor
     return catalog;
   });
 
-  const read = lock.withPermits(1)(loadUnlocked());
+  // Once loaded, a read takes the saved document without the lock: every environment's connect
+  // reads its credentials here, and must not wait for another environment's secure-storage save.
+  const read = Ref.get(state).pipe(
+    Effect.flatMap((cached) =>
+      Option.isSome(cached) ? Effect.succeed(cached.value) : lock.withPermits(1)(loadUnlocked()),
+    ),
+  );
   const update: CatalogStore["update"] = Effect.fn("web.connectionStorage.updateCatalog")(
     function* (transform) {
       yield* lock.withPermits(1)(
         Effect.gen(function* () {
           const next = transform(yield* loadUnlocked());
-          yield* backend.write(yield* encodeCatalog(next));
+          const encoded = yield* encodeCatalog(next);
+          if (encoded !== stored) {
+            yield* backend.write(encoded);
+            stored = encoded;
+          }
           yield* Ref.set(state, Option.some(next));
         }),
       );

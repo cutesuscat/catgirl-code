@@ -69,6 +69,8 @@ export const make = Effect.fn("mobile.connectionStorage.makeCatalogStore")(funct
     storage.removeItem(key).pipe(Effect.mapError((cause) => catalogError("delete", cause)));
   const state = yield* Ref.make<Option.Option<ConnectionCatalogDocumentType>>(Option.none());
   const lock = yield* Semaphore.make(1);
+  // The text secure storage holds, once known, so a save that changes nothing is skipped.
+  let stored: string | undefined;
 
   const loadLegacyCatalog = Effect.fn("mobile.connectionStorage.loadLegacyCatalog")(function* () {
     const legacyRaw = yield* getItem(LEGACY_CONNECTIONS_KEY);
@@ -100,6 +102,11 @@ export const make = Effect.fn("mobile.connectionStorage.makeCatalogStore")(funct
     let catalog: ConnectionCatalogDocumentType;
     if (raw !== null && raw.trim() !== "") {
       catalog = yield* decodeCatalog(raw).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            stored = raw;
+          }),
+        ),
         Effect.catch((error) =>
           Effect.logWarning("Discarding corrupt mobile connection catalog", error).pipe(
             Effect.andThen(deleteItem(CONNECTION_CATALOG_KEY)),
@@ -114,14 +121,23 @@ export const make = Effect.fn("mobile.connectionStorage.makeCatalogStore")(funct
     return catalog;
   });
 
-  const read = lock.withPermits(1)(loadUnlocked());
+  // Once loaded, a read takes the saved document without the lock: every environment's connect
+  // reads its credentials here, and must not wait for another environment's secure-storage save.
+  const read = Ref.get(state).pipe(
+    Effect.flatMap((cached) =>
+      Option.isSome(cached) ? Effect.succeed(cached.value) : lock.withPermits(1)(loadUnlocked()),
+    ),
+  );
   const update: CatalogStore["update"] = Effect.fn("mobile.connectionStorage.updateCatalog")(
     function* (transform) {
       yield* lock.withPermits(1)(
         Effect.gen(function* () {
           const next = transform(yield* loadUnlocked());
           const encoded = yield* encodeCatalog(next);
-          yield* setItem(CONNECTION_CATALOG_KEY, encoded);
+          if (encoded !== stored) {
+            yield* setItem(CONNECTION_CATALOG_KEY, encoded);
+            stored = encoded;
+          }
           yield* Ref.set(state, Option.some(next));
         }),
       );

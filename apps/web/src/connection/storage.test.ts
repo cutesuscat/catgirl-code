@@ -7,6 +7,7 @@ import { ConnectionCatalogDocument, Persistence } from "@t3tools/client-runtime/
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
+import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -60,6 +61,45 @@ describe("ConnectionStorage.makeCatalogStore", () => {
       });
 
       expect(yield* Effect.flip(store.read)).toBe(failure);
+    }),
+  );
+
+  it.effect("reads while another save is still writing", () =>
+    Effect.gen(function* () {
+      const writing = yield* Deferred.make<void>();
+      const finishWrite = yield* Deferred.make<void>();
+      const store = yield* ConnectionStorage.makeCatalogStore({
+        read: Effect.succeed(encodeCatalog(emptyCatalog)),
+        write: () =>
+          Deferred.succeed(writing, undefined).pipe(Effect.andThen(Deferred.await(finishWrite))),
+      });
+      expect(yield* store.read).toEqual(emptyCatalog);
+
+      const save = yield* store
+        .update((document) => ({ ...document, githubRoutingPermissions: [] }))
+        .pipe(Effect.forkChild);
+      yield* Deferred.await(writing);
+      // The save holds the lock; a read answers from the loaded document all the same.
+      expect(yield* store.read.pipe(Effect.timeout("1 second"))).toEqual(emptyCatalog);
+      yield* Deferred.succeed(finishWrite, undefined);
+      yield* Fiber.join(save);
+    }),
+  );
+
+  it.effect("skips the backend write when a save changes nothing", () =>
+    Effect.gen(function* () {
+      const writes: string[] = [];
+      const store = yield* ConnectionStorage.makeCatalogStore({
+        read: Effect.succeed(encodeCatalog(emptyCatalog)),
+        write: (raw) => Effect.sync(() => writes.push(raw)),
+      });
+
+      yield* store.update((document) => ({ ...document, profiles: [...document.profiles] }));
+      expect(writes).toEqual([]);
+      yield* store.update((document) => ({ ...document, githubRoutingPermissions: [] }));
+      expect(writes).toHaveLength(1);
+      yield* store.update((document) => ({ ...document }));
+      expect(writes).toHaveLength(1);
     }),
   );
 });
