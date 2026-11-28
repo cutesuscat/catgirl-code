@@ -1,5 +1,6 @@
 // @effect-diagnostics globalTimers:off globalDate:off -- Drag polling, hover debounce and mood timers run only while needed.
 import {
+  CAT_PET_SIZES,
   CatPetSnapshot as CatPetSnapshotSchema,
   DEFAULT_CAT_PET_SETTINGS,
   type CatPetSettings,
@@ -7,6 +8,7 @@ import {
 } from "@t3tools/contracts";
 import {
   CAT_PET_DONE_LOOPS,
+  CAT_PET_SIZE_LABELS,
   CAT_PET_SLEEP_AFTER_MS,
   catPetDisplayWidth,
   catPetLoopDuration,
@@ -104,6 +106,7 @@ export class CatPetController {
   private petRequest = "";
   private petSent: LoadedCatPet | null = null;
   private panel: CatPetPanel = "none";
+  private menuOpen = false;
   private panelSize: { width: number; height: number } = { width: 296, height: 120 };
   private petBox: CatPetRect | null = null;
   private positions: CatPetSavedPositions = EMPTY_CAT_PET_POSITIONS;
@@ -470,6 +473,8 @@ export class CatPetController {
       petSize: this.petSize(),
       layout: { pet: layout.pet, panel: layout.panel },
       panel: this.panel,
+      menuOpen: this.menuOpen,
+      opacity: this.settings.opacity / 100,
       clickThrough: this.deps.platform !== "linux",
     };
     this.petSent = pet;
@@ -713,11 +718,8 @@ export class CatPetController {
     const needs = (this.snapshot?.threads ?? []).filter(
       (thread) => thread.kind !== "working" && thread.kind !== "done",
     );
-    const size = (
-      value: CatPetSettings["size"],
-      label: string,
-    ): Electron.MenuItemConstructorOptions => ({
-      label,
+    const size = (value: CatPetSettings["size"]): Electron.MenuItemConstructorOptions => ({
+      label: CAT_PET_SIZE_LABELS[value],
       type: "radio",
       checked: this.settings.size === value,
       click: () => this.updateSettings({ size: value }),
@@ -739,7 +741,7 @@ export class CatPetController {
       { type: "separator" },
       {
         label: "Size",
-        submenu: [size("small", "Small"), size("medium", "Medium"), size("large", "Large")],
+        submenu: CAT_PET_SIZES.map(size),
       },
       {
         label: "Pet",
@@ -747,7 +749,7 @@ export class CatPetController {
           label: pet.displayName,
           type: "radio",
           checked: this.settings.petId === pet.id,
-          click: () => this.updateSettings({ petId: pet.id }),
+          click: () => this.updateSettings({ petId: pet.id, petPicked: true }),
         })),
       },
       {
@@ -761,7 +763,16 @@ export class CatPetController {
       { label: "Hide pet", click: () => this.updateSettings({ enabled: false }) },
       { label: "Pet settings…", click: () => this.sendToApp({ type: "open-settings" }) },
     ]);
-    menu.popup({ window });
+    // She shows fully while her menu is open.
+    this.menuOpen = true;
+    this.render();
+    menu.popup({
+      window,
+      callback: () => {
+        this.menuOpen = false;
+        this.render();
+      },
+    });
   }
 
   private startDrag(): void {

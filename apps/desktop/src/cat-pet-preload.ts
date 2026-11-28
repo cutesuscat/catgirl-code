@@ -20,6 +20,10 @@ const send = (message: CatPetPageMessage) => ipcRenderer.send(CAT_PET_PAGE_CHANN
 const SHADOW = 8;
 const HOVER_IN_MS = 300;
 const HOVER_OUT_MS = 400;
+/** A new needs-you shows her fully this long, or until she has looked. */
+const ALERT_MS = 30_000;
+/** Moving from the pet to her bubble passes through a gap; don't fade across it. */
+const LEAVE_MS = 150;
 
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -47,6 +51,38 @@ window.addEventListener("DOMContentLoaded", () => {
   let hoverTimer: ReturnType<typeof setTimeout> | null = null;
   let hovering = false;
   let reportedPanel = "";
+  let pointerInside = false;
+  let leaveTimer: ReturnType<typeof setTimeout> | null = null;
+  let alertCount = 0;
+  let alertUntil = 0;
+  let alertTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Opacity is a style on #pet with a CSS transition; frames, hit-testing and click-through
+  // don't change. She shows fully while hovered, held, with her bubble, tray or menu open,
+  // and for ALERT_MS after a new needs-you unless she looks or it is answered sooner.
+  const updateOpacity = () => {
+    if (current === null) return;
+    const engaged =
+      pointerInside || current.panel !== "none" || current.menuOpen || current.state === "held";
+    if (engaged) alertUntil = 0;
+    const full = engaged || Date.now() < alertUntil || current.opacity >= 1;
+    pet.style.opacity = full ? "" : String(current.opacity);
+  };
+  const trackAlert = (render: CatPetRenderMessage) => {
+    const asking = render.snapshot?.mood === "needs-you" ? render.snapshot.needsYou : 0;
+    if (asking > alertCount) {
+      alertUntil = Date.now() + ALERT_MS;
+      if (alertTimer !== null) clearTimeout(alertTimer);
+      alertTimer = setTimeout(() => {
+        alertTimer = null;
+        updateOpacity();
+      }, ALERT_MS);
+    } else if (asking === 0) {
+      // Answered elsewhere: nothing is left to see.
+      alertUntil = 0;
+    }
+    alertCount = asking;
+  };
 
   const player = new CatPetPlayer(
     {
@@ -129,6 +165,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const apply = (render: CatPetRenderMessage) => {
     current = render;
+    trackAlert(render);
+    updateOpacity();
     if (render.pet !== null && render.pet !== art) {
       art = render.pet;
       sheet.src = art.sheetUrl;
@@ -200,9 +238,29 @@ window.addEventListener("DOMContentLoaded", () => {
       on ? HOVER_IN_MS : HOVER_OUT_MS,
     );
   };
+  const setInside = (inside: boolean) => {
+    if (leaveTimer !== null) clearTimeout(leaveTimer);
+    leaveTimer = null;
+    if (inside) {
+      pointerInside = true;
+      updateOpacity();
+      return;
+    }
+    leaveTimer = setTimeout(() => {
+      leaveTimer = null;
+      pointerInside = false;
+      updateOpacity();
+    }, LEAVE_MS);
+  };
   for (const target of [pet, panel]) {
-    target.addEventListener("pointerenter", () => setHover(true));
-    target.addEventListener("pointerleave", () => setHover(false));
+    target.addEventListener("pointerenter", () => {
+      setHover(true);
+      setInside(true);
+    });
+    target.addEventListener("pointerleave", () => {
+      setHover(false);
+      setInside(false);
+    });
   }
 
   // macOS and Windows forward moves over the transparent window; only the pet and its panel are solid.

@@ -202,11 +202,16 @@ describe("CatPetPlayer", () => {
 });
 
 describe("catPetDisplayWidth", () => {
-  it("keeps pixel pets at whole multiples of 96", () => {
-    for (const size of ["small", "medium", "large"] as const) {
-      expect(catPetDisplayWidth(size, "pixelated") % 96).toBe(0);
-    }
-    expect(catPetDisplayWidth("medium", "auto")).toBe(128);
+  const sizes = ["xs", "s", "m", "l", "xl"] as const;
+
+  it("keeps pixel pets at whole multiples of 96, never shrinking up the slider", () => {
+    const widths = sizes.map((size) => catPetDisplayWidth(size, "pixelated"));
+    for (const width of widths) expect(width % 96).toBe(0);
+    expect(widths).toEqual([96, 96, 192, 288, 384]);
+  });
+
+  it("grows vector pets at every stop, keeping the first build's small, medium and large", () => {
+    expect(sizes.map((size) => catPetDisplayWidth(size, "auto"))).toEqual([64, 96, 128, 192, 256]);
   });
 });
 

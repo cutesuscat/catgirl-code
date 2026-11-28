@@ -33,7 +33,6 @@ const idle: CatPetThreadState = {
   runId: null,
   runStatus: null,
   activeRunId: null,
-  snoozed: false,
 };
 
 const thread = (
@@ -115,10 +114,9 @@ describe("summarizeCatPet", () => {
     expect(snapshot.working).toBe(1);
   });
 
-  it("ignores failures she has seen, snoozed requests, and archived or sub-agent rows", () => {
+  it("ignores failures she has seen, and archived or sub-agent rows", () => {
     const { snapshot } = summarize([
       thread("seen", { status: "failed", failureUnseen: false }),
-      thread("snoozed", { status: "input", snoozed: true }),
       thread("archived", { status: "approval", archived: true }),
       thread("sub", { status: "approval", subagentOf: "root" }),
     ]);

@@ -3,15 +3,9 @@ import {
   EMPTY_CAT_PET_MEMORY,
   sameCatPetSnapshot,
   summarizeCatPet,
-  type CatPetThreadState,
   type CatPetUsageLimit,
 } from "@t3tools/client-runtime/state/cat-pet";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { isThreadWorking } from "@t3tools/client-runtime/state/thread-inbox";
-import {
-  effectiveSnoozed,
-  hasUnseenRunFailure,
-} from "@t3tools/client-runtime/state/thread-settled";
 import type {
   CatgirlPetBridge,
   CatPetCommand,
@@ -24,8 +18,6 @@ import type { AtomRegistry } from "effect/reactivity";
 
 import { openCommandPalette } from "../commandPaletteBus";
 import { useComposerDraftStore } from "../composerDraftStore";
-import { resolveBackgroundThreadRunStatus } from "../components/backgroundThreadAnnouncement";
-import { resolveSidebarThreadStatus } from "../components/Sidebar.logic";
 import {
   getClientSettings,
   subscribeClientSettings,
@@ -37,8 +29,7 @@ import { liveShellEnvironmentIdsAtom } from "../state/shell";
 import { environmentThreadShells } from "../state/threads";
 import { resolveActiveThreadRouteRef, resolveThreadRouteTarget } from "../threadRoutes";
 import { publishCatPetSnapshot } from "./catPetStore";
-
-type Shell = EnvironmentThreadShell;
+import { catPetListedThreads, classifyCatPetThread } from "./catPetThreads";
 
 declare global {
   interface Window {
@@ -57,31 +48,6 @@ function readOpenThreadKey(router: AnyRouter): string | null {
       : null;
   const ref = resolveActiveThreadRouteRef(target, draft);
   return ref === null ? null : `${ref.environmentId}:${ref.threadId}`;
-}
-
-function classify(thread: Shell, nowIso: string): CatPetThreadState {
-  const status = resolveSidebarThreadStatus(thread);
-  const run = thread.latestRun;
-  const completedAt = run?.completedAt ? Date.parse(run.completedAt) : Number.NaN;
-  const visitedAt = thread.lastVisitedAt ? Date.parse(thread.lastVisitedAt) : Number.NaN;
-  return {
-    status:
-      status === "approval" ||
-      status === "input" ||
-      status === "request" ||
-      status === "limited" ||
-      status === "failed"
-        ? status
-        : "other",
-    // A runtime failure with no failed run has nothing to date it, so it counts, as in the sidebar.
-    failureUnseen: run?.status === "failed" ? hasUnseenRunFailure(thread) : true,
-    completionUnseen:
-      !Number.isNaN(completedAt) && (Number.isNaN(visitedAt) || completedAt > visitedAt),
-    runId: run?.runId ?? null,
-    runStatus: resolveBackgroundThreadRunStatus(thread),
-    activeRunId: thread.runtime?.activeRunId ?? null,
-    snoozed: effectiveSnoozed(thread, { now: nowIso }),
-  };
 }
 
 /** Providers with a usage window at 100%, on machines that are connected now. */
@@ -145,20 +111,29 @@ export function startCatPet(registry: AtomRegistry.AtomRegistry, router: AnyRout
   let memory = EMPTY_CAT_PET_MEMORY;
   let last: CatPetSnapshot | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let wakeTimer: ReturnType<typeof setTimeout> | null = null;
   let openThreadKey = readOpenThreadKey(router);
 
   const compute = () => {
     timer = null;
-    if (!getClientSettings().catPet.enabled) {
+    if (wakeTimer !== null) clearTimeout(wakeTimer);
+    wakeTimer = null;
+    const settings = getClientSettings();
+    if (!settings.catPet.enabled) {
       memory = EMPTY_CAT_PET_MEMORY;
       last = null;
       return;
     }
-    const overrides = getClientSettings().environmentLabelOverrides;
+    const overrides = settings.environmentLabelOverrides;
+    const hiddenEnvironmentIds = settings.sidebarHiddenEnvironmentIds;
     const live = registry.get(liveShellEnvironmentIdsAtom);
+    // Machines hidden from the sidebar are hidden from her too: no moods, limits or offline names.
     const environments = registry
       .get(environmentSummaries.environmentsAtom)
-      .filter((environment) => environment.isEnabled)
+      .filter(
+        (environment) =>
+          environment.isEnabled && !hiddenEnvironmentIds.includes(environment.environmentId),
+      )
       .map((environment) => ({
         environmentId: environment.environmentId,
         label: overrides[environment.environmentId] ?? environment.environmentLabel,
@@ -166,19 +141,32 @@ export function startCatPet(registry: AtomRegistry.AtomRegistry, router: AnyRout
         live: live.has(environment.environmentId),
       }));
     const connected = new Set(environments.filter((e) => e.connected).map((e) => e.environmentId));
+    const configs = registry.get(environmentServerConfigsAtom);
     const now = Date.now();
     const nowIso = new Date(now).toISOString();
+    const shells = registry.get(environmentThreadShells.quietThreadShellsAtom);
     const result = summarizeCatPet({
       memory,
       now,
       environments,
-      threads: registry.get(environmentThreadShells.quietThreadShellsAtom),
+      threads: catPetListedThreads(shells, {
+        now: nowIso,
+        hiddenEnvironmentIds,
+        configLoaded: (environmentId) => configs.has(environmentId),
+      }),
       isWorking: isThreadWorking,
-      classify: (thread) => classify(thread, nowIso),
+      classify: classifyCatPetThread,
       openThreadKey,
-      usageLimits: fullUsageLimits(registry.get(environmentServerConfigsAtom), connected),
+      usageLimits: fullUsageLimits(configs, connected),
     });
     memory = result.memory;
+    // A snooze that ends changes no atom, so look again when the next one does.
+    const nextWake = Math.min(
+      ...shells.map((shell) => Date.parse(shell.snoozedUntil ?? "")).filter((at) => at > now),
+    );
+    if (Number.isFinite(nextWake)) {
+      wakeTimer = setTimeout(update, Math.min(nextWake - now + 50, 2 ** 31 - 1));
+    }
     if (sameCatPetSnapshot(last, result.snapshot)) return;
     last = result.snapshot;
     publishCatPetSnapshot(result.snapshot);
@@ -207,6 +195,7 @@ export function startCatPet(registry: AtomRegistry.AtomRegistry, router: AnyRout
   update();
   return () => {
     if (timer !== null) clearTimeout(timer);
+    if (wakeTimer !== null) clearTimeout(wakeTimer);
     for (const unsubscribe of unsubscribes) unsubscribe();
   };
 }

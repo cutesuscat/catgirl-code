@@ -163,7 +163,13 @@ export function InAppCatPet() {
         </div>
       ) : null}
       <div
-        className="pointer-events-auto relative cursor-pointer touch-none"
+        className="pointer-events-auto relative cursor-pointer touch-none transition-opacity duration-200"
+        // Faded while nothing draws her attention; full when hovered, held or asking for you.
+        style={
+          hover || held || snapshot?.mood === "needs-you"
+            ? undefined
+            : { opacity: settings.opacity / 100 }
+        }
         onPointerEnter={() => setHover(true)}
         onPointerLeave={() => setHover(false)}
         onPointerDown={(event) => {
