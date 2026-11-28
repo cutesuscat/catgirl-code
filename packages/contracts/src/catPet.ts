@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 
 /** The pets bundled with the app, under `apps/web/public/pets/<id>/`. */
 export const BUILT_IN_CAT_PET_IDS = ["marmalade", "clementine", "cinnamon", "meowtase"] as const;
-export const DEFAULT_CAT_PET_ID = "marmalade";
+const DEFAULT_CAT_PET_ID = "marmalade";
 
 export const CatPetSize = Schema.Literals(["small", "medium", "large"]);
 export type CatPetSize = typeof CatPetSize.Type;
@@ -39,19 +39,6 @@ export const CatPetSettings = Schema.Struct({
 });
 export type CatPetSettings = typeof CatPetSettings.Type;
 export const DEFAULT_CAT_PET_SETTINGS: CatPetSettings = Schema.decodeSync(CatPetSettings)({});
-
-/** Most urgent first. `held` and `done` are decided where the pet is drawn. */
-export const CAT_PET_MOODS = [
-  "held",
-  "needs-you",
-  "limited",
-  "error",
-  "done",
-  "working",
-  "idle",
-  "sleeping",
-] as const;
-export type CatPetMood = (typeof CAT_PET_MOODS)[number];
 
 const Count = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100_000 }));
 const ShortText = Schema.String.check(Schema.isMaxLength(200));

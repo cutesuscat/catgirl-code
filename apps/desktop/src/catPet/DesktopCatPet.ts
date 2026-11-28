@@ -112,7 +112,7 @@ function isWaylandSession(platform: NodeJS.Platform): boolean {
   return (process.env.WAYLAND_DISPLAY ?? "") !== "" || process.env.XDG_SESSION_TYPE === "wayland";
 }
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const electronWindow = yield* ElectronWindow.ElectronWindow;
   const desktopWindow = yield* DesktopWindow.DesktopWindow;

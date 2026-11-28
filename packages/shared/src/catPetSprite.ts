@@ -4,7 +4,7 @@
  * pets, resolves the mood to draw, and steps frames with timers only (no animation loop).
  */
 
-export const CAT_PET_STATES = [
+const CAT_PET_STATES = [
   "idle",
   "working",
   "needs-you",
@@ -37,7 +37,7 @@ export interface CatPetSpec {
   readonly animations: Readonly<Record<CatPetState, CatPetAnimation>>;
 }
 
-export const CODEX_CELL = { width: 192, height: 208 } as const;
+const CODEX_CELL = { width: 192, height: 208 } as const;
 const CODEX_COLUMNS = 8;
 const CODEX_ROWS = 9;
 
@@ -237,7 +237,7 @@ export function isCatPetBusy(state: CatPetState): boolean {
 
 export const CAT_PET_DONE_LOOPS = 3;
 
-export function catPetFrameDuration(animation: CatPetAnimation, frame: number): number {
+function catPetFrameDuration(animation: CatPetAnimation, frame: number): number {
   return animation.durations[frame] ?? animation.durations.at(-1) ?? 200;
 }
 
@@ -347,7 +347,7 @@ export const CAT_PET_KIND_LABELS = {
 } as const;
 
 /** "18:40", or the day too when the reset is not today. */
-export function formatCatPetResetTime(iso: string, now: Date, locale?: string): string | null {
+function formatCatPetResetTime(iso: string, now: Date, locale?: string): string | null {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return null;
   const time = at.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
