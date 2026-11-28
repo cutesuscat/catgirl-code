@@ -1,9 +1,11 @@
-// @effect-diagnostics globalTimers:off -- The player takes plain timers; these tests drive them with fake ones.
+// @effect-diagnostics globalTimers:off globalDate:off -- The player takes plain timers; these tests drive them with fake ones.
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   CAT_PET_SLEEP_AFTER_MS,
   CatPetPlayer,
+  catPetHeadline,
+  catPetOfflineLine,
   catPetDisplayWidth,
   checkCatPetSheet,
   isCatPetBusy,
@@ -205,5 +207,44 @@ describe("catPetDisplayWidth", () => {
       expect(catPetDisplayWidth(size, "pixelated") % 96).toBe(0);
     }
     expect(catPetDisplayWidth("medium", "auto")).toBe(128);
+  });
+});
+
+describe("catPetHeadline", () => {
+  const now = new Date(2026, 10, 28, 12, 0);
+  const base = {
+    working: 0,
+    needsYou: 0,
+    limited: 0,
+    failed: 0,
+    unreadDone: 0,
+    limit: null,
+    machines: { offline: [] as string[] },
+  };
+  it("joins the counts, most urgent first", () => {
+    expect(
+      catPetHeadline(
+        {
+          ...base,
+          working: 2,
+          needsYou: 1,
+          limit: { label: "Claude", resetsAt: new Date(2026, 10, 28, 18, 40).toISOString() },
+        },
+        { appClosed: false, now, locale: "en-GB" },
+      ),
+    ).toBe("1 needs you · 2 working · Claude limit resets 18:40");
+    expect(catPetHeadline(base, { appClosed: false, now })).toBe("All quiet");
+    expect(catPetHeadline(base, { appClosed: true, now })).toBe(
+      "The Catgirl Code window is closed",
+    );
+    expect(catPetHeadline({ ...base, limited: 2, failed: 1 }, { appClosed: false, now })).toBe(
+      "2 hit a usage limit · 1 failed",
+    );
+  });
+
+  it("names offline machines", () => {
+    expect(catPetOfflineLine({ ...base, machines: { offline: ["a"] } })).toBe("a is offline");
+    expect(catPetOfflineLine({ ...base, machines: { offline: ["a", "b"] } })).toBe("Offline: a, b");
+    expect(catPetOfflineLine(base)).toBeNull();
   });
 });

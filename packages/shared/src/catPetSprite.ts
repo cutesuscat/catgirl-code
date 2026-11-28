@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off -- Formats a reset time for the pet bubble, which runs outside any Effect runtime.
 /**
  * Desktop pet sprites: reads our `pet.json` (a Codex pet with a `catgirl` block) and plain Codex
  * pets, resolves the mood to draw, and steps frames with timers only (no animation loop).
@@ -323,4 +324,69 @@ export function catPetDisplayWidth(
 ): number {
   if (imageRendering === "pixelated") return size === "small" ? 96 : size === "medium" ? 192 : 288;
   return size === "small" ? 96 : size === "medium" ? 128 : 192;
+}
+
+export interface CatPetSummaryInput {
+  readonly working: number;
+  readonly needsYou: number;
+  readonly limited: number;
+  readonly failed: number;
+  readonly unreadDone: number;
+  readonly limit: { readonly label: string; readonly resetsAt: string | null } | null;
+  readonly machines: { readonly offline: readonly string[] };
+}
+
+export const CAT_PET_KIND_LABELS = {
+  approval: "Approve",
+  input: "Answer",
+  request: "Guest",
+  limited: "Limited",
+  failed: "Failed",
+  working: "Working",
+  done: "Done",
+} as const;
+
+/** "18:40", or the day too when the reset is not today. */
+export function formatCatPetResetTime(iso: string, now: Date, locale?: string): string | null {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  const time = at.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  return at.toDateString() === now.toDateString()
+    ? time
+    : `${at.toLocaleDateString(locale, { weekday: "short" })} ${time}`;
+}
+
+/** The bubble's first line: "2 working · 1 needs you · Claude limit resets 18:40". */
+export function catPetHeadline(
+  summary: CatPetSummaryInput | null,
+  options: { readonly appClosed: boolean; readonly now: Date; readonly locale?: string },
+): string {
+  if (options.appClosed) return "The Catgirl Code window is closed";
+  if (summary === null) return "Waiting for Catgirl Code…";
+  const parts: string[] = [];
+  if (summary.needsYou > 0)
+    parts.push(`${summary.needsYou} need${summary.needsYou === 1 ? "s" : ""} you`);
+  if (summary.working > 0) parts.push(`${summary.working} working`);
+  if (summary.limit !== null) {
+    const reset =
+      summary.limit.resetsAt === null
+        ? null
+        : formatCatPetResetTime(summary.limit.resetsAt, options.now, options.locale);
+    parts.push(
+      reset === null
+        ? `${summary.limit.label} limit reached`
+        : `${summary.limit.label} limit resets ${reset}`,
+    );
+  } else if (summary.limited > 0) {
+    parts.push(`${summary.limited} hit a usage limit`);
+  }
+  if (summary.failed > 0) parts.push(`${summary.failed} failed`);
+  if (summary.unreadDone > 0) parts.push(`${summary.unreadDone} done`);
+  return parts.length === 0 ? "All quiet" : parts.join(" · ");
+}
+
+export function catPetOfflineLine(summary: CatPetSummaryInput | null): string | null {
+  const offline = summary?.machines.offline ?? [];
+  if (offline.length === 0) return null;
+  return offline.length === 1 ? `${offline[0]} is offline` : `Offline: ${offline.join(", ")}`;
 }
