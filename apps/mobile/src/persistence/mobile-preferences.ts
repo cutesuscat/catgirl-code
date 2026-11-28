@@ -156,6 +156,8 @@ export interface Preferences {
   readonly mathRenderingEnabled?: boolean;
   /** Unset means on: the row of cat planets above the thread list. */
   readonly catFleetEnabled?: boolean;
+  /** How many machines that row holds. Unset means the default, 12. */
+  readonly catFleetLimit?: number;
   /** Unset means off: Catgirl Code sends crash reports only once the user turns them on. */
   readonly crashReportsEnabled?: boolean;
   /** Unset means off: Catgirl Code sends connection traces only once the user turns them on. */
@@ -256,6 +258,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     codeWordBreak?: boolean;
     mathRenderingEnabled?: boolean;
     catFleetEnabled?: boolean;
+    catFleetLimit?: number;
     crashReportsEnabled?: boolean;
     connectionTracesEnabled?: boolean;
     connectOnboardingOptOutAccounts?: ReadonlyArray<string>;
@@ -358,6 +361,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     preferences.mathRenderingEnabled = parsed.mathRenderingEnabled;
   if (typeof parsed.catFleetEnabled === "boolean") {
     preferences.catFleetEnabled = parsed.catFleetEnabled;
+  }
+  if (typeof parsed.catFleetLimit === "number" && Number.isInteger(parsed.catFleetLimit)) {
+    preferences.catFleetLimit = parsed.catFleetLimit;
   }
   if (typeof parsed.crashReportsEnabled === "boolean") {
     preferences.crashReportsEnabled = parsed.crashReportsEnabled;

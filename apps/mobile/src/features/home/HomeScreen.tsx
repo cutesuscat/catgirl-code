@@ -105,6 +105,7 @@ import { useWorkspaceTabs } from "../layout/workspace/WorkspaceTabsContext";
 import { ThreadListFilters } from "./ThreadListFilters";
 import { deriveHomeEmptyState } from "./home-empty-state";
 import { HomeCatFleet } from "./HomeCatFleet";
+import { createHomeListScrollWatch } from "./home-cat-fleet";
 
 interface HomeScreenProps {
   /** Whether this list is the one on screen; see `useHomeRouteVisible`. */
@@ -200,6 +201,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const usesNativeWorkspaceColumns = useNativeWorkspaceColumnsSupported();
   const workspace = useWorkspaceTabs();
   const [initialScrollOffset] = useState(() => workspace?.getScrollOffset("threads") ?? 0);
+  const [catFleetScroll] = useState(createHomeListScrollWatch);
   const primaryColumn = use(NativePrimaryColumnContext);
   const sidebarSurface = usePaneRole() === "sidebar" && primaryColumn !== null;
   const contentBackground = sidebarSurface ? "bg-drawer" : "bg-screen";
@@ -299,6 +301,7 @@ export function HomeScreen(props: HomeScreenProps) {
   useEffect(() => () => clearTimeout(activationTimerRef.current), []);
   const handleListScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     onFabScroll?.(event);
+    catFleetScroll.note(event.nativeEvent.contentOffset.y);
     if (workspace)
       workspace.recordScrollOffset(
         "threads",
@@ -688,6 +691,7 @@ export function HomeScreen(props: HomeScreenProps) {
       environments={props.environments}
       selectedEnvironmentId={props.selectedEnvironmentId}
       onEnvironmentChange={props.onEnvironmentChange}
+      listScroll={catFleetScroll}
     />
   );
 
