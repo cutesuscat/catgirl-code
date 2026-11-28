@@ -8,6 +8,7 @@ import {
   appleSpeechTranscribe,
 } from "./methods/appleSpeech.ts";
 import * as DesktopIpc from "./DesktopIpc.ts";
+import * as DesktopCatPet from "../catPet/DesktopCatPet.ts";
 import { installNotificationBadge } from "./methods/notificationBadge.ts";
 import { getClientSettings, setClientSettings } from "./methods/clientSettings.ts";
 import {
@@ -103,6 +104,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   const ipc = yield* DesktopIpc.DesktopIpc;
   yield* installNotificationBadge();
   yield* PreviewIpc.installPreviewEventForwarding();
+  yield* (yield* DesktopCatPet.optional)?.install ?? Effect.void;
 
   yield* ipc.handle(AppActivationIpc.setReady);
   yield* ipc.handle(AppActivationIpc.complete);
