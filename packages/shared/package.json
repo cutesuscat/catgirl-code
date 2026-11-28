@@ -315,6 +315,10 @@
       "types": "./src/keybindingMatching.ts",
       "import": "./src/keybindingMatching.ts"
     },
+    "./catPetSprite": {
+      "types": "./src/catPetSprite.ts",
+      "import": "./src/catPetSprite.ts"
+    },
     "./threadTranscript": {
       "types": "./src/threadTranscript.ts",
       "import": "./src/threadTranscript.ts"
