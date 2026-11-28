@@ -28,7 +28,7 @@ export function CatFleetAppearanceSection() {
   return (
     <SettingsSection
       title="Thread list"
-      footer="Your busiest machines as one row of cats above the threads. Tap a cat to list only that machine's threads."
+      footer="Your busiest machines as a row of cats above the threads, which you can swipe sideways when they don't all fit. Running threads orbit their cat. Tap a cat to list only that machine's threads."
     >
       <SettingsSwitchRow
         disabled={!loaded}

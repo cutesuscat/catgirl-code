@@ -5,13 +5,21 @@ import {
   CAT_ORBITS,
   CAT_ORBIT_CENTER,
   CAT_PLANET,
+  CAT_SCALE,
+  CAT_SUBAGENT_ORBIT,
   DEFAULT_HOME_CAT_FLEET_LIMIT,
+  HOME_CAT_FLEET_GUTTER,
   HOME_CAT_FLEET_LIMITS,
   catCoatStops,
+  catOrbitPaceOf,
   catOrbitPoint,
+  catOrbitTurn,
   catStoppedPoint,
+  catSubagentOffset,
+  createHomeListScrollWatch,
   homeCatFleetCells,
   homeCatFleetLimitOf,
+  isHomeCatCellInView,
   mixHexColors,
   pickHomeCatFleet,
   rankHomeCatFleet,
@@ -87,12 +95,49 @@ describe("pickHomeCatFleet", () => {
 });
 
 describe("homeCatFleetCells", () => {
-  it("fits whole cats only and shares the row between them", () => {
-    expect(homeCatFleetCells(387)).toEqual({ count: 5, width: 387 / 5 });
-    expect(homeCatFleetCells(336)).toEqual({ count: 4, width: 84 });
-    expect(homeCatFleetCells(70)).toEqual({ count: 0, width: 0 });
-    // Before the row is measured its width is not known.
-    expect(homeCatFleetCells(-24)).toEqual({ count: 0, width: 0 });
+  const cellMin = CAT_PLANET.width * CAT_SCALE;
+
+  it("shares the row between whole cells when every cat fits, and does not scroll", () => {
+    // A 411-point phone less the list's own margins: five cells between the gutters.
+    expect(homeCatFleetCells(411, 5)).toEqual({ width: 387 / 5, scrolls: false });
+    expect(homeCatFleetCells(411, 1)).toEqual({ width: 387 / 5, scrolls: false });
+    expect(homeCatFleetCells(360, 4)).toEqual({ width: 84, scrolls: false });
+  });
+
+  it("scrolls when there are more cats, with the last one in view cut about in half", () => {
+    for (const rowWidth of [360, 411, 600]) {
+      const fit = Math.floor((rowWidth - 2 * HOME_CAT_FLEET_GUTTER) / cellMin);
+      const cells = homeCatFleetCells(rowWidth, fit + 1);
+      const visible = rowWidth - HOME_CAT_FLEET_GUTTER;
+      const peek = (visible / cells.width) % 1;
+
+      expect(cells.scrolls).toBe(true);
+      expect(peek).toBeCloseTo(0.45);
+      // Cells are squeezed a little at most, never below 92% of a planet.
+      expect(cells.width).toBeGreaterThanOrEqual(cellMin * 0.92);
+      expect(homeCatFleetCells(rowWidth, 48)).toEqual(cells);
+    }
+  });
+
+  it("has no cells before the row is measured or when not one cat fits", () => {
+    expect(homeCatFleetCells(0, 3)).toEqual({ width: 0, scrolls: false });
+    expect(homeCatFleetCells(90, 3)).toEqual({ width: 0, scrolls: false });
+    expect(homeCatFleetCells(-24, 0)).toEqual({ width: 0, scrolls: false });
+  });
+
+  it("counts a cell as in view from half a cell before it shows to half a cell after", () => {
+    const width = 80;
+    const rowWidth = 400;
+    // The first cell starts at the gutter; the sixth starts at 412, past the row's end.
+    expect(isHomeCatCellInView(0, width, 0, rowWidth)).toBe(true);
+    expect(isHomeCatCellInView(4, width, 0, rowWidth)).toBe(true);
+    expect(isHomeCatCellInView(5, width, 0, rowWidth)).toBe(true);
+    expect(isHomeCatCellInView(6, width, 0, rowWidth)).toBe(false);
+    // Scrolled two and a half cells along, the first has gone and the eighth is coming.
+    expect(isHomeCatCellInView(0, width, 200, rowWidth)).toBe(false);
+    expect(isHomeCatCellInView(1, width, 200, rowWidth)).toBe(true);
+    expect(isHomeCatCellInView(7, width, 200, rowWidth)).toBe(true);
+    expect(isHomeCatCellInView(8, width, 200, rowWidth)).toBe(false);
   });
 });
 
@@ -127,6 +172,67 @@ describe("how many cats the row holds", () => {
     expect(ids(null)).toEqual(["m00", "m01", "m02", "m03", "m04", "m05"]);
     expect(ids("m15")).toEqual(["m00", "m01", "m02", "m03", "m04", "m15"]);
     expect(pickHomeCatFleet(fleet, 48, null)).toHaveLength(20);
+  });
+});
+
+describe("motion", () => {
+  it("starts every body where the still picture puts it, and turns it once a period", () => {
+    expect(catOrbitTurn(0.3, 0, 7.5)).toBeCloseTo(0.3);
+    expect(catOrbitTurn(0.3, 7.5, 7.5)).toBeCloseTo(0.3);
+    expect(catOrbitTurn(0.3, 3.75, 7.5)).toBeCloseTo(0.8);
+    expect(catOrbitTurn(0.9, 1.5, 7.5)).toBeCloseTo(0.1);
+    // Hours in, the turn stays a fraction.
+    const late = catOrbitTurn(0.3, 36_000.25, 10.5);
+    expect(late).toBeGreaterThanOrEqual(0);
+    expect(late).toBeLessThan(1);
+  });
+
+  it("turns outer orbits more slowly, and each machine at its own pace", () => {
+    expect(CAT_ORBITS.map((orbit) => orbit.period)).toEqual([7.5, 10.5, 14]);
+    for (const id of ["slop-box", "nickybox", "this Mac", "i9"]) {
+      expect(catOrbitPaceOf(id)).toBeGreaterThanOrEqual(0.9);
+      expect(catOrbitPaceOf(id)).toBeLessThanOrEqual(1.2);
+      expect(catOrbitPaceOf(id)).toBe(catOrbitPaceOf(id));
+    }
+    expect(catOrbitPaceOf("slop-box")).not.toBe(catOrbitPaceOf("nickybox"));
+  });
+
+  it("goes clockwise on screen, as on the desktop: from the right-hand end down in front", () => {
+    const orbit = CAT_ORBITS[1];
+    const start = catOrbitPoint(orbit, catOrbitTurn(0, 0, orbit.period));
+    const later = catOrbitPoint(orbit, catOrbitTurn(0, 1, orbit.period));
+
+    expect(start.x).toBeGreaterThan(CAT_ORBIT_CENTER.x);
+    expect(later.y).toBeGreaterThan(start.y);
+    expect(later.near).toBe(true);
+  });
+
+  it("keeps a sub-agent on a small orbit squashed and tilted like its thread's", () => {
+    for (let step = 0; step < 8; step++) {
+      const offset = catSubagentOffset(0, step / 8);
+      expect(Math.abs(offset.x)).toBeLessThanOrEqual(CAT_SUBAGENT_ORBIT.radius + 1e-9);
+      expect(Math.abs(offset.y)).toBeLessThan(CAT_SUBAGENT_ORBIT.radius / 2);
+    }
+    expect(catSubagentOffset(0, 0).x).toBeCloseTo(CAT_SUBAGENT_ORBIT.radius);
+    expect(catSubagentOffset(90, 0).y).toBeCloseTo(CAT_SUBAGENT_ORBIT.radius);
+  });
+});
+
+describe("createHomeListScrollWatch", () => {
+  it("tells the row when the list moves, and only then", () => {
+    const watch = createHomeListScrollWatch();
+    let calls = 0;
+    const stop = watch.subscribe(() => calls++);
+
+    expect(watch.offset()).toBe(0);
+    watch.note(120);
+    watch.note(120);
+    expect(watch.offset()).toBe(120);
+    expect(calls).toBe(1);
+    stop();
+    watch.note(0);
+    expect(calls).toBe(1);
+    expect(watch.offset()).toBe(0);
   });
 });
 
