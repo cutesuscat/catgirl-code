@@ -1,7 +1,7 @@
 import { Editor, Extension, InputRule, type Extensions } from "@tiptap/core";
 import { closeHistory, redo, undo } from "@tiptap/pm/history";
 import { splitBlock } from "@tiptap/pm/commands";
-import { TextSelection } from "@tiptap/pm/state";
+import { EditorState, TextSelection } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
 import { describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 
@@ -227,6 +227,22 @@ describe("composer list normalization", () => {
       expect(editor.state.doc.textContent).toContain("- ");
     },
   );
+
+  it("drops the pending dash gesture when a draft switch swaps in a shorter document", () => {
+    const editor = createEditor("a first line of twenty six");
+    splitBlock(editor.state, editor.view.dispatch);
+    editor.view.dispatch(editor.state.tr.insertText("- "));
+    expect(editor.state.doc.lastChild?.type.name).toBe("paragraph");
+    // ComposerPromptEditorTiptap swaps drafts this way, keeping the plugin instances.
+    editor.view.updateState(
+      EditorState.create({
+        doc: editor.schema.nodeFromJSON(buildDocJson("hi", () => null)),
+        plugins: editor.state.plugins,
+      }),
+    );
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.atEnd(editor.state.doc)));
+    expect(serializeEditorDoc(editor.state.doc).value).toBe("hi");
+  });
 
   it("waits for a non-composition transaction before changing paragraph structure", () => {
     const editor = createEditor("");

@@ -648,6 +648,9 @@ function parseListPrefix(line: string): { prefix: ListLinePrefix; markerLength: 
 /** Only changed top-level paragraphs can acquire a literal list prefix outside an input rule. */
 function listNormalizationPlugin(isComposing: () => boolean) {
   let pending = new Set<number>();
+  // A draft switch swaps in a new state that reuses this plugin, so positions only hold for
+  // the doc they were last mapped onto. Outside that doc they can point past its end.
+  let pendingDoc: ProseMirrorNode | null = null;
   const key = new PluginKey("composerListNormalization");
   return new Plugin({
     key,
@@ -665,6 +668,7 @@ function listNormalizationPlugin(isComposing: () => boolean) {
       },
     },
     appendTransaction(transactions, oldState, state) {
+      if (oldState.doc !== pendingDoc) pending.clear();
       // Tiptap's undoInputRule (Backspace right after a rule) restores the typed text on purpose.
       const undoesInputRule = oldState.plugins.some(
         (plugin) => plugin.spec.isInputRules && plugin.getState(oldState),
@@ -691,6 +695,7 @@ function listNormalizationPlugin(isComposing: () => boolean) {
         });
       }
       // The next non-composition transaction can normalize after the browser finishes its DOM edits.
+      pendingDoc = state.doc;
       if (isComposing() || transactions.some((tr) => tr.getMeta("composition") != null))
         return null;
 
@@ -757,6 +762,7 @@ function listNormalizationPlugin(isComposing: () => boolean) {
         joinCompatibleLists(tr, pos);
       }
       pending = new Set([...pending].map((pos) => tr.mapping.map(pos, 1)));
+      pendingDoc = tr.doc;
       return tr.docChanged ? tr : null;
     },
   });
