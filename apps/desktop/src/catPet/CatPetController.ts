@@ -747,7 +747,7 @@ export class CatPetController {
           label: pet.displayName,
           type: "radio",
           checked: this.settings.petId === pet.id,
-          click: () => this.updateSettings({ petId: pet.id }),
+          click: () => this.updateSettings({ petId: pet.id, petPicked: true }),
         })),
       },
       {

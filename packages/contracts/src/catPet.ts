@@ -1,9 +1,12 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 
 /** The pets bundled with the app, under `apps/web/public/pets/<id>/`. */
 export const BUILT_IN_CAT_PET_IDS = ["marmalade", "clementine", "cinnamon", "meowtase"] as const;
-const DEFAULT_CAT_PET_ID = "marmalade";
+const DEFAULT_CAT_PET_ID = "meowtase";
+/** Pets that were once the default. Stored but never picked, they follow today's default. */
+const PAST_DEFAULT_CAT_PET_IDS: readonly string[] = ["marmalade"];
 
 export const CatPetSize = Schema.Literals(["small", "medium", "large"]);
 export type CatPetSize = typeof CatPetSize.Type;
@@ -15,7 +18,7 @@ export type CatPetMotion = typeof CatPetMotion.Type;
  * The desktop pet's device settings. `placement: "desktop"` floats over other apps and falls
  * back to a pet inside the app window where it can't (Wayland, the web build).
  */
-export const CatPetSettings = Schema.Struct({
+const CatPetSettingsFields = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   placement: Schema.Literals(["desktop", "in-app"]).pipe(
     Schema.withDecodingDefault(Effect.succeed("desktop" as const)),
@@ -23,6 +26,8 @@ export const CatPetSettings = Schema.Struct({
   petId: Schema.String.check(Schema.isMaxLength(128)).pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_CAT_PET_ID)),
   ),
+  /** She chose `petId` herself; otherwise it follows the default. */
+  petPicked: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   size: CatPetSize.pipe(Schema.withDecodingDefault(Effect.succeed("medium" as const))),
   showWhen: Schema.Literals(["always", "busy"]).pipe(
     Schema.withDecodingDefault(Effect.succeed("always" as const)),
@@ -37,6 +42,25 @@ export const CatPetSettings = Schema.Struct({
   ),
   customPets: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
 });
+
+/**
+ * The desktop pet's device settings (see the fields above). Before `petPicked` existed a
+ * past default was stored like a choice, so one she never marked as picked follows the default.
+ */
+export const CatPetSettings = CatPetSettingsFields.pipe(
+  Schema.decodeTo(
+    Schema.toType(CatPetSettingsFields),
+    SchemaTransformation.transform({
+      decode: (settings) =>
+        settings.petPicked || settings.petId === DEFAULT_CAT_PET_ID
+          ? settings
+          : PAST_DEFAULT_CAT_PET_IDS.includes(settings.petId)
+            ? { ...settings, petId: DEFAULT_CAT_PET_ID }
+            : { ...settings, petPicked: true },
+      encode: (settings) => settings,
+    }),
+  ),
+);
 export type CatPetSettings = typeof CatPetSettings.Type;
 export const DEFAULT_CAT_PET_SETTINGS: CatPetSettings = Schema.decodeSync(CatPetSettings)({});
 

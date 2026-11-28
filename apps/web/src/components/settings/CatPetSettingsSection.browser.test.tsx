@@ -31,6 +31,7 @@ it("turns the pet on and changes its size and bubble titles, keeping the other f
   expect(getClientSettings().catPet).toMatchObject({
     enabled: true,
     size: "large",
-    petId: "marmalade",
+    petId: "meowtase",
+    petPicked: false,
   });
 });

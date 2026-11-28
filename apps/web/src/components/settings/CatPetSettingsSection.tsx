@@ -83,7 +83,7 @@ function PetPicker(props: { readonly settings: CatPetSettings; readonly reduced:
               role="radio"
               aria-checked={selected}
               aria-label={pet.displayName}
-              onClick={() => void updateCatPetSettings({ petId: pet.id })}
+              onClick={() => void updateCatPetSettings({ petId: pet.id, petPicked: true })}
               className={cn(
                 "flex flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-colors",
                 selected ? "border-primary bg-accent" : "border-border hover:bg-accent/50",

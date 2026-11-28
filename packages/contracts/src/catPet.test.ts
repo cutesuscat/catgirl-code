@@ -14,7 +14,8 @@ describe("CatPetSettings", () => {
     expect(DEFAULT_CAT_PET_SETTINGS).toEqual({
       enabled: false,
       placement: "desktop",
-      petId: "marmalade",
+      petId: "meowtase",
+      petPicked: false,
       size: "medium",
       showWhen: "always",
       hideWhenAppFocused: false,
@@ -39,6 +40,23 @@ describe("CatPetSettings", () => {
     expect(decodePatch({ catPet: settings.catPet })).toEqual({
       catPet: settings.catPet,
     });
+  });
+
+  it("gives Meowtase to anyone who never picked a pet, and keeps every pick", () => {
+    // The first build stored its default like a choice.
+    expect(decodePetSettings({ petId: "marmalade" })).toMatchObject({
+      petId: "meowtase",
+      petPicked: false,
+    });
+    expect(decodePetSettings({ petId: "clementine" })).toMatchObject({
+      petId: "clementine",
+      petPicked: true,
+    });
+    expect(decodePetSettings({ petId: "marmalade", petPicked: true })).toMatchObject({
+      petId: "marmalade",
+      petPicked: true,
+    });
+    expect(decodePetSettings({ petId: "meowtase", petPicked: true }).petPicked).toBe(true);
   });
 
   it("rejects values outside the choices", () => {
