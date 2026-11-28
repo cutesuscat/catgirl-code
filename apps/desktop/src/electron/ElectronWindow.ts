@@ -149,6 +149,9 @@ export const make = Effect.gen(function* () {
   const mainWindowRef = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
   const auxiliaryWindows = new WeakSet<Electron.BrowserWindow>();
   const titleBarOverlayWindows = new WeakSet<Electron.BrowserWindow>();
+  // Transparent windows (the cat pet, overlays) must keep a clear background: the theme sync
+  // paints an opaque one, which shows as a solid block behind them on macOS.
+  const transparentWindows = new WeakSet<Electron.BrowserWindow>();
 
   const listWindows = Effect.try({
     try: () => Electron.BrowserWindow.getAllWindows(),
@@ -245,6 +248,7 @@ export const make = Effect.gen(function* () {
         try: () => {
           const window = new Electron.BrowserWindow(options);
           if (behavior?.auxiliary === true) auxiliaryWindows.add(window);
+          if (options.transparent === true) transparentWindows.add(window);
           if (options.titleBarOverlay !== undefined && options.titleBarOverlay !== false) {
             titleBarOverlayWindows.add(window);
           }
@@ -397,7 +401,7 @@ export const make = Effect.gen(function* () {
     ) {
       const windows = yield* listWindows;
       for (const window of windows) {
-        if (yield* isWindowDestroyed(window)) {
+        if (transparentWindows.has(window) || (yield* isWindowDestroyed(window))) {
           continue;
         }
         yield* sync(window, { titleBarOverlay: titleBarOverlayWindows.has(window) });

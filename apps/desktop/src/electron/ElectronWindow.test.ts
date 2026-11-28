@@ -176,6 +176,29 @@ describe("ElectronWindow", () => {
     }).pipe(Effect.provide(layerTestFor("win32"))),
   );
 
+  it.effect("leaves transparent windows out of the appearance sync", () =>
+    Effect.gen(function* () {
+      const opaque = { isDestroyed: () => false };
+      const clear = { isDestroyed: () => false };
+      browserWindowMock
+        .mockImplementationOnce(function OpaqueWindowMock() {
+          return opaque;
+        })
+        .mockImplementationOnce(function ClearWindowMock() {
+          return clear;
+        });
+      const electronWindow = yield* ElectronWindow.ElectronWindow;
+      yield* electronWindow.create({});
+      yield* electronWindow.create({ transparent: true, backgroundColor: "#00000000" });
+      getAllWindowsMock.mockReturnValue([opaque, clear]);
+
+      const seen: Array<unknown> = [];
+      yield* electronWindow.syncAllAppearance((window) => Effect.sync(() => seen.push(window)));
+
+      assert.deepEqual(seen, [opaque]);
+    }).pipe(Effect.provide(layerTestFor("darwin"))),
+  );
+
   it.effect("preserves destroy failures and continues with later windows", () =>
     Effect.gen(function* () {
       const cause = new Error("window destroy failed");
