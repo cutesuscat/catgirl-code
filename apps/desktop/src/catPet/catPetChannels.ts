@@ -55,6 +55,10 @@ export interface CatPetRenderMessage {
     readonly panel: { readonly x: number; readonly y: number; readonly above: boolean } | null;
   };
   readonly panel: CatPetPanel;
+  /** Her right-click menu is open: she shows fully. */
+  readonly menuOpen: boolean;
+  /** 0.01 to 1 while nothing draws her attention; the page shows her fully when something does. */
+  readonly opacity: number;
   /** macOS and Windows forward mouse moves over transparent pixels; Linux does not. */
   readonly clickThrough: boolean;
 }

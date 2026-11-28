@@ -13,7 +13,7 @@ export function catPetPageHtml(): string {
 html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
 body { color: var(--text); font: 12px/16px -apple-system, BlinkMacSystemFont, "Segoe UI", Ubuntu, sans-serif;
   user-select: none; -webkit-user-select: none; }
-#pet { position: absolute; cursor: pointer; touch-action: none; }
+#pet { position: absolute; cursor: pointer; touch-action: none; transition: opacity 180ms ease-out; }
 #pet.held { cursor: grabbing; }
 #sprite { position: absolute; inset: 0; overflow: hidden; }
 #sheet { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; will-change: transform; }

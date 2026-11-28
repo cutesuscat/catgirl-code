@@ -8,8 +8,21 @@ const DEFAULT_CAT_PET_ID = "meowtase";
 /** Pets that were once the default. Stored but never picked, they follow today's default. */
 const PAST_DEFAULT_CAT_PET_IDS: readonly string[] = ["marmalade"];
 
-export const CatPetSize = Schema.Literals(["small", "medium", "large"]);
+/** The size slider's stops, smallest first. */
+export const CAT_PET_SIZES = ["xs", "s", "m", "l", "xl"] as const;
+export const CatPetSize = Schema.Literals(CAT_PET_SIZES);
 export type CatPetSize = typeof CatPetSize.Type;
+
+const LegacyCatPetSize = Schema.Literals(["small", "medium", "large"]).pipe(
+  Schema.decodeTo(
+    CatPetSize,
+    SchemaTransformation.transform({
+      decode: (size): CatPetSize => (size === "small" ? "s" : size === "large" ? "l" : "m"),
+      encode: (size) =>
+        size === "xs" || size === "s" ? "small" : size === "m" ? "medium" : "large",
+    }),
+  ),
+);
 
 export const CatPetMotion = Schema.Literals(["system", "reduced", "full"]);
 export type CatPetMotion = typeof CatPetMotion.Type;
@@ -28,7 +41,14 @@ const CatPetSettingsFields = Schema.Struct({
   ),
   /** She chose `petId` herself; otherwise it follows the default. */
   petPicked: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
-  size: CatPetSize.pipe(Schema.withDecodingDefault(Effect.succeed("medium" as const))),
+  // The first build stored small, medium and large: they become s, m and l.
+  size: Schema.Union([CatPetSize, LegacyCatPetSize]).pipe(
+    Schema.withDecodingDefault(Effect.succeed("m" as const)),
+  ),
+  /** Percent, 1 to 100, while nothing draws her attention; hovering or an alert shows her fully. */
+  opacity: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })).pipe(
+    Schema.withDecodingDefault(Effect.succeed(100)),
+  ),
   showWhen: Schema.Literals(["always", "busy"]).pipe(
     Schema.withDecodingDefault(Effect.succeed("always" as const)),
   ),

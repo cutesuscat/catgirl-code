@@ -317,13 +317,25 @@ export class CatPetPlayer {
   }
 }
 
-/** Pixel art stays crisp at whole multiples of its 1x size; vector pets use the usual sizes. */
+/** The size slider's stops in words, for menus and screen readers. */
+export const CAT_PET_SIZE_LABELS = {
+  xs: "Extra small",
+  s: "Small",
+  m: "Medium",
+  l: "Large",
+  xl: "Extra large",
+} as const;
+
+const VECTOR_WIDTHS = { xs: 64, s: 96, m: 128, l: 192, xl: 256 } as const;
+// Pixel pets only take whole multiples of their 96 px art, so XS and S share 1x.
+const PIXEL_WIDTHS = { xs: 96, s: 96, m: 192, l: 288, xl: 384 } as const;
+
+/** The pet's width in CSS pixels at a size-slider stop. Pixel art stays crisp at any DPR. */
 export function catPetDisplayWidth(
-  size: "small" | "medium" | "large",
+  size: keyof typeof VECTOR_WIDTHS,
   imageRendering: CatPetSpec["imageRendering"],
 ): number {
-  if (imageRendering === "pixelated") return size === "small" ? 96 : size === "medium" ? 192 : 288;
-  return size === "small" ? 96 : size === "medium" ? 128 : 192;
+  return (imageRendering === "pixelated" ? PIXEL_WIDTHS : VECTOR_WIDTHS)[size];
 }
 
 export interface CatPetSummaryInput {

@@ -5,6 +5,7 @@ import { CatPetSettings, CatPetSnapshot, DEFAULT_CAT_PET_SETTINGS } from "./catP
 import { ClientSettingsPatch, ClientSettingsSchema, DEFAULT_CLIENT_SETTINGS } from "./settings.ts";
 
 const decodeClientSettings = Schema.decodeSync(ClientSettingsSchema);
+const encodeClientSettings = Schema.encodeSync(ClientSettingsSchema);
 const decodePatch = Schema.decodeSync(ClientSettingsPatch);
 const decodePetSettings = Schema.decodeUnknownSync(CatPetSettings);
 const decodeSnapshot = Schema.decodeUnknownSync(CatPetSnapshot);
@@ -16,7 +17,8 @@ describe("CatPetSettings", () => {
       placement: "desktop",
       petId: "meowtase",
       petPicked: false,
-      size: "medium",
+      size: "m",
+      opacity: 100,
       showWhen: "always",
       hideWhenAppFocused: false,
       overFullScreen: false,
@@ -57,6 +59,24 @@ describe("CatPetSettings", () => {
       petPicked: true,
     });
     expect(decodePetSettings({ petId: "meowtase", petPicked: true }).petPicked).toBe(true);
+  });
+
+  it("moves the first build's sizes onto the slider's stops and saves the new ones", () => {
+    expect(decodePetSettings({ size: "small" }).size).toBe("s");
+    expect(decodePetSettings({ size: "medium" }).size).toBe("m");
+    expect(decodePetSettings({ size: "large" }).size).toBe("l");
+    for (const size of ["xs", "s", "m", "l", "xl"]) {
+      expect(decodePetSettings({ size }).size).toBe(size);
+    }
+    const stored = encodeClientSettings(decodeClientSettings({ catPet: { size: "large" } }));
+    expect(stored.catPet).toMatchObject({ size: "l" });
+  });
+
+  it("keeps opacity a whole percent from 1 to 100", () => {
+    expect(decodePetSettings({ opacity: 1 }).opacity).toBe(1);
+    expect(() => decodePetSettings({ opacity: 0 })).toThrow();
+    expect(() => decodePetSettings({ opacity: 101 })).toThrow();
+    expect(() => decodePetSettings({ opacity: 50.5 })).toThrow();
   });
 
   it("rejects values outside the choices", () => {
