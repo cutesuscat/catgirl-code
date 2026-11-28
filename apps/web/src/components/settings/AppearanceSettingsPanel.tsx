@@ -39,6 +39,7 @@ import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { TypographySection } from "./TypographySettings";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
 import { CatFleetSettingsRow } from "./CatFleetSettingsRow";
+import { CatPetSettingsSection } from "./CatPetSettingsSection";
 
 const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
   artwork: msg("Artwork"),
@@ -545,6 +546,8 @@ export function AppearanceSettingsPanel() {
           />
         </AdvancedSettings>
       </SettingsSection>
+
+      <CatPetSettingsSection />
 
       <TypographySection />
     </SettingsPageContainer>

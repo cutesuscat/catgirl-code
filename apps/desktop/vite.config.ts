@@ -182,6 +182,16 @@ export default defineConfig({
       outExtensions: () => ({ js: ".cjs" }),
       entry: ["src/mac-permission-preload.ts"],
     },
+    {
+      // The pet window's page logic; sandboxed, so its shared code is bundled in.
+      format: "cjs",
+      outDir: "dist-electron",
+      dts: false,
+      sourcemap: true,
+      outExtensions: () => ({ js: ".cjs" }),
+      entry: ["src/cat-pet-preload.ts"],
+      deps: { alwaysBundle: (id) => id === "@t3tools/shared/catPetSprite" },
+    },
   ]),
   test: {
     // The Windows lane runs workspace suites concurrently; filesystem-heavy
