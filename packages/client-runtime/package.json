@@ -263,6 +263,10 @@
       "types": "./src/state/catFleet.ts",
       "default": "./src/state/catFleet.ts"
     },
+    "./state/cat-pet": {
+      "types": "./src/state/catPet.ts",
+      "default": "./src/state/catPet.ts"
+    },
     "./state/entities": {
       "types": "./src/state/entities.ts",
       "default": "./src/state/entities.ts"
