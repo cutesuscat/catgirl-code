@@ -1,0 +1,59 @@
+{
+  "id": "cinnamon",
+  "displayName": "Cinnamon",
+  "description": "Navy-striped baby tee with a cat patch, cuffed light-wash jorts, heart choker, white socks, chunky black boots. Long hair.",
+  "catgirl": {
+    "version": 1,
+    "sheetPath": "sheet.webp",
+    "cell": {
+      "width": 192,
+      "height": 208
+    },
+    "imageRendering": "auto",
+    "animations": {
+      "idle": {
+        "row": 0,
+        "frames": 6,
+        "durations": [900, 130, 500, 500, 260, 500],
+        "stillFrame": 0
+      },
+      "working": {
+        "row": 1,
+        "frames": 6,
+        "durations": [120, 120, 120, 120, 120, 120]
+      },
+      "needs-you": {
+        "row": 2,
+        "frames": 6,
+        "durations": [140, 140, 140, 140, 140, 260]
+      },
+      "done": {
+        "row": 3,
+        "frames": 6,
+        "durations": [130, 110, 150, 120, 130, 320]
+      },
+      "error": {
+        "row": 4,
+        "frames": 8,
+        "durations": [140, 90, 90, 120, 200, 220, 260, 520]
+      },
+      "limited": {
+        "row": 5,
+        "frames": 6,
+        "durations": [650, 650, 650, 900, 650, 650],
+        "stillFrame": 0
+      },
+      "sleeping": {
+        "row": 6,
+        "frames": 6,
+        "durations": [420, 420, 420, 420, 420, 420],
+        "stillFrame": 0
+      },
+      "held": {
+        "row": 7,
+        "frames": 8,
+        "durations": [120, 120, 120, 120, 120, 120, 120, 120]
+      }
+    }
+  }
+}

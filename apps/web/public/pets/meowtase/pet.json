@@ -1,0 +1,59 @@
+{
+  "id": "meowtase",
+  "displayName": "Meowtase",
+  "description": "catgirlcluster.org's orange catgirl in pixel art: short-sleeved dark top, pleated denim jorts with a frayed hem, socks, Mary Janes.",
+  "catgirl": {
+    "version": 1,
+    "sheetPath": "sheet.webp",
+    "cell": {
+      "width": 192,
+      "height": 208
+    },
+    "imageRendering": "pixelated",
+    "animations": {
+      "idle": {
+        "row": 0,
+        "frames": 4,
+        "durations": [900, 150, 600, 800],
+        "stillFrame": 0
+      },
+      "working": {
+        "row": 1,
+        "frames": 4,
+        "durations": [180, 180, 180, 180]
+      },
+      "needs-you": {
+        "row": 2,
+        "frames": 4,
+        "durations": [200, 200, 200, 300]
+      },
+      "done": {
+        "row": 3,
+        "frames": 5,
+        "durations": [160, 140, 200, 140, 360]
+      },
+      "error": {
+        "row": 4,
+        "frames": 6,
+        "durations": [160, 110, 110, 300, 300, 500]
+      },
+      "limited": {
+        "row": 5,
+        "frames": 4,
+        "durations": [700, 700, 300, 700],
+        "stillFrame": 0
+      },
+      "sleeping": {
+        "row": 6,
+        "frames": 4,
+        "durations": [520, 520, 520, 520],
+        "stillFrame": 0
+      },
+      "held": {
+        "row": 7,
+        "frames": 4,
+        "durations": [170, 170, 170, 170]
+      }
+    }
+  }
+}
