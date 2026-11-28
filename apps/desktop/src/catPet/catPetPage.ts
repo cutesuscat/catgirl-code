@@ -18,8 +18,8 @@ body { color: var(--text); font: 12px/16px -apple-system, BlinkMacSystemFont, "S
 #sprite { position: absolute; inset: 0; overflow: hidden; }
 #sheet { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; will-change: transform; }
 #sheet.pixelated { image-rendering: pixelated; }
-#pet.dim #sheet { opacity: 0.72; filter: saturate(0.7); }
-#z { position: absolute; right: 18%; top: 8%; font: 700 15px/1 ui-rounded, sans-serif; color: var(--muted);
+#pet.dim #sheet { opacity: 0.8; }
+#z { position: absolute; left: 62%; top: 0; font: 700 20px/1 ui-rounded, sans-serif; color: var(--muted);
   display: none; }
 #pet.dim #z { display: block; }
 #dot { position: absolute; right: 14%; top: 10%; width: 10px; height: 10px; border-radius: 50%;
@@ -32,6 +32,7 @@ body { color: var(--text); font: 12px/16px -apple-system, BlinkMacSystemFont, "S
 #panel { position: absolute; width: 280px; padding: 10px 10px 8px; border: 1px solid var(--line); border-radius: 14px;
   background: var(--base); box-shadow: 0 6px 22px rgba(40, 20, 10, 0.18); display: none; }
 body.bubble #panel, body.tray #panel { display: block; }
+#panel:focus { outline: none; }
 #panel h1 { margin: 0 0 6px; font-size: 12px; font-weight: 650; }
 #panel .sub { color: var(--muted); }
 .rows { margin: 4px 0 0; padding: 0; list-style: none; }

@@ -230,8 +230,10 @@ export class CatPetController {
   }
 
   setDebug(override: CatPetDebugOverride): void {
+    const hadPanel = this.debug.panel !== undefined;
     this.debug = override;
     if (override.panel !== undefined) this.panel = override.panel;
+    else if (hadPanel) this.panel = "none";
     this.update();
   }
 
@@ -494,7 +496,9 @@ export class CatPetController {
         fullscreenable: false,
         skipTaskbar: true,
         alwaysOnTop: true,
-        ...(mac ? { type: "panel" } : { focusable: false }),
+        // Linux has no setFocusable, so its window stays focusable for the tray's keys; it is
+        // still only ever shown inactive.
+        ...(mac ? { type: "panel" } : this.deps.platform === "win32" ? { focusable: false } : {}),
         webPreferences: {
           preload: this.deps.preloadPath,
           sandbox: true,
@@ -633,11 +637,13 @@ export class CatPetController {
     if (this.debug.panel !== undefined) return;
     if (panel === this.panel) return;
     const window = this.window;
-    const focusable = this.deps.platform !== "darwin" && window !== null && !window.isDestroyed();
+    const focusable = this.deps.platform === "win32" && window !== null && !window.isDestroyed();
     if (panel === "tray" && window !== null && !window.isDestroyed()) {
       if (focusable) window.setFocusable(true);
       this.panel = panel;
       this.render();
+      // The tray takes keys (arrows, Esc); show() activates where focus() alone is refused.
+      window.show();
       window.focus();
       return;
     }
