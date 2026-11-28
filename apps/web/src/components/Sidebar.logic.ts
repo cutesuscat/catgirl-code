@@ -200,7 +200,7 @@ export const animateSidebarLayoutChanges: AnimateLayoutChanges = (args) =>
 
 export type SidebarSection = "pinned" | "active" | "working" | "snoozed" | "settled";
 
-export function resolveSidebarThreadSection(input: {
+function resolveSidebarThreadSection(input: {
   readonly snoozed: boolean;
   readonly settled: boolean;
   readonly pinned: boolean;
@@ -209,6 +209,18 @@ export function resolveSidebarThreadSection(input: {
   if (input.settled) return "settled";
   if (input.pinned) return "pinned";
   return "active";
+}
+
+/** A listed thread's section. Until its server config loads it can't be snoozed or settled. */
+export function resolveSidebarShellSection(
+  thread: ThreadSnoozeShell & Pick<SidebarThreadSummary, "settledOverride" | "pinnedAt">,
+  input: { readonly now: string; readonly configLoaded: boolean },
+): SidebarSection {
+  return resolveSidebarThreadSection({
+    snoozed: input.configLoaded && effectiveSnoozed(thread, { now: input.now }),
+    settled: input.configLoaded && thread.settledOverride === "settled",
+    pinned: thread.pinnedAt != null,
+  });
 }
 
 const SIDEBAR_MARKER_PREFIX = "sidebar-marker-";

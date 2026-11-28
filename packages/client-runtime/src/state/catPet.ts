@@ -15,7 +15,6 @@ export interface CatPetThreadState {
   /** How the latest run ended, null while it runs or when its ending doesn't count. */
   readonly runStatus: string | null;
   readonly activeRunId: string | null;
-  readonly snoozed: boolean;
 }
 
 export interface CatPetEnvironment {
@@ -84,6 +83,7 @@ function earliestLimit(limits: readonly CatPetUsageLimit[]): CatPetUsageLimit | 
  * The pet's one mood over every thread on every machine, most urgent first:
  * needs-you > limited > error > working > idle > sleeping. `done` is edge-triggered through
  * `celebrateSeq`; first sightings and reconnects only set a baseline, as the announcer does.
+ * The caller passes only the threads the sidebar shows, so a thread coming back is a first sighting.
  */
 export function summarizeCatPet<T extends FleetThread>(input: {
   readonly memory: CatPetMemory;
@@ -152,17 +152,13 @@ export function summarizeCatPet<T extends FleetThread>(input: {
         kind,
         order,
       });
-    const quiet = state.snoozed;
-    if (
-      !quiet &&
-      (state.status === "approval" || state.status === "input" || state.status === "request")
-    ) {
+    if (state.status === "approval" || state.status === "input" || state.status === "request") {
       needsYou += 1;
       entry(state.status);
-    } else if (!quiet && state.status === "limited" && state.failureUnseen) {
+    } else if (state.status === "limited" && state.failureUnseen) {
       limited += 1;
       entry("limited");
-    } else if (!quiet && state.status === "failed" && state.failureUnseen) {
+    } else if (state.status === "failed" && state.failureUnseen) {
       failed += 1;
       entry("failed");
     } else if (input.isWorking(thread)) {
